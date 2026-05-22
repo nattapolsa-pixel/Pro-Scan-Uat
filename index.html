@@ -326,6 +326,8 @@
 
     <script>
         const backendApiUrl = 'https://dc-scanner-api.onrender.com';
+        // 💡 เพิ่มบรรทัดนี้กลับมา เพื่อให้ระบบ Login ตรวจรหัสพนักงานได้
+        const employeeApiUrl = 'https://script.google.com/macros/s/AKfycbybmW6N7TxfsHqEa-Fx6ayy8M8xfjKGmTYO27izmbEoLJmQRrFD3i9c0XogP0fG6tlG/exec';
 
         let loggedInEmpId = ""; let loggedInEmpName = ""; let currentWave = ""; let allLpnsInWave = []; 
         let isAlertOpen = false; let selectedBranchCode = ""; let selectedBranchName = "";
@@ -344,8 +346,8 @@
                 html5QrcodeScanner = new Html5QrcodeScanner(
                     "reader", 
                     { 
-                        fps: 15, // 💡 เร่งความเร็วการอ่านภาพ
-                        qrbox: { width: 300, height: 100 }, // 💡 เปลี่ยนกรอบเป็นทรงผืนผ้าแนวยาว เหมาะกับ LPN
+                        fps: 15, 
+                        qrbox: { width: 300, height: 100 }, 
                         aspectRatio: 1.0,
                         videoConstraints: { 
                             facingMode: "environment"
@@ -391,7 +393,13 @@
             while(syncQueue.length > 0) {
                 const payload = syncQueue[0];
                 try {
-                    const res = await fetch(backendApiUrl + '/api/scan', { method: 'POST', body: JSON.stringify(payload) });
+                    // 💡 แก้ไข: แนบ Headers ให้ FastAPI ยอมรับข้อมูล
+                    const res = await fetch(backendApiUrl + '/api/scan', { 
+                        method: 'POST', 
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload) 
+                    });
+                    
                     if(res.ok) { 
                         syncQueue.shift(); 
                         localStorage.setItem('proScannerQueue', JSON.stringify(syncQueue)); 
@@ -602,30 +610,8 @@
                     }
                 });
                 
-                try {
-                    const bufferRes = await fetch(`${bufferApiUrl}?wave_no=${encodeURIComponent(waveNo)}`);
-                    const bufferData = await bufferRes.json();
-                    if (bufferData.success && bufferData.scanned_list) {
-                        bufferData.scanned_list.forEach(bItem => {
-                            const found = allLpnsInWave.find(item => item.lpn === bItem.lpn);
-                            if (found) { 
-                                found.status = 'Scanned'; found.qty = bItem.qty; 
-                                
-                                if (bItem.type && bItem.type.startsWith('COMBINE: ')) {
-                                    const masterLpn = bItem.type.replace('COMBINE: ', '').trim();
-                                    found.combinedWith = masterLpn; 
-                                    
-                                    const foundMaster = allLpnsInWave.find(item => item.lpn === masterLpn);
-                                    if (foundMaster) { 
-                                        foundMaster.status = 'Scanned'; 
-                                        foundMaster.isMaster = true; 
-                                        foundMaster.childCount = (foundMaster.childCount || 0) + 1;
-                                    }
-                                }
-                            }
-                        });
-                    }
-                } catch (err) {}
+                // 💡 นำโค้ดดึงบัฟเฟอร์แบบเก่าออกไปแล้ว เพราะ Python ดึงข้อมูลสถานะล่าสุดทั้งหมดมาให้ตั้งแต่รอบแรกแล้ว
+                
                 renderBranchGrid(); document.getElementById('waveSelectorModal').classList.add('hidden'); document.getElementById('branchWaveDisplay').innerText = currentWave;
                 document.getElementById('branchSelectorModal').classList.remove('hidden'); document.getElementById('branchSelectorModal').classList.add('flex');
             } catch (e) { showAlert('ข้อผิดพลาดเครือข่าย', "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้"); } finally { hideLoading(); }
