@@ -539,7 +539,7 @@
             const tbody = document.getElementById('pendingWaveTableBody');
             tbody.innerHTML = '<tr><td colspan="2" class="p-4 text-center text-sm text-gray-500 font-bold animate-pulse">กำลังตรวจสอบข้อมูล...</td></tr>';
             try {
-                const res = await fetch('/api/pending-waves');
+                const res = await fetch('https://script.google.com/macros/s/AKfycbxUQXWPNoNLhT92Hmj0VDwn1UX6W0u7JInd6n6VJVKD2ReEqsuaNpqUWwHSlqLNi40z/exec/exec?action=pending-waves');
                 if (!res.ok) throw new Error('API Error');
                 const data = await res.json();
                 
@@ -573,7 +573,7 @@
             if (!waveNo) return;
             showLoading(); 
             try {
-                const res = await fetch(`/api/check-wave?wave_no=${waveNo}`);
+                const res = await fetch(`https://script.google.com/macros/s/AKfycbxUQXWPNoNLhT92Hmj0VDwn1UX6W0u7JInd6n6VJVKD2ReEqsuaNpqUWwHSlqLNi40z/exec/exec?action=check-wave&wave_no=${waveNo}`);
                 if (!res.ok) { showAlert('ข้อผิดพลาด', `ไม่พบข้อมูลรหัส Wave\n[${waveNo}]`); document.getElementById('waveInput').value = ''; return; }
                 const data = await res.json(); currentWave = data.wave_no; allLpnsInWave = data.lpn_list; 
                 
@@ -797,7 +797,7 @@
             (async () => { 
                 let waitCnt = 0; while(syncQueue.length > 0 && waitCnt < 120) { await new Promise(r => setTimeout(r, 1000)); waitCnt++; } 
                 try { 
-                    await fetch('/api/close-job', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ wave: waveToClose, branch: branchCodeToClose, emp_id: loggedInEmpId }) }); 
+                    await fetch('https://script.google.com/macros/s/AKfycbxUQXWPNoNLhT92Hmj0VDwn1UX6W0u7JInd6n6VJVKD2ReEqsuaNpqUWwHSlqLNi40z/exec/exec?action=close-job', { method: 'POST', body: JSON.stringify({ wave: waveToClose, branch: branchCodeToClose, emp_id: loggedInEmpId }) });
                     
                     // 💡 แสดงหน้าต่าง Success 
                     showAlert('ดำเนินการสำเร็จ', `บังคับปิดงานสาขา ${branchCodeToClose} เสร็จสมบูรณ์`, 'border-green-600', true); 
@@ -816,7 +816,7 @@
             (async () => { 
                 let waitCnt = 0; while(syncQueue.length > 0 && waitCnt < 120) { await new Promise(r => setTimeout(r, 1000)); waitCnt++; } 
                 try { 
-                    const res = await fetch('/api/close-job', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ wave: waveToClose, branch: branchCodeToClose, emp_id: loggedInEmpId }) }); 
+                    const res = await fetch('https://script.google.com/macros/s/AKfycbxUQXWPNoNLhT92Hmj0VDwn1UX6W0u7JInd6n6VJVKD2ReEqsuaNpqUWwHSlqLNi40z/exec/exec?action=close-job', { method: 'POST', body: JSON.stringify({ wave: waveToClose, branch: branchCodeToClose, emp_id: loggedInEmpId }) }); 
                     if(res.ok) { 
                         // 💡 แสดงหน้าต่าง Success 
                         showAlert('ดำเนินการสำเร็จ', `ปิดยอดสาขา ${branchCodeToClose} เรียบร้อยแล้ว\nกำลังพิมพ์ใบสรุป...`, 'border-green-600', true); 
