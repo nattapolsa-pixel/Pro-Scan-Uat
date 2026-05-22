@@ -393,14 +393,14 @@
             while(syncQueue.length > 0) {
                 const payload = syncQueue[0];
                 try {
-                    // 💡 แก้ไข: แนบ Headers ให้ FastAPI ยอมรับข้อมูล
                     const res = await fetch(backendApiUrl + '/api/scan', { 
                         method: 'POST', 
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload) 
                     });
                     
-                    if(res.ok) { 
+                    // 💡 แก้ไขจุดนี้: ถ้าส่งผ่าน (res.ok) หรือ เจอข้อมูลเก่าที่พัง (422) ให้ดึงทิ้งออกจากคิวไปเลย ระบบจะได้ไม่ค้าง
+                    if(res.ok || res.status === 422) { 
                         syncQueue.shift(); 
                         localStorage.setItem('proScannerQueue', JSON.stringify(syncQueue)); 
                         updateSyncStatusUI(); 
