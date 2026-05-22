@@ -340,15 +340,16 @@
             currentScanTargetId = targetInputId;
             document.getElementById('scannerModal').classList.remove('hidden');
             
-            // 💡 แก้ไขการทำงานของกล้องที่นี่: เพิ่ม videoConstraints เพื่อบังคับใช้กล้องหลังเสมอ
             if (!html5QrcodeScanner) {
                 html5QrcodeScanner = new Html5QrcodeScanner(
                     "reader", 
                     { 
-                        fps: 10, 
-                        qrbox: {width: 250, height: 150}, 
+                        fps: 15, // 💡 เร่งความเร็วการอ่านภาพ
+                        qrbox: { width: 300, height: 100 }, // 💡 เปลี่ยนกรอบเป็นทรงผืนผ้าแนวยาว เหมาะกับ LPN
                         aspectRatio: 1.0,
-                        videoConstraints: { facingMode: "environment" } // <--- บังคับเปิดกล้องหลังมือถือ
+                        videoConstraints: { 
+                            facingMode: "environment"
+                        } 
                     }, 
                     false
                 );
