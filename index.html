@@ -36,6 +36,10 @@
             overflow-y: auto;
             padding-bottom: 20px;
         }
+
+        /* 💡 แก้ไขปัญหากล้องหน้าจอดำบนมือถือ */
+        #reader { border: none !important; width: 100%; background: #ffffff; }
+        #reader video { width: 100% !important; object-fit: cover; border-radius: 0.5rem; }
     </style>
 </head>
 <body class="bg-gray-100 h-screen flex flex-col font-sans overflow-hidden">
@@ -58,7 +62,7 @@
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg> ปิด
                 </button>
             </div>
-            <div id="reader" class="w-full bg-black"></div>
+            <div id="reader" class="w-full"></div>
         </div>
     </div>
 
@@ -321,8 +325,7 @@
     </div>
 
     <script>
-        const employeeApiUrl = 'https://script.google.com/macros/s/AKfycbybmW6N7TxfsHqEa-Fx6ayy8M8xfjKGmTYO27izmbEoLJmQRrFD3i9c0XogP0fG6tlG/exec';
-        const bufferApiUrl = 'https://script.google.com/macros/s/AKfycbxUQXWPNoNLhT92Hmj0VDwn1UX6W0u7JInd6n6VJVKD2ReEqsuaNpqUWwHSlqLNi40z/exec';
+        const backendApiUrl = 'https://dc-scanner-api.onrender.com';
 
         let loggedInEmpId = ""; let loggedInEmpName = ""; let currentWave = ""; let allLpnsInWave = []; 
         let isAlertOpen = false; let selectedBranchCode = ""; let selectedBranchName = "";
@@ -337,10 +340,16 @@
             currentScanTargetId = targetInputId;
             document.getElementById('scannerModal').classList.remove('hidden');
             
+            // 💡 แก้ไขการทำงานของกล้องที่นี่: เพิ่ม videoConstraints เพื่อบังคับใช้กล้องหลังเสมอ
             if (!html5QrcodeScanner) {
                 html5QrcodeScanner = new Html5QrcodeScanner(
                     "reader", 
-                    { fps: 10, qrbox: {width: 250, height: 150}, aspectRatio: 1.0 }, 
+                    { 
+                        fps: 10, 
+                        qrbox: {width: 250, height: 150}, 
+                        aspectRatio: 1.0,
+                        videoConstraints: { facingMode: "environment" } // <--- บังคับเปิดกล้องหลังมือถือ
+                    }, 
                     false
                 );
             }
@@ -539,7 +548,7 @@
             const tbody = document.getElementById('pendingWaveTableBody');
             tbody.innerHTML = '<tr><td colspan="2" class="p-4 text-center text-sm text-gray-500 font-bold animate-pulse">กำลังตรวจสอบข้อมูล...</td></tr>';
             try {
-                const res = await fetch('/api/pending-waves');
+                const res = await fetch(backendApiUrl + '/api/pending-waves');
                 if (!res.ok) throw new Error('API Error');
                 const data = await res.json();
                 
@@ -573,7 +582,7 @@
             if (!waveNo) return;
             showLoading(); 
             try {
-                const res = await fetch(`/api/check-wave?wave_no=${waveNo}`);
+                const res = await fetch(backendApiUrl + `/api/check-wave?wave_no=${waveNo}`);
                 if (!res.ok) { showAlert('ข้อผิดพลาด', `ไม่พบข้อมูลรหัส Wave\n[${waveNo}]`); document.getElementById('waveInput').value = ''; return; }
                 const data = await res.json(); currentWave = data.wave_no; allLpnsInWave = data.lpn_list; 
                 
@@ -797,7 +806,7 @@
             (async () => { 
                 let waitCnt = 0; while(syncQueue.length > 0 && waitCnt < 120) { await new Promise(r => setTimeout(r, 1000)); waitCnt++; } 
                 try { 
-                    await fetch('/api/close-job', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ wave: waveToClose, branch: branchCodeToClose, emp_id: loggedInEmpId }) }); 
+                    await fetch(backendApiUrl + '/api/close-job', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ wave: waveToClose, branch: branchCodeToClose, emp_id: loggedInEmpId }) }); 
                     
                     // 💡 แสดงหน้าต่าง Success 
                     showAlert('ดำเนินการสำเร็จ', `บังคับปิดงานสาขา ${branchCodeToClose} เสร็จสมบูรณ์`, 'border-green-600', true); 
@@ -816,7 +825,7 @@
             (async () => { 
                 let waitCnt = 0; while(syncQueue.length > 0 && waitCnt < 120) { await new Promise(r => setTimeout(r, 1000)); waitCnt++; } 
                 try { 
-                    const res = await fetch('/api/close-job', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ wave: waveToClose, branch: branchCodeToClose, emp_id: loggedInEmpId }) }); 
+                    const res = await fetch(backendApiUrl + '/api/close-job', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ wave: waveToClose, branch: branchCodeToClose, emp_id: loggedInEmpId }) }); 
                     if(res.ok) { 
                         // 💡 แสดงหน้าต่าง Success 
                         showAlert('ดำเนินการสำเร็จ', `ปิดยอดสาขา ${branchCodeToClose} เรียบร้อยแล้ว\nกำลังพิมพ์ใบสรุป...`, 'border-green-600', true); 
