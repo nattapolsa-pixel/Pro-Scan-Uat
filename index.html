@@ -828,20 +828,35 @@
 
         // ==================== COMBINE LOGIC ====================
         const masterInput = document.getElementById('masterInput'); const childInput = document.getElementById('childInput'); const childList = document.getElementById('childList'); let childLpns = [];
-        masterInput.addEventListener('keypress', (e) => { if (e.key === 'Enter' && e.target.value.trim() !== "" && !isAlertOpen) { childInput.disabled = false; childInput.classList.remove('bg-gray-100'); childInput.classList.add('bg-white'); const cBtn = document.getElementById('childScanBtn'); cBtn.disabled = false; cBtn.classList.replace('bg-gray-400', 'bg-purple-800'); cBtn.classList.add('hover:bg-purple-900'); childInput.focus(); } });
-        
-        childInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter' && e.target.value.trim() !== "" && !isAlertOpen) {
-                const lpn = e.target.value.trim().toUpperCase(); const master = masterInput.value.trim().toUpperCase(); const foundItem = allLpnsInWave.find(item => item.lpn === lpn);
-                if(!foundItem) { showAlert('ข้อผิดพลาด', `ไม่มีข้อมูล LPN รหัส\n[${lpn}]\nในรอบ Wave นี้`); } 
-                else if (foundItem.branch !== selectedBranchCode) { showAlert('รหัสสาขาไม่ตรงกัน', `บาร์โค้ด ${lpn} เป็นของสาขา [${foundItem.branch}]`); } 
-                else if (lpn === master) { showAlert('ข้อมูลไม่ถูกต้อง', `กล่องสินค้า ต้องไม่เป็นหมายเลขเดียวกับพาเลทหลัก`); } 
-                else if (foundItem.status === 'Scanned' && !foundItem.combinedWith) { showAlert('ข้อมูลซ้ำซ้อน', `กล่อง ${lpn} ถูกตรวจสอบเดี่ยวเสร็จสิ้นไปแล้ว ไม่สามารถนำมารวมกล่อง/พาเลทได้`); }
-                else if (childLpns.includes(lpn)) { showAlert('ข้อมูลซ้ำซ้อน', `สแกนบาร์โค้ดซ้ำ`, 'border-yellow-500'); } 
-                else { childLpns.push(lpn); updateChildUI(); }
-                childInput.value = '';
-            }
-        });
+        // ✅ แก้แล้ว — เช็คก่อนว่ามีใน Wave และยังไม่ถูกสแกนแบบเดี่ยว
+masterInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter' && e.target.value.trim() !== "" && !isAlertOpen) {
+        const masterLpn = e.target.value.trim().toUpperCase();
+        const foundMaster = allLpnsInWave.find(item => item.lpn === masterLpn);
+
+        if (!foundMaster) {
+            showAlert('ข้อผิดพลาด', `ไม่มีข้อมูล LPN รหัส\n[${masterLpn}]\nในรอบ Wave นี้`);
+            masterInput.value = ''; return;
+        }
+        if (foundMaster.branch !== selectedBranchCode) {
+            showAlert('รหัสสาขาไม่ตรงกัน', `พาเลท ${masterLpn} เป็นของสาขา [${foundMaster.branch}]`);
+            masterInput.value = ''; return;
+        }
+        if (foundMaster.status === 'Scanned' && !foundMaster.isMaster) {
+            showAlert('ไม่สามารถใช้งานได้', `[${masterLpn}] ถูกตรวจสอบเดี่ยวไปแล้ว\nไม่สามารถใช้เป็นพาเลทหลักได้`);
+            masterInput.value = ''; return;
+        }
+
+        childInput.disabled = false;
+        childInput.classList.remove('bg-gray-100');
+        childInput.classList.add('bg-white');
+        const cBtn = document.getElementById('childScanBtn');
+        cBtn.disabled = false;
+        cBtn.classList.replace('bg-gray-400', 'bg-purple-800');
+        cBtn.classList.add('hover:bg-purple-900');
+        childInput.focus();
+    }
+});
         function updateChildUI() { childList.innerHTML = childLpns.map(lpn => `<li class="bg-white p-2 rounded shadow-sm border text-sm flex justify-between"><b>${lpn}</b> <span class="text-red-500 font-bold px-2 cursor-pointer" onclick="removeChild('${lpn}')">X</span></li>`).reverse().join(''); }
         function removeChild(lpn) { childLpns = childLpns.filter(item => item !== lpn); updateChildUI(); }
         function selectCombineColor(color, btnElem) { document.getElementById('selectedCombineColor').value = color; document.querySelectorAll('.color-btn').forEach(btn => btn.classList.remove('color-btn-active')); btnElem.classList.add('color-btn-active'); }
