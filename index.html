@@ -369,16 +369,19 @@
         }
 
         function onScanSuccess(decodedText) {
-            closeScanner(); 
-            if (currentScanTargetId) {
-                const targetInput = document.getElementById(currentScanTargetId);
-                targetInput.value = decodedText; 
-                targetInput.focus();
-                
-                const enterEvent = new KeyboardEvent('keypress', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true });
-                targetInput.dispatchEvent(enterEvent);
-            }
-        }
+    const savedTargetId = currentScanTargetId; // ✅ เซฟไว้ก่อน
+    closeScanner();                             // ← ค่อย close (จะ null currentScanTargetId)
+
+    if (savedTargetId) {
+        const targetInput = document.getElementById(savedTargetId);
+        targetInput.value = decodedText;
+        targetInput.focus();
+        const enterEvent = new KeyboardEvent('keypress', { 
+            key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true 
+        });
+        targetInput.dispatchEvent(enterEvent); // ✅ validation ทำงานตามปกติ
+    }
+}
         function onScanFailure(error) {}
 
         // ==================== 🚀 ระบบคิวส่งออกแบบ FAST SEQUENTIAL (มีระบบควบคุมไฟจราจร) ====================
