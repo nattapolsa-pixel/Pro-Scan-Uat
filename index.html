@@ -555,132 +555,32 @@ window.onload = function() {
         }
         
         function executeLoginSuccess(id, name) {
-    loggedInEmpId = id; loggedInEmpName = name; 
-    document.getElementById('empNameDisplay').innerHTML = `<svg ... > เข้าใช้งานโดย: ${loggedInEmpId} (${loggedInEmpName})`;
+    loggedInEmpId = id; 
+    loggedInEmpName = name; 
     
-    // บังคับเปลี่ยน style โดยตรงให้เด็ดขาด
-    document.getElementById('loginModal').style.display = 'none'; 
-    document.getElementById('loginModal').classList.add('hidden');
+    // 1. อัปเดตชื่อพนักงาน
+    document.getElementById('empNameDisplay').innerHTML = `<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg> เข้าใช้งานโดย: ${loggedInEmpId} (${loggedInEmpName})`;
     
-    document.getElementById('waveSelectorModal').classList.remove('hidden');
-    // ...
-            hideLoading(); 
-            loadPendingWaves(); 
-            setTimeout(() => document.getElementById('waveInput').focus(), 10);
-        }
-        document.getElementById('empInput').addEventListener('keypress', (e) => { if (e.key === 'Enter') processLogin(); });
-
-        // ==================== WAVE LOGIC ====================
-        async function loadPendingWaves() {
-            const tbody = document.getElementById('pendingWaveTableBody');
-            tbody.innerHTML = '<tr><td colspan="2" class="p-4 text-center text-sm text-gray-500 font-bold animate-pulse">กำลังตรวจสอบข้อมูล...</td></tr>';
-            try {
-                const res = await fetch(backendApiUrl + '/api/pending-waves');
-                if (!res.ok) throw new Error('API Error');
-                const data = await res.json();
-                
-                if (!data.waves || data.waves.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="2" class="p-4 text-center text-sm text-green-600 font-bold">ไม่มีรายการ Wave ค้างในระบบ</td></tr>';
-                    return;
-                }
-                
-                let html = '';
-                data.waves.forEach(w => {
-                    html += `
-                        <tr class="hover:bg-blue-50 border-b border-gray-200 transition">
-                            <td class="p-3 text-sm md:text-base font-bold text-gray-800 tracking-wider pl-3">${w.wave_no}</td>
-                            <td class="p-2 text-center">
-                                <button onclick="selectWaveFromTable('${w.wave_no}')" class="bg-blue-600 hover:bg-blue-700 text-white text-xs md:text-sm font-bold py-1.5 px-3 rounded-lg shadow active:scale-95 transition">เลือกงาน</button>
-                            </td>
-                        </tr>
-                    `;
-                });
-                tbody.innerHTML = html;
-            } catch (e) {
-                tbody.innerHTML = '<tr><td colspan="2" class="p-4 text-center text-sm text-red-500 font-bold">ไม่สามารถดึงข้อมูลรายการ Wave ได้</td></tr>';
-            }
-        }
-
-        function selectWaveFromTable(waveNo) { document.getElementById('waveInput').value = waveNo; checkAndLoadWave(); }
-
-        async function checkAndLoadWave() {
-            if (isAlertOpen) return;
-            const waveNo = document.getElementById('waveInput').value.trim().toUpperCase();
-            if (!waveNo) return;
-            showLoading(); 
-            try {
-                const res = await fetch(backendApiUrl + `/api/check-wave?wave_no=${waveNo}`);
-                if (!res.ok) { showAlert('ข้อผิดพลาด', `ไม่พบข้อมูลรหัส Wave\n[${waveNo}]`); document.getElementById('waveInput').value = ''; return; }
-                const data = await res.json(); currentWave = data.wave_no; allLpnsInWave = data.lpn_list; 
-                
-                allLpnsInWave.forEach(i => { i.childCount = 0; i.combinedWith = null; i.isMaster = false; });
-                
-                allLpnsInWave.forEach(item => {
-                    if (item.status === 'Scanned' && item.scan_type && item.scan_type.startsWith('COMBINE: ')) {
-                        const masterLpn = item.scan_type.replace('COMBINE: ', '').trim();
-                        item.combinedWith = masterLpn;
-                        
-                        const masterTarget = allLpnsInWave.find(m => m.lpn === masterLpn);
-                        if (masterTarget) {
-                            masterTarget.isMaster = true;
-                            masterTarget.childCount = (masterTarget.childCount || 0) + 1;
-                        }
-                    }
-                });
-                
-                // 💡 นำโค้ดดึงบัฟเฟอร์แบบเก่าออกไปแล้ว เพราะ Python ดึงข้อมูลสถานะล่าสุดทั้งหมดมาให้ตั้งแต่รอบแรกแล้ว
-                
-                renderBranchGrid(); document.getElementById('waveSelectorModal').classList.add('hidden'); document.getElementById('branchWaveDisplay').innerText = currentWave;
-                document.getElementById('branchSelectorModal').classList.remove('hidden'); document.getElementById('branchSelectorModal').classList.add('flex');
-            } catch (e) { showAlert('ข้อผิดพลาดเครือข่าย', "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้"); } finally { hideLoading(); }
-        }
-        
-        function renderBranchGrid() {
-            const uniqueBranchesMap = new Map();
-            allLpnsInWave.forEach(item => { const bCode = item.branch || "Unknown"; if(!uniqueBranchesMap.has(bCode)) uniqueBranchesMap.set(bCode, item.branch_name || "ไม่ระบุ"); });
-            const branchGrid = document.getElementById('branchButtonGrid'); branchGrid.innerHTML = '';
-            Array.from(uniqueBranchesMap.entries()).sort().forEach(([bCode, bName]) => {
-                const branchLpns = allLpnsInWave.filter(i => i.branch === bCode);
-                let totalBoxes = 0; let scannedBoxes = 0;
-                branchLpns.forEach(i => {
-                    let expectedQty = parseInt(i.Total_Qty || i.total_qty) || 1;
-                    let actualQty = i.qty ? parseInt(i.qty) : expectedQty;
-                    totalBoxes += expectedQty;
-                    if (i.status === 'Scanned' || i.status === 'ForceClosed') scannedBoxes += actualQty;
-                });
-                
-                const isDone = branchLpns.every(i => i.status === 'Scanned' || i.status === 'ForceClosed');
-                const inProgress = !isDone && scannedBoxes > 0;
-                
-                let btnStyle = isDone ? 'border-green-400 bg-green-50 text-green-900' : 
-                               inProgress ? 'border-orange-400 bg-orange-50 text-orange-900' : 
-                               'border-blue-400 bg-white text-blue-900';
-                               
-                let statusBadge = `<div class="font-black text-xl ml-2 whitespace-nowrap px-3 py-1 rounded-full ${isDone ? 'bg-green-200 text-green-800' : inProgress ? 'bg-orange-200 text-orange-800' : 'bg-blue-100 text-blue-800'}">${scannedBoxes}/${totalBoxes}</div>`;
-                
-                branchGrid.innerHTML += `
-                    <button onclick="selectBranch('${bCode}', '${bName}')" class="flex items-center p-4 rounded-xl border-2 shadow-sm active:scale-95 transition ${btnStyle}">
-                        <div class="flex-1 text-left min-w-0 pr-2">
-                            <div class="font-black text-xl truncate">${bCode}</div>
-                            <div class="text-xs font-bold truncate opacity-70">${bName}</div>
-                        </div>
-                        ${statusBadge}
-                    </button>
-                `;
-            });
-        }
-        
-        document.getElementById('waveInput').addEventListener('keypress', (e) => { if (e.key === 'Enter') checkAndLoadWave(); });
-        
-        function exitWave() { 
-            currentWave = ""; allLpnsInWave = []; selectedBranchCode = ""; selectedBranchName = ""; 
-            document.getElementById('branchSelectorModal').classList.add('hidden'); 
-            document.getElementById('mainApp').classList.add('hidden'); 
-            document.getElementById('waveSelectorModal').classList.remove('hidden'); 
-            document.getElementById('waveInput').value = ''; 
-            loadPendingWaves();
-            setTimeout(() => document.getElementById('waveInput').focus(), 100); 
-        }
+    // 2. บังคับซ่อนหน้า Login แบบเด็ดขาด (ใช้ style.display ทับ CSS ทุกอย่าง)
+    var loginUI = document.getElementById('loginModal');
+    loginUI.style.display = 'none'; 
+    loginUI.style.visibility = 'hidden';
+    loginUI.classList.add('hidden');
+    
+    // 3. บังคับโชว์หน้า Wave Selector
+    var waveUI = document.getElementById('waveSelectorModal');
+    waveUI.style.display = 'flex';
+    waveUI.classList.remove('hidden');
+    
+    hideLoading(); 
+    loadPendingWaves(); 
+    
+    // 4. สั่งโฟกัสไปที่ช่องสแกน Wave อัตโนมัติ (หน่วงเวลาเล็กน้อยให้หน้าต่างโหลดเสร็จ)
+    setTimeout(function() {
+        var waveInp = document.getElementById('waveInput');
+        if (waveInp) waveInp.focus();
+    }, 200);
+}
         
         function selectBranch(code, name) { selectedBranchCode = code; selectedBranchName = name; document.getElementById('branchSelectorModal').classList.add('hidden'); document.getElementById('mainApp').classList.remove('hidden'); document.getElementById('mainApp').classList.add('flex'); document.getElementById('currentBranchDisplay').innerText = code; document.getElementById('currentBranchNameDisplay').innerText = name; updateDashboardUI(); switchTab('scan'); }
         function backToBranchSelect() { selectedBranchCode = ""; document.getElementById('mainApp').classList.add('hidden'); renderBranchGrid(); document.getElementById('branchSelectorModal').classList.remove('hidden'); document.getElementById('branchSelectorModal').classList.add('flex'); }
