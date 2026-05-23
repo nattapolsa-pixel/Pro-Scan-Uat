@@ -436,25 +436,20 @@
                 statusEl.className = "text-[10px] text-green-300 font-bold flex items-center gap-1"; 
             }
         }
+window.onload = function() {
+    // โค้ดส่วนดักจับการกด Enter (แก้ไขเพิ่ม e.which ตามจุดที่ 2 ไปด้วยเลยครับ)
+    var emp = document.getElementById('empInput');
+    if(emp) emp.focus();
+    if(emp) emp.addEventListener('keydown', function(e){
+        if(e.key==='Enter'||e.keyCode===13||e.which===13){e.preventDefault();processLogin();}
+    });
 
-        // ==================== UI Helper ====================
-        window.onload = function() {
-            var emp = document.getElementById('empInput');
-            if(emp) emp.focus();
-            if(emp) emp.addEventListener('keydown', function(e){
-                if(e.key==='Enter'||e.keyCode===13){e.preventDefault();processLogin();}
-            });
-            var btn = document.getElementById('loginBtn');
-            if(btn){
-                btn.addEventListener('touchend', function(e){e.preventDefault();processLogin();});
-                btn.addEventListener('click', function(e){processLogin();});
-            }
-            fetch(employeeApiUrl).then(function(res){ return res.json(); }).then(function(data){
-                if(data.success&&data.employees){employeeDB=data.employees;localStorage.setItem('proScannerEmpDB',JSON.stringify(employeeDB));}
-            }).catch(function(){});
-            if(syncQueue.length>0){updateSyncStatusUI();processQueue();}
-        };
-
+    // โค้ดส่วนดึงข้อมูลพนักงาน (fetch) จะขยับขึ้นมาต่อกันเลย
+    fetch(employeeApiUrl).then(function(res){ return res.json(); }).then(function(data){
+        if(data.success&&data.employees){employeeDB=data.employees;localStorage.setItem('proScannerEmpDB',JSON.stringify(employeeDB));}
+    }).catch(function(){});
+    if(syncQueue.length>0){updateSyncStatusUI();processQueue();}
+};
         function showLoading() { document.getElementById('loadingOverlay').classList.remove('hidden'); }
         function hideLoading() { document.getElementById('loadingOverlay').classList.add('hidden'); }
 
