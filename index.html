@@ -42,7 +42,7 @@
         #reader video { width: 100% !important; object-fit: cover; border-radius: 0.5rem; }
     </style>
 </head>
-<body class="bg-gray-100 h-screen flex flex-col font-sans overflow-hidden">
+<body class="bg-gray-100 font-sans" style="min-height:100vh;margin:0;padding:0;">
 
     <div id="toastMsg" class="toast-msg bg-green-600 z-[100] flex items-center gap-2"></div>
 
@@ -89,7 +89,7 @@
         </div>
     </div>
 
-    <div id="loginModal" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:1rem;z-index:50;background:rgba(17,24,39,0.9);-webkit-transform:translate3d(0,0,0);transform:translate3d(0,0,0);">
+    <div id="loginModal" style="position:absolute;top:0;left:0;width:100%;min-height:100vh;background:rgba(17,24,39,0.95);display:flex;align-items:center;justify-content:center;padding:1rem;box-sizing:border-box;z-index:50;">
         <div class="bg-white p-6 md:p-8 rounded-xl shadow-2xl w-full max-w-md border-t-8 border-gray-800 text-center flex flex-col items-center">
             <div class="mb-4 flex justify-center items-center h-28 w-auto">
                 <img src="https://i.postimg.cc/L4qLLFNj/Black-White-Modern-Handwritten-Square-Studio-Logo-(15)-Photoroom-0.png" alt="Pro LPN Scanner Logo" class="h-full w-auto object-contain">
@@ -97,8 +97,8 @@
             <h2 class="text-2xl font-black text-gray-800 mb-1">Pro LPN Scanner</h2>
             <p class="text-gray-500 text-sm font-bold mb-5">กรุณาระบุรหัสพนักงานของคุณ</p>
             <div class="flex flex-col gap-3 mt-2 w-full">
-                <input type="text" id="empInput" autocomplete="off" style="touch-action:manipulation;" class="w-full text-2xl p-3 border-2 border-gray-300 rounded-lg text-center uppercase bg-gray-50 focus:border-gray-800 focus:bg-white font-bold tracking-wider" placeholder="รหัสพนักงาน...">
-                <button onclick="processLogin()" ontouchend="event.preventDefault();processLogin();" style="touch-action:manipulation;-webkit-tap-highlight-color:rgba(0,0,0,0.2);cursor:pointer;" class="w-full bg-gray-800 hover:bg-black text-white font-bold py-3 rounded-lg text-xl shadow-lg transition">เข้าสู่ระบบ (Enter)</button>
+                <input type="text" id="empInput" autocomplete="off" class="w-full text-2xl p-3 border-2 border-gray-300 rounded-lg text-center uppercase bg-gray-50 focus:border-gray-800 focus:bg-white font-bold tracking-wider" placeholder="รหัสพนักงาน...">
+                <button id="loginBtn" onclick="processLogin()" style="width:100%;background:#1f2937;color:white;font-weight:700;padding:0.75rem;border-radius:0.5rem;font-size:1.25rem;border:none;cursor:pointer;touch-action:manipulation;-webkit-appearance:none;">เข้าสู่ระบบ (Enter)</button>
             </div>
         </div>
     </div>
@@ -440,14 +440,19 @@
         // ==================== UI Helper ====================
         window.onload = function() {
             var emp = document.getElementById('empInput');
-            emp.focus();
-            emp.addEventListener('keydown', function(e) {
-                if (e.key === 'Enter' || e.keyCode === 13) { e.preventDefault(); processLogin(); }
+            if(emp) emp.focus();
+            if(emp) emp.addEventListener('keydown', function(e){
+                if(e.key==='Enter'||e.keyCode===13){e.preventDefault();processLogin();}
             });
+            var btn = document.getElementById('loginBtn');
+            if(btn){
+                btn.addEventListener('touchend', function(e){e.preventDefault();processLogin();});
+                btn.addEventListener('click', function(e){processLogin();});
+            }
             fetch(employeeApiUrl).then(function(res){ return res.json(); }).then(function(data){
-                if(data.success && data.employees){ employeeDB=data.employees; localStorage.setItem('proScannerEmpDB', JSON.stringify(employeeDB)); }
+                if(data.success&&data.employees){employeeDB=data.employees;localStorage.setItem('proScannerEmpDB',JSON.stringify(employeeDB));}
             }).catch(function(){});
-            if(syncQueue.length > 0){ updateSyncStatusUI(); processQueue(); }
+            if(syncQueue.length>0){updateSyncStatusUI();processQueue();}
         };
 
         function showLoading() { document.getElementById('loadingOverlay').classList.remove('hidden'); }
@@ -542,13 +547,12 @@
             var empId = document.getElementById('empInput').value.trim().toUpperCase();
             if (!empId) { showAlert('การแจ้งเตือน', 'กรุณาระบุรหัสพนักงานก่อนดำเนินการ'); return; }
             if (employeeDB[empId]) { executeLoginSuccess(empId, employeeDB[empId]); return; }
-            // เข้าระบบทันที ดึงชื่อจริงเบื้องหลัง
             employeeDB[empId] = empId;
             localStorage.setItem('proScannerEmpDB', JSON.stringify(employeeDB));
             executeLoginSuccess(empId, empId);
             fetch(employeeApiUrl + '?emp_id=' + encodeURIComponent(empId))
                 .then(function(r){ return r.json(); })
-                .then(function(d){ if(d && d.success && d.emp_name){ employeeDB[empId]=d.emp_name; localStorage.setItem('proScannerEmpDB', JSON.stringify(employeeDB)); } })
+                .then(function(d){ if(d&&d.success&&d.emp_name){ employeeDB[empId]=d.emp_name; localStorage.setItem('proScannerEmpDB',JSON.stringify(employeeDB)); } })
                 .catch(function(){});
         }
         
