@@ -98,7 +98,7 @@
             <p class="text-gray-500 text-sm font-bold mb-5">กรุณาระบุรหัสพนักงานของคุณ</p>
             <div class="flex flex-col gap-3 mt-2 w-full">
                 <input type="text" id="empInput" autocomplete="off" class="w-full text-2xl p-3 border-2 border-gray-300 rounded-lg text-center uppercase bg-gray-50 focus:border-gray-800 focus:bg-white font-bold tracking-wider" placeholder="รหัสพนักงาน...">
-                <button id="loginBtn" onclick="processLogin()" style="width:100%;background:#1f2937;color:white;font-weight:700;padding:0.75rem;border-radius:0.5rem;font-size:1.25rem;border:none;cursor:pointer;touch-action:manipulation;-webkit-appearance:none;">เข้าสู่ระบบ (Enter)</button>
+                <button type="button" id="loginBtn" onclick="processLogin()" style=""width:100%;background:#1f2937;color:white;font-weight:700;padding:0.75rem;border-radius:0.5rem;font-size:1.25rem;border:none;cursor:pointer;touch-action:manipulation;-webkit-appearance:none;">เข้าสู่ระบบ (Enter)</button>
             </div>
         </div>
     </div>
@@ -538,7 +538,10 @@ window.onload = function() {
 
         // ==================== LOGIN ====================
         function processLogin() {
-            if (isAlertOpen) return;
+    // 👇 แทรกบรรทัดนี้ลงไปเลยครับ 👇
+    alert("ระบบรับทราบการกดปุ่มแล้ว! รหัส: " + document.getElementById('empInput').value);
+    
+    if (isAlertOpen) return;
             var empId = document.getElementById('empInput').value.trim().toUpperCase();
             if (!empId) { showAlert('การแจ้งเตือน', 'กรุณาระบุรหัสพนักงานก่อนดำเนินการ'); return; }
             if (employeeDB[empId]) { executeLoginSuccess(empId, employeeDB[empId]); return; }
