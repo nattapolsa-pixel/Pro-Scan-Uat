@@ -89,7 +89,7 @@
         </div>
     </div>
 
-    <div id="loginModal" style="position:absolute;top:0;left:0;width:100%;min-height:100vh;background:rgba(17,24,39,0.95);display:flex;align-items:center;justify-content:center;padding:1rem;box-sizing:border-box;z-index:50;">
+    <div id="loginModal" class="fixed inset-0 bg-gray-900 bg-opacity-95 flex items-center justify-center p-4 z-50">
         <div class="bg-white p-6 md:p-8 rounded-xl shadow-2xl w-full max-w-md border-t-8 border-gray-800 text-center flex flex-col items-center">
             <div class="mb-4 flex justify-center items-center h-28 w-auto">
                 <img src="https://i.postimg.cc/L4qLLFNj/Black-White-Modern-Handwritten-Square-Studio-Logo-(15)-Photoroom-0.png" alt="Pro LPN Scanner Logo" class="h-full w-auto object-contain">
@@ -557,9 +557,15 @@
         }
         
         function executeLoginSuccess(id, name) {
-            loggedInEmpId = id; loggedInEmpName = name; 
-            document.getElementById('empNameDisplay').innerHTML = `<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg> เข้าใช้งานโดย: ${loggedInEmpId} (${loggedInEmpName})`;
-            document.getElementById('loginModal').classList.add('hidden'); document.getElementById('waveSelectorModal').classList.remove('hidden');
+    loggedInEmpId = id; loggedInEmpName = name; 
+    document.getElementById('empNameDisplay').innerHTML = `<svg ... > เข้าใช้งานโดย: ${loggedInEmpId} (${loggedInEmpName})`;
+    
+    // บังคับเปลี่ยน style โดยตรงให้เด็ดขาด
+    document.getElementById('loginModal').style.display = 'none'; 
+    document.getElementById('loginModal').classList.add('hidden');
+    
+    document.getElementById('waveSelectorModal').classList.remove('hidden');
+    // ...
             hideLoading(); 
             loadPendingWaves(); 
             setTimeout(() => document.getElementById('waveInput').focus(), 10);
