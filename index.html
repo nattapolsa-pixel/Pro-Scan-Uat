@@ -538,9 +538,6 @@ window.onload = function() {
 
         // ==================== LOGIN ====================
         function processLogin() {
-    // 👇 แทรกบรรทัดนี้ลงไปเลยครับ 👇
-    alert("ระบบรับทราบการกดปุ่มแล้ว! รหัส: " + document.getElementById('empInput').value);
-    
     if (isAlertOpen) return;
             var empId = document.getElementById('empInput').value.trim().toUpperCase();
             if (!empId) { showAlert('การแจ้งเตือน', 'กรุณาระบุรหัสพนักงานก่อนดำเนินการ'); return; }
