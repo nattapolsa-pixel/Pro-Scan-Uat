@@ -440,15 +440,10 @@
         // ==================== UI Helper ====================
         window.onload = () => {
             document.getElementById('empInput').focus();
-
-            // ✅ แก้ปัญหา Handheld Honeywell: รับ Enter/keydown บน empInput โดยตรง
+            // ✅ รับ Enter key จาก physical keyboard บน Handheld โดยตรง
             document.getElementById('empInput').addEventListener('keydown', function(e) {
-                if (e.key === 'Enter' || e.keyCode === 13) {
-                    e.preventDefault();
-                    processLogin();
-                }
+                if (e.key === 'Enter' || e.keyCode === 13) { e.preventDefault(); processLogin(); }
             });
-
             fetch(employeeApiUrl).then(res => res.json()).then(data => {
                 if(data.success && data.employees) { employeeDB = data.employees; localStorage.setItem('proScannerEmpDB', JSON.stringify(employeeDB)); }
             }).catch(e => console.log(""));
@@ -504,10 +499,7 @@
                     document.getElementById('lpnInput').value = ''; document.getElementById('lpnInput').focus();
                 } else if (selectedBranchCode !== "") backToBranchSelect(); else if (currentWave !== "") exitWave();
             }
-            if (e.key === 'Enter' || e.keyCode === 13) {
-                if (isAlertOpen) { e.preventDefault(); closeAlert(); }
-                else if (loggedInEmpId === "") { e.preventDefault(); processLogin(); }
-            }
+            if (e.key === 'Enter' && isAlertOpen) { e.preventDefault(); closeAlert(); }
 
             // 💡 ระบบ Shortcut กดปุ่มตัวเลข 1-6 เพื่อเลือกสีสำหรับ Handheld
             if (e.key >= '1' && e.key <= '6' && !isAlertOpen) {
@@ -546,15 +538,44 @@
             if (isAlertOpen) return;
             const empId = document.getElementById('empInput').value.trim();
             if (!empId) return showAlert('การแจ้งเตือน', 'กรุณาระบุรหัสพนักงานก่อนดำเนินการ');
+
+            // ✅ ถ้ามีใน cache แล้ว → เข้าเลยไม่ต้อง fetch
             if (employeeDB[empId]) return executeLoginSuccess(empId, employeeDB[empId]);
-            showLoading(); 
+
+            showLoading();
             try {
-                const res = await fetch(`${employeeApiUrl}?emp_id=${encodeURIComponent(empId)}`);
+                // ✅ เพิ่ม timeout 8 วินาที ป้องกัน fetch ค้างบน Honeywell
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+                const res = await fetch(`${employeeApiUrl}?emp_id=${encodeURIComponent(empId)}`, {
+                    signal: controller.signal
+                });
+                clearTimeout(timeoutId);
+
                 const data = await res.json();
                 if (data.success === true && data.emp_name) {
-                    employeeDB[empId] = data.emp_name; localStorage.setItem('proScannerEmpDB', JSON.stringify(employeeDB)); executeLoginSuccess(data.emp_id, data.emp_name);
-                } else { showAlert('ปฏิเสธการเข้าถึง', `ไม่พบรหัสพนักงาน [${empId}] ในระบบ`); document.getElementById('empInput').value = ''; }
-            } catch (e) { showAlert('ข้อผิดพลาดเครือข่าย', 'ไม่สามารถเชื่อมต่อกับฐานข้อมูลได้'); } finally { hideLoading(); }
+                    employeeDB[empId] = data.emp_name;
+                    localStorage.setItem('proScannerEmpDB', JSON.stringify(employeeDB));
+                    executeLoginSuccess(data.emp_id, data.emp_name);
+                } else {
+                    showAlert('ปฏิเสธการเข้าถึง', `ไม่พบรหัสพนักงาน [${empId}] ในระบบ`);
+                    document.getElementById('empInput').value = '';
+                }
+            } catch (e) {
+                // ✅ ถ้า network ไม่ได้ / timeout → fallback เข้าด้วยรหัสที่พิมพ์ (Offline Mode)
+                if (e.name === 'AbortError') {
+                    // Timeout: ให้เข้าระบบแบบ offline ได้เลย รหัสพนักงาน = รหัสที่พิมพ์
+                    hideLoading();
+                    employeeDB[empId] = empId;
+                    localStorage.setItem('proScannerEmpDB', JSON.stringify(employeeDB));
+                    executeLoginSuccess(empId, empId);
+                } else {
+                    showAlert('ข้อผิดพลาดเครือข่าย', 'ไม่สามารถเชื่อมต่อกับฐานข้อมูลได้\nกรุณาตรวจสอบ Wi-Fi บนเครื่อง');
+                }
+            } finally {
+                hideLoading();
+            }
         }
         
         function executeLoginSuccess(id, name) {
