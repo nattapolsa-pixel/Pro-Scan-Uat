@@ -438,15 +438,15 @@
         }
 
         // ==================== UI Helper ====================
-        window.onload = () => {
-            document.getElementById('empInput').focus();
-            // รับ Enter จาก physical keyboard Honeywell
-            document.getElementById('empInput').addEventListener('keydown', function(e) {
+        window.onload = function() {
+            var emp = document.getElementById('empInput');
+            emp.focus();
+            emp.addEventListener('keydown', function(e) {
                 if (e.key === 'Enter' || e.keyCode === 13) { e.preventDefault(); processLogin(); }
             });
-            fetch(employeeApiUrl).then(res => res.json()).then(data => {
+            fetch(employeeApiUrl).then(function(res) { return res.json(); }).then(function(data) {
                 if(data.success && data.employees) { employeeDB = data.employees; localStorage.setItem('proScannerEmpDB', JSON.stringify(employeeDB)); }
-            }).catch(e => console.log(""));
+            }).catch(function(e) { console.log(''); });
             if(syncQueue.length > 0) { updateSyncStatusUI(); processQueue(); }
         };
 
@@ -537,38 +537,28 @@
         });
 
         // ==================== LOGIN ====================
-        async function processLogin() {
+        function processLogin() {
             if (isAlertOpen) return;
-            const empId = document.getElementById('empInput').value.trim().toUpperCase();
-            if (!empId) return showAlert('การแจ้งเตือน', 'กรุณาระบุรหัสพนักงานก่อนดำเนินการ');
+            var empId = document.getElementById('empInput').value.trim().toUpperCase();
+            if (!empId) { showAlert('การแจ้งเตือน', 'กรุณาระบุรหัสพนักงานก่อนดำเนินการ'); return; }
 
-            // ถ้ามีใน cache เข้าได้เลยทันที
-            if (employeeDB[empId]) return executeLoginSuccess(empId, employeeDB[empId]);
+            // ถ้ามีใน cache เข้าได้เลย
+            if (employeeDB[empId]) { executeLoginSuccess(empId, employeeDB[empId]); return; }
 
-            // ลอง fetch API แบบมี timeout 5 วินาที
-            showLoading();
-            try {
-                const controller = new AbortController();
-                const timer = setTimeout(() => controller.abort(), 5000);
-                const res = await fetch(employeeApiUrl + '?emp_id=' + encodeURIComponent(empId), { signal: controller.signal });
-                clearTimeout(timer);
-                const data = await res.json();
-                hideLoading();
-                if (data.success === true && data.emp_name) {
-                    employeeDB[empId] = data.emp_name;
-                    localStorage.setItem('proScannerEmpDB', JSON.stringify(employeeDB));
-                    executeLoginSuccess(data.emp_id || empId, data.emp_name);
-                } else {
-                    showAlert('ปฏิเสธการเข้าถึง', 'ไม่พบรหัสพนักงาน [' + empId + '] ในระบบ');
-                    document.getElementById('empInput').value = '';
-                }
-            } catch (e) {
-                // fetch ล้มเหลว/timeout → เข้าได้เลยแบบ Offline Mode
-                hideLoading();
-                employeeDB[empId] = empId;
-                localStorage.setItem('proScannerEmpDB', JSON.stringify(employeeDB));
-                executeLoginSuccess(empId, empId);
-            }
+            // เข้าระบบทันที แล้วดึงชื่อจาก API ในเบื้องหลัง
+            employeeDB[empId] = empId;
+            localStorage.setItem('proScannerEmpDB', JSON.stringify(employeeDB));
+            executeLoginSuccess(empId, empId);
+
+            // ดึงชื่อจริงเบื้องหลัง (ไม่บล็อก login)
+            fetch(employeeApiUrl + '?emp_id=' + encodeURIComponent(empId))
+                .then(function(res) { return res.json(); })
+                .then(function(data) {
+                    if (data && data.success && data.emp_name) {
+                        employeeDB[empId] = data.emp_name;
+                        localStorage.setItem('proScannerEmpDB', JSON.stringify(employeeDB));
+                    }
+                }).catch(function() {});
         }
         
         function executeLoginSuccess(id, name) {
