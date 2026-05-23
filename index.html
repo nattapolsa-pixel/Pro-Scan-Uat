@@ -440,6 +440,10 @@
         // ==================== UI Helper ====================
         window.onload = () => {
             document.getElementById('empInput').focus();
+            // ✅ เพิ่มบรรทัดนี้
+    document.getElementById('empInput').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); processLogin(); }
+    });
             fetch(employeeApiUrl).then(res => res.json()).then(data => {
                 if(data.success && data.employees) { employeeDB = data.employees; localStorage.setItem('proScannerEmpDB', JSON.stringify(employeeDB)); }
             }).catch(e => console.log(""));
@@ -495,7 +499,12 @@
                     document.getElementById('lpnInput').value = ''; document.getElementById('lpnInput').focus();
                 } else if (selectedBranchCode !== "") backToBranchSelect(); else if (currentWave !== "") exitWave();
             }
-            if (e.key === 'Enter' && isAlertOpen) { e.preventDefault(); closeAlert(); }
+            if (e.key === 'Enter') {
+    if (isAlertOpen) { e.preventDefault(); closeAlert(); }
+    else if (loggedInEmpId === "" && document.activeElement.id === 'empInput') {
+        e.preventDefault(); processLogin();
+    }
+}
 
             // 💡 ระบบ Shortcut กดปุ่มตัวเลข 1-6 เพื่อเลือกสีสำหรับ Handheld
             if (e.key >= '1' && e.key <= '6' && !isAlertOpen) {
