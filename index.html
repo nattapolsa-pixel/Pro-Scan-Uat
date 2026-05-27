@@ -42,7 +42,7 @@
         #reader video { width: 100% !important; object-fit: cover; border-radius: 0.5rem; }
     </style>
 </head>
-<body class="bg-gray-100 font-sans" style="min-height:100vh;margin:0;padding:0;">
+<body class="bg-gray-100 h-screen flex flex-col font-sans overflow-hidden">
 
     <div id="toastMsg" class="toast-msg bg-green-600 z-[100] flex items-center gap-2"></div>
 
@@ -89,7 +89,7 @@
         </div>
     </div>
 
-    <div id="loginModal" class="fixed inset-0 bg-gray-900 bg-opacity-95 flex items-center justify-center p-4 z-50">
+    <div id="loginModal" class="fixed inset-0 bg-gray-900 bg-opacity-90 flex items-center justify-center p-4 z-50">
         <div class="bg-white p-6 md:p-8 rounded-xl shadow-2xl w-full max-w-md border-t-8 border-gray-800 text-center flex flex-col items-center">
             <div class="mb-4 flex justify-center items-center h-28 w-auto">
                 <img src="https://i.postimg.cc/L4qLLFNj/Black-White-Modern-Handwritten-Square-Studio-Logo-(15)-Photoroom-0.png" alt="Pro LPN Scanner Logo" class="h-full w-auto object-contain">
@@ -98,7 +98,7 @@
             <p class="text-gray-500 text-sm font-bold mb-5">กรุณาระบุรหัสพนักงานของคุณ</p>
             <div class="flex flex-col gap-3 mt-2 w-full">
                 <input type="text" id="empInput" autocomplete="off" class="w-full text-2xl p-3 border-2 border-gray-300 rounded-lg text-center uppercase bg-gray-50 focus:border-gray-800 focus:bg-white font-bold tracking-wider" placeholder="รหัสพนักงาน...">
-                <button type="button" id="loginBtn" onclick="processLogin()" style="width:100%;background:#1f2937;color:white;font-weight:700;padding:0.75rem;border-radius:0.5rem;font-size:1.25rem;border:none;cursor:pointer;touch-action:manipulation;-webkit-appearance:none;">เข้าสู่ระบบ (Enter)</button>
+                <button onclick="processLogin()" class="w-full bg-gray-800 hover:bg-black text-white font-bold py-3 rounded-lg text-xl shadow-lg transition">เข้าสู่ระบบ (Enter)</button>
             </div>
         </div>
     </div>
@@ -436,20 +436,16 @@
                 statusEl.className = "text-[10px] text-green-300 font-bold flex items-center gap-1"; 
             }
         }
-window.onload = function() {
-    // โค้ดส่วนดักจับการกด Enter (แก้ไขเพิ่ม e.which ตามจุดที่ 2 ไปด้วยเลยครับ)
-    var emp = document.getElementById('empInput');
-    if(emp) emp.focus();
-    if(emp) emp.addEventListener('keydown', function(e){
-        if(e.key==='Enter'||e.keyCode===13||e.which===13){e.preventDefault();processLogin();}
-    });
 
-    // โค้ดส่วนดึงข้อมูลพนักงาน (fetch) จะขยับขึ้นมาต่อกันเลย
-    fetch(employeeApiUrl).then(function(res){ return res.json(); }).then(function(data){
-        if(data.success&&data.employees){employeeDB=data.employees;localStorage.setItem('proScannerEmpDB',JSON.stringify(employeeDB));}
-    }).catch(function(){});
-    if(syncQueue.length>0){updateSyncStatusUI();processQueue();}
-};
+        // ==================== UI Helper ====================
+        window.onload = () => {
+            document.getElementById('empInput').focus();
+            fetch(employeeApiUrl).then(res => res.json()).then(data => {
+                if(data.success && data.employees) { employeeDB = data.employees; localStorage.setItem('proScannerEmpDB', JSON.stringify(employeeDB)); }
+            }).catch(e => console.log(""));
+            if(syncQueue.length > 0) { updateSyncStatusUI(); processQueue(); }
+        };
+
         function showLoading() { document.getElementById('loadingOverlay').classList.remove('hidden'); }
         function hideLoading() { document.getElementById('loadingOverlay').classList.add('hidden'); }
 
@@ -499,10 +495,7 @@ window.onload = function() {
                     document.getElementById('lpnInput').value = ''; document.getElementById('lpnInput').focus();
                 } else if (selectedBranchCode !== "") backToBranchSelect(); else if (currentWave !== "") exitWave();
             }
-            if (e.key === 'Enter' || e.keyCode === 13) {
-                if (isAlertOpen) { e.preventDefault(); closeAlert(); }
-                else if (loggedInEmpId === '') { e.preventDefault(); processLogin(); }
-            }
+            if (e.key === 'Enter' && isAlertOpen) { e.preventDefault(); closeAlert(); }
 
             // 💡 ระบบ Shortcut กดปุ่มตัวเลข 1-6 เพื่อเลือกสีสำหรับ Handheld
             if (e.key >= '1' && e.key <= '6' && !isAlertOpen) {
@@ -537,49 +530,30 @@ window.onload = function() {
         });
 
         // ==================== LOGIN ====================
-        function processLogin() {
-    if (isAlertOpen) return;
-            var empId = document.getElementById('empInput').value.trim().toUpperCase();
-            if (!empId) { showAlert('การแจ้งเตือน', 'กรุณาระบุรหัสพนักงานก่อนดำเนินการ'); return; }
-            if (employeeDB[empId]) { executeLoginSuccess(empId, employeeDB[empId]); return; }
-            employeeDB[empId] = empId;
-            localStorage.setItem('proScannerEmpDB', JSON.stringify(employeeDB));
-            executeLoginSuccess(empId, empId);
-            fetch(employeeApiUrl + '?emp_id=' + encodeURIComponent(empId))
-                .then(function(r){ return r.json(); })
-                .then(function(d){ if(d&&d.success&&d.emp_name){ employeeDB[empId]=d.emp_name; localStorage.setItem('proScannerEmpDB',JSON.stringify(employeeDB)); } })
-                .catch(function(){});
+        async function processLogin() {
+            if (isAlertOpen) return;
+            const empId = document.getElementById('empInput').value.trim();
+            if (!empId) return showAlert('การแจ้งเตือน', 'กรุณาระบุรหัสพนักงานก่อนดำเนินการ');
+            if (employeeDB[empId]) return executeLoginSuccess(empId, employeeDB[empId]);
+            showLoading(); 
+            try {
+                const res = await fetch(`${employeeApiUrl}?emp_id=${encodeURIComponent(empId)}`);
+                const data = await res.json();
+                if (data.success === true && data.emp_name) {
+                    employeeDB[empId] = data.emp_name; localStorage.setItem('proScannerEmpDB', JSON.stringify(employeeDB)); executeLoginSuccess(data.emp_id, data.emp_name);
+                } else { showAlert('ปฏิเสธการเข้าถึง', `ไม่พบรหัสพนักงาน [${empId}] ในระบบ`); document.getElementById('empInput').value = ''; }
+            } catch (e) { showAlert('ข้อผิดพลาดเครือข่าย', 'ไม่สามารถเชื่อมต่อกับฐานข้อมูลได้'); } finally { hideLoading(); }
         }
         
         function executeLoginSuccess(id, name) {
-    loggedInEmpId = id; 
-    loggedInEmpName = name; 
-    
-    // 1. อัปเดตชื่อพนักงาน
-    document.getElementById('empNameDisplay').innerHTML = `<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg> เข้าใช้งานโดย: ${loggedInEmpId} (${loggedInEmpName})`;
-    
-    // 2. บังคับซ่อนหน้า Login แบบเด็ดขาด (ใช้ style.display ทับ CSS ทุกอย่าง)
-    var loginUI = document.getElementById('loginModal');
-    loginUI.style.display = 'none'; 
-    loginUI.style.visibility = 'hidden';
-    loginUI.classList.add('hidden');
-    
-    // 3. บังคับโชว์หน้า Wave Selector
-    var waveUI = document.getElementById('waveSelectorModal');
-    waveUI.style.display = 'flex';
-    waveUI.classList.remove('hidden');
-    
-    hideLoading(); 
-    loadPendingWaves(); 
-    
-    // 4. สั่งโฟกัสไปที่ช่องสแกน Wave อัตโนมัติ (หน่วงเวลาเล็กน้อยให้หน้าต่างโหลดเสร็จ)
-    setTimeout(function() {
-        var waveInp = document.getElementById('waveInput');
-        if (waveInp) waveInp.focus();
-    }, 200);
-}
-        
-        // 👇👇 ก๊อปปี้บล็อกด้านล่างนี้ ไปวางแทรกตรงนี้เลยครับ 👇👇
+            loggedInEmpId = id; loggedInEmpName = name; 
+            document.getElementById('empNameDisplay').innerHTML = `<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg> เข้าใช้งานโดย: ${loggedInEmpId} (${loggedInEmpName})`;
+            document.getElementById('loginModal').classList.add('hidden'); document.getElementById('waveSelectorModal').classList.remove('hidden');
+            hideLoading(); 
+            loadPendingWaves(); 
+            setTimeout(() => document.getElementById('waveInput').focus(), 10);
+        }
+        document.getElementById('empInput').addEventListener('keypress', (e) => { if (e.key === 'Enter') processLogin(); });
 
         // ==================== WAVE LOGIC ====================
         async function loadPendingWaves() {
@@ -638,6 +612,8 @@ window.onload = function() {
                         }
                     }
                 });
+                
+                // 💡 นำโค้ดดึงบัฟเฟอร์แบบเก่าออกไปแล้ว เพราะ Python ดึงข้อมูลสถานะล่าสุดทั้งหมดมาให้ตั้งแต่รอบแรกแล้ว
                 
                 renderBranchGrid(); document.getElementById('waveSelectorModal').classList.add('hidden'); document.getElementById('branchWaveDisplay').innerText = currentWave;
                 document.getElementById('branchSelectorModal').classList.remove('hidden'); document.getElementById('branchSelectorModal').classList.add('flex');
