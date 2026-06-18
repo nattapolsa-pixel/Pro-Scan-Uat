@@ -91,9 +91,11 @@
             scroll-behavior: smooth;
         }
 
-        /* Scan mode: scroll เฉพาะพื้นที่ list */
+        /* Scan mode: ให้ scroll ได้ทั้ง section */
         #modeScan {
-            overflow: hidden;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior-y: contain;
         }
 
         /* Combine mode: scroll ได้ทั้ง section */
@@ -383,7 +385,7 @@
 
         <main class="flex-1 flex flex-col relative bg-gray-100" style="min-height:0;overflow:hidden;">
 
-            <section id="modeScan" class="flex flex-col min-h-0" style="height:100%;overflow:hidden;">
+            <section id="modeScan" class="flex flex-col min-h-0" style="height:100%;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain;">
                 <div class="bg-white p-3 md:p-4 shrink-0 shadow-sm z-20">
                     <label class="block text-gray-800 font-black mb-1.5 text-sm md:text-base">สแกนบาร์โค้ด LPN
                         กล่อง</label>
@@ -411,9 +413,18 @@
                 <div id="dynamicFuntionArea" class="px-3 shrink-0 relative z-10">
                     <div id="colorSelectionArea"
                         class="hidden bg-white p-4 rounded-b-xl shadow-lg border-x-2 border-b-2 border-blue-300 mb-2">
-                        <div class="text-center border-b pb-2 mb-3"><span class="text-sm text-gray-500 font-bold">LPN
-                                ล่าสุด</span>
-                            <h2 id="displayLpn" class="text-2xl font-black text-gray-800 tracking-wider"></h2>
+                        <div class="flex items-center justify-between border-b pb-2 mb-3">
+                            <div>
+                                <span class="text-sm text-gray-500 font-bold">LPN ล่าสุด</span>
+                                <h2 id="displayLpn" class="text-2xl font-black text-gray-800 tracking-wider"></h2>
+                            </div>
+                            <button onclick="cancelColorSelection()"
+                                class="flex items-center gap-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold px-3 py-2 rounded-lg border border-gray-300 text-sm shadow-sm transition">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                                ยกเลิก
+                            </button>
                         </div>
                         <div class="grid grid-cols-2 gap-2">
                             <button onclick="executeScanSave('Black')"
@@ -442,15 +453,24 @@
 
                     <div id="qtySelectionArea"
                         class="hidden bg-white p-4 rounded-b-xl shadow-lg border-x-2 border-b-2 border-orange-400 mb-2">
-                        <div class="text-center border-b pb-2 mb-3 flex flex-col items-center">
-                            <span class="text-sm text-orange-600 font-bold flex items-center gap-1">
+                        <div class="flex items-center justify-between border-b pb-2 mb-3">
+                            <div class="flex flex-col">
+                                <span class="text-sm text-orange-600 font-bold flex items-center gap-1">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                                    </svg>
+                                    สแกนกล่อง PP
+                                </span>
+                                <h2 id="displayLpnQty" class="text-2xl font-black text-gray-800 tracking-wider mt-1"></h2>
+                            </div>
+                            <button onclick="cancelQtySelection()"
+                                class="flex items-center gap-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold px-3 py-2 rounded-lg border border-gray-300 text-sm shadow-sm transition">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                                 </svg>
-                                สแกนกล่อง PP
-                            </span>
-                            <h2 id="displayLpnQty" class="text-2xl font-black text-gray-800 tracking-wider mt-1"></h2>
+                                ยกเลิก
+                            </button>
                         </div>
                         <div
                             class="bg-orange-100 text-orange-800 p-2 rounded text-center border border-orange-300 shadow-inner mb-3 font-bold flex items-center justify-center gap-2">
@@ -805,8 +825,7 @@
                 else if (!document.getElementById('scannerModal').classList.contains('hidden')) closeScanner();
                 else if (!document.getElementById('confirmModal').classList.contains('hidden')) closeConfirm();
                 else if (!document.getElementById('colorSelectionArea').classList.contains('hidden') || !document.getElementById('qtySelectionArea').classList.contains('hidden')) {
-                    document.getElementById('colorSelectionArea').classList.add('hidden'); document.getElementById('qtySelectionArea').classList.add('hidden');
-                    document.getElementById('lpnInput').value = ''; document.getElementById('lpnInput').focus();
+                    cancelColorSelection(); cancelQtySelection();
                 } else if (selectedBranchCode !== "") backToBranchSelect(); else if (currentWave !== "") exitWave();
             }
             if (e.key === 'Enter' && isAlertOpen) { e.preventDefault(); closeAlert(); }
@@ -842,6 +861,19 @@
                 }
             }
         });
+
+        // ==================== ❌ ปุ่มยกเลิกการสแกน ====================
+        function cancelColorSelection() {
+            document.getElementById('colorSelectionArea').classList.add('hidden');
+            document.getElementById('lpnInput').value = '';
+            document.getElementById('lpnInput').focus();
+        }
+
+        function cancelQtySelection() {
+            document.getElementById('qtySelectionArea').classList.add('hidden');
+            document.getElementById('lpnInput').value = '';
+            document.getElementById('lpnInput').focus();
+        }
 
         // ==================== LOGIN ====================
         async function processLogin() {
