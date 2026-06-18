@@ -3,13 +3,29 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Pro LPN Scanner (Professional UI)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     <style>
+        /* ==================== BASE RESET FOR HANDHELD ==================== */
+        html, body {
+            height: 100%;
+            /* ใช้ dvh (dynamic viewport height) เพื่อรองรับ address bar ของ Android Chrome */
+            height: 100dvh;
+            margin: 0;
+            padding: 0;
+            /* ป้องกัน overscroll ทั้งหน้า ไม่ให้เลื่อนขึ้น/ลงเกิน viewport */
+            overflow: hidden;
+            overscroll-behavior: none;
+            /* ป้องกัน rubber-band / pull-to-refresh */
+            touch-action: pan-y;
+        }
+
         body {
-            touch-action: pan-y manipulation;
+            /* ป้องกัน text resize อัตโนมัติบน Android */
+            -webkit-text-size-adjust: 100%;
+            text-size-adjust: 100%;
         }
 
         input[type=number]::-webkit-inner-spin-button,
@@ -51,29 +67,58 @@
             top: 30px;
         }
 
+        /* ==================== FULL-HEIGHT CONTAINERS ==================== */
+        /* fixed overlays (#loginModal, #loadingOverlay ฯลฯ) ใช้ inset-0 อยู่แล้ว ไม่ต้องแก้เพิ่ม */
+        #branchSelectorModal,
+        #mainApp {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            height: 100dvh;
+            overflow: hidden;
+        }
+
+        /* ==================== SCROLL AREAS ==================== */
         #mainScrollingArea {
             flex: 1;
             overflow-y: auto;
             -webkit-overflow-scrolling: touch;
             overscroll-behavior-y: contain;
-            padding-bottom: 20px;
+            padding-bottom: 16px;
+            /* เพิ่ม scroll smooth */
+            scroll-behavior: smooth;
         }
 
-        /* แก้ scroll สำหรับ Handheld Android */
+        /* Scan mode: scroll เฉพาะพื้นที่ list */
         #modeScan {
-            -webkit-overflow-scrolling: touch;
+            overflow: hidden;
         }
 
+        /* Combine mode: scroll ได้ทั้ง section */
         #modeCombine {
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior-y: contain;
+            scroll-behavior: smooth;
+        }
+
+        /* รายการกล่องใน combine mode */
+        #childList {
             overflow-y: auto;
             -webkit-overflow-scrolling: touch;
             overscroll-behavior-y: contain;
         }
 
-        #childList {
+        /* Branch selector scroll area */
+        #branchSelectorModal > div.p-3 {
+            overflow-y: auto;
             -webkit-overflow-scrolling: touch;
+            overscroll-behavior-y: contain;
         }
 
+        /* ==================== CAMERA SCANNER ==================== */
         /* 💡 แก้ไขปัญหากล้องหน้าจอดำบนมือถือ */
         #reader {
             border: none !important;
@@ -86,10 +131,21 @@
             object-fit: cover;
             border-radius: 0.5rem;
         }
+
+        /* ==================== SMOOTH INTERACTIONS ==================== */
+        button, input {
+            /* ป้องกัน highlight สีเทาเมื่อแตะบน Android */
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        button:active {
+            transform: scale(0.97);
+            transition: transform 0.1s;
+        }
     </style>
 </head>
 
-<body class="bg-gray-100 h-screen flex flex-col font-sans overflow-hidden">
+<body class="bg-gray-100 flex flex-col font-sans" style="height:100dvh;overflow:hidden;">
 
     <div id="toastMsg" class="toast-msg bg-green-600 z-[100] flex items-center gap-2"></div>
 
@@ -256,7 +312,7 @@
         </div>
     </div>
 
-    <div id="branchSelectorModal" class="hidden flex-col h-screen bg-gray-100">
+    <div id="branchSelectorModal" class="hidden flex-col bg-gray-100" style="position:fixed;top:0;left:0;right:0;bottom:0;height:100dvh;overflow:hidden;">
         <header class="bg-blue-900 text-white p-3 flex justify-between items-center shadow-md shrink-0">
             <div><span class="text-xs text-blue-300 block">WAVE NO.</span>
                 <h1 id="branchWaveDisplay" class="text-xl font-bold text-yellow-300"></h1>
@@ -269,13 +325,13 @@
                 </svg> ออก (Esc)
             </button>
         </header>
-        <div class="p-3 md:p-4 flex-1 overflow-y-auto">
+        <div class="p-3 md:p-4 flex-1 overflow-y-auto" style="-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain;">
             <h2 class="text-lg font-bold text-gray-800 mb-3 text-center">กรุณาเลือกสาขาที่ต้องการปฏิบัติงาน</h2>
             <div id="branchButtonGrid" class="grid grid-cols-1 gap-3 pb-6"></div>
         </div>
     </div>
 
-    <div id="mainApp" class="hidden flex-col h-screen">
+    <div id="mainApp" class="hidden flex-col" style="position:fixed;top:0;left:0;right:0;bottom:0;height:100dvh;overflow:hidden;">
         <header class="bg-blue-900 text-white shadow-md shrink-0">
             <div class="p-2 md:p-3 flex justify-between items-center border-b border-blue-700">
                 <div class="flex-1 min-w-0 pr-2">
@@ -325,9 +381,9 @@
             </button>
         </div>
 
-        <main class="flex-1 flex flex-col relative min-h-0 bg-gray-100">
+        <main class="flex-1 flex flex-col relative bg-gray-100" style="min-height:0;overflow:hidden;">
 
-            <section id="modeScan" class="flex flex-col h-full min-h-0">
+            <section id="modeScan" class="flex flex-col min-h-0" style="height:100%;overflow:hidden;">
                 <div class="bg-white p-3 md:p-4 shrink-0 shadow-sm z-20">
                     <label class="block text-gray-800 font-black mb-1.5 text-sm md:text-base">สแกนบาร์โค้ด LPN
                         กล่อง</label>
