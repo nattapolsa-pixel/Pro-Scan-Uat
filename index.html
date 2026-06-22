@@ -1637,24 +1637,13 @@
 
                     <!-- Signature Section (Only in print view) -->
                     <div class="print-signature-section flex flex-row justify-between items-end mt-6 text-xs text-slate-700 font-sans print-break-inside-avoid px-2">
-                        <!-- Left Block: Signature and departure/arrival times -->
+                        <!-- Left Block: Signature -->
                         <div class="flex flex-col gap-1 min-w-[300px]">
                             <div class="flex items-center gap-1">
                                 <span class="font-bold">เจ้าหน้าที่ :</span>
-                                <span class="border-b border-dotted border-slate-400 min-w-[180px] inline-block text-center font-bold px-2 py-0.5 text-slate-800">${escapeDocumentText(loggedInEmpName || '')} (${escapeDocumentText(loggedInEmpId || '')})</span>
+                                <span class="border-b border-dotted border-slate-400 min-w-[180px] inline-block text-center font-bold px-2 py-0.5 text-slate-800">${escapeDocumentText(loggedInEmpName || '')}</span>
                             </div>
                             <div class="pl-16 text-slate-500 font-semibold text-[10px]">(ผู้จัดทำเอกสารใบคุมส่งสินค้า)</div>
-
-                            <div class="mt-4 flex flex-col gap-2">
-                                <div class="flex items-center gap-1">
-                                    <span class="font-bold">เวลาออกเดินทาง :</span>
-                                    <span class="border-b border-dotted border-slate-400 min-w-[180px] inline-block">&nbsp;</span>
-                                </div>
-                                <div class="flex items-center gap-1">
-                                    <span class="font-bold">เวลาเสร็จสิ้น :</span>
-                                    <span class="border-b border-dotted border-slate-400 min-w-[180px] inline-block">&nbsp;</span>
-                                </div>
-                            </div>
                         </div>
 
                         <!-- Right Block: Courier sign off -->
