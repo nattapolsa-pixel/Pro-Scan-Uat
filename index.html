@@ -826,7 +826,9 @@
     </div>
 
     <script>
-        const backendApiUrl = 'https://dc-scanner-api.onrender.com';
+        const backendApiUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+            ? 'http://localhost:8000'
+            : 'https://dc-scanner-api.onrender.com';
         // 💡 เพิ่มบรรทัดนี้กลับมา เพื่อให้ระบบ Login ตรวจรหัสพนักงานได้
         const employeeApiUrl = 'https://script.google.com/macros/s/AKfycbybmW6N7TxfsHqEa-Fx6ayy8M8xfjKGmTYO27izmbEoLJmQRrFD3i9c0XogP0fG6tlG/exec';
 
