@@ -5,7 +5,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Pro LPN Scanner (Professional UI)</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Sarabun:wght@400;600;800&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     <style>
@@ -153,27 +152,7 @@
             }
         }
 
-        /* Default styles for screen (web browser) */
-        .only-print {
-            display: none !important;
-        }
-
         @media print {
-            @page {
-                size: A4 landscape;
-                margin: 8mm 6mm 8mm;
-            }
-
-            html,
-            body {
-                width: auto !important;
-                min-height: auto !important;
-                margin: 0 !important;
-                padding: 0 !important;
-                overflow: visible !important;
-                background: #ffffff !important;
-            }
-
             body * {
                 visibility: hidden !important;
             }
@@ -189,7 +168,7 @@
                 top: 0;
                 width: 100%;
                 padding: 0 !important;
-                color: #000000 !important;
+                color: #111827 !important;
                 background: #ffffff !important;
             }
 
@@ -197,115 +176,17 @@
                 display: none !important;
             }
 
-            .only-print {
-                display: flex !important;
-            }
-
-            .overflow-x-auto {
-                overflow: visible !important;
-            }
-
             .branch-document-sheet {
                 border: none !important;
                 box-shadow: none !important;
                 padding: 0 !important;
                 margin: 0 !important;
-                width: 100% !important;
-                min-height: auto !important;
-                box-sizing: border-box !important;
-                page-break-after: auto !important;
-                break-after: auto !important;
-                gap: 3mm !important;
-                background: #ffffff !important;
-            }
-
-            .print-document-header {
-                padding-bottom: 2mm !important;
-                margin-bottom: 1mm !important;
-                border-bottom: 1px solid #000000 !important;
-                flex-shrink: 0 !important;
-            }
-
-            .print-document-header img {
-                height: 11mm !important;
-                width: auto !important;
-            }
-
-            .print-document-title {
-                font-size: 15px !important;
-                line-height: 1.2 !important;
-            }
-
-            .print-table-wrap {
-                margin-top: 0 !important;
-                border-radius: 0 !important;
-                border: 1px solid #000000 !important;
-                box-shadow: none !important;
-                overflow: visible !important;
-                flex-shrink: 0 !important;
-            }
-
-            .print-table {
-                table-layout: fixed !important;
-                width: 100% !important;
-                font-size: 8px !important;
-                line-height: 1.1 !important;
-            }
-
-            .print-table th,
-            .print-table td {
-                padding: 1mm 0.8mm !important;
-                height: 5.8mm !important;
-                line-height: 1.1 !important;
-                vertical-align: middle !important;
-            }
-
-            .print-table th {
-                background: #e8edf3 !important;
-                color: #000000 !important;
-                font-weight: 800 !important;
-            }
-
-            .print-signature-section {
-                margin-top: 4mm !important;
-                flex-shrink: 0 !important;
+                page-break-after: always !important;
+                break-after: page !important;
             }
 
             .print-break-inside-avoid {
                 break-inside: avoid;
-            }
-
-            /* Thin black borders on all table cells when printing */
-            table, th, td {
-                border: 1px solid #000000 !important;
-                border-collapse: collapse !important;
-                color: #000000 !important;
-            }
-
-            thead,
-            th,
-            .bg-slate-800,
-            .bg-slate-700 {
-                background: #f1f5f9 !important;
-                color: #000000 !important;
-            }
-
-            /* Make sure text colors are black in print for visibility */
-            th, td, span, div, h1, h2, p, input {
-                color: #000000 !important;
-            }
-
-            /* Hide input borders and backgrounds during print */
-            input {
-                border: none !important;
-                background: transparent !important;
-                box-shadow: none !important;
-                padding: 0 !important;
-            }
-
-            /* Hide placeholder in print */
-            input::placeholder {
-                color: transparent !important;
             }
         }
     </style>
@@ -406,7 +287,7 @@
                 </button>
             </div>
             <div class="flex items-center justify-between gap-3 mt-3 bg-gray-800 p-2.5 rounded-lg border border-gray-700">
-                <span class="font-bold text-yellow-300 text-xs md:text-sm">📄 รวมใบคุมส่งสินค้าทุกสาขาใน Wave นี้</span>
+                <span class="font-bold text-yellow-300 text-xs md:text-sm">📄 รวมใบคุมส่งสินค้าทุกสาขาในรอบงานนี้</span>
                 <button onclick="printShippingDocument()"
                     class="bg-blue-600 hover:bg-blue-700 text-white font-black px-4 py-2.5 rounded-lg shadow flex items-center justify-center gap-2 text-sm transition active:scale-95">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -448,12 +329,12 @@
         class="hidden fixed inset-0 bg-gray-900 bg-opacity-80 flex items-center justify-center p-4 z-40">
         <div
             class="bg-white p-5 md:p-6 rounded-xl shadow-2xl w-full max-w-md border-t-8 border-blue-600 flex flex-col max-h-[90vh]">
-            <h2 class="text-2xl font-bold text-gray-800 mb-2 shrink-0">เลือกงาน (Wave)</h2>
+            <h2 class="text-2xl font-bold text-gray-800 mb-2 shrink-0">เลือกงาน (Wave / Booking)</h2>
             <div class="flex flex-col gap-3 mt-2 shrink-0">
                 <div class="flex gap-2">
                     <input type="text" id="waveInput" autocomplete="off"
                         class="w-full text-xl p-3 border-2 border-gray-300 rounded-lg uppercase bg-blue-50 focus:border-blue-500 font-bold tracking-wider"
-                        placeholder="สแกนรหัส WAVE...">
+                        placeholder="ระบุรหัส WAVE หรือ BOOKING...">
                     <button onclick="openScanner('waveInput')"
                         class="bg-blue-800 hover:bg-blue-900 text-white w-14 rounded-lg shadow transition flex items-center justify-center flex-shrink-0">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -515,7 +396,7 @@
 
     <div id="branchSelectorModal" class="hidden flex-col bg-gray-100" style="position:fixed;top:0;left:0;right:0;bottom:0;height:100dvh;overflow:hidden;">
         <header class="bg-blue-900 text-white p-3 flex justify-between items-center shadow-md shrink-0">
-            <div><span class="text-xs text-blue-300 block">WAVE NO.</span>
+            <div><span class="text-xs text-blue-300 block">WAVE / BOOKING NO.</span>
                 <h1 id="branchWaveDisplay" class="text-xl font-bold text-yellow-300"></h1>
             </div>
             <div class="flex items-center gap-2">
@@ -914,9 +795,7 @@
     </div>
 
     <script>
-        const backendApiUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-            ? 'http://localhost:8000'
-            : 'https://dc-scanner-api.onrender.com';
+        const backendApiUrl = 'https://dc-scanner-api.onrender.com';
         // 💡 เพิ่มบรรทัดนี้กลับมา เพื่อให้ระบบ Login ตรวจรหัสพนักงานได้
         const employeeApiUrl = 'https://script.google.com/macros/s/AKfycbybmW6N7TxfsHqEa-Fx6ayy8M8xfjKGmTYO27izmbEoLJmQRrFD3i9c0XogP0fG6tlG/exec';
 
@@ -1040,51 +919,6 @@
             }[char]));
         }
 
-        function firstFilledValue(...values) {
-            for (const value of values) {
-                const text = String(value === undefined || value === null ? '' : value).trim();
-                if (text !== '' && text !== '-') return text;
-            }
-            return '';
-        }
-
-        function getShippingDocumentMetaKey(waveNo = currentWave) {
-            return `proScannerShippingDocumentMeta:${waveNo || 'NO_WAVE'}`;
-        }
-
-        function getSavedShippingDocumentMeta(waveNo = currentWave) {
-            try {
-                return JSON.parse(localStorage.getItem(getShippingDocumentMetaKey(waveNo))) || {};
-            } catch (e) {
-                return {};
-            }
-        }
-
-        function saveShippingDocumentMeta() {
-            if (!currentWave) return;
-            localStorage.setItem(getShippingDocumentMetaKey(), JSON.stringify({
-                booking_no: currentBookingNo || '',
-                license_plate: currentLicensePlate || ''
-            }));
-        }
-
-        function syncShippingDocumentInputs() {
-            const screenBooking = document.getElementById('screenBookingNoInput');
-            const screenPlate = document.getElementById('screenLicensePlateInput');
-            const printBooking = document.getElementById('documentBookingNoInput');
-            const printPlate = document.getElementById('documentLicensePlateInput');
-
-            currentBookingNo = firstFilledValue(screenBooking && screenBooking.value, printBooking && printBooking.value, currentBookingNo);
-            currentLicensePlate = firstFilledValue(screenPlate && screenPlate.value, printPlate && printPlate.value, currentLicensePlate);
-
-            if (screenBooking) screenBooking.value = currentBookingNo;
-            if (printBooking) printBooking.value = currentBookingNo;
-            if (screenPlate) screenPlate.value = currentLicensePlate;
-            if (printPlate) printPlate.value = currentLicensePlate;
-
-            saveShippingDocumentMeta();
-        }
-
         function getExpectedQty(item) {
             return parseInt(item.Total_Qty || item.total_qty) || 1;
         }
@@ -1173,34 +1007,23 @@
                 return;
             }
 
-            const now = new Date();
-            const dateStr = now.toLocaleDateString('en-GB', {
-                timeZone: 'Asia/Bangkok',
-                day: 'numeric',
-                month: 'numeric',
-                year: 'numeric'
-            });
-            const timeStr = `${now.toLocaleTimeString('en-GB', {
-                timeZone: 'Asia/Bangkok',
-                hour: '2-digit',
-                minute: '2-digit',
-                hour12: false
-            })} น.`;
+            const today = new Date();
+            const dateStr = `${today.getMonth() + 1}/${today.getDate()}/${today.getFullYear()}`;
 
             let totalM = 0;
             let totalRed = 0;
             let totalBlue = 0;
             let totalGreen = 0;
             let totalBlack = 0;
+            let totalYellow = 0;
             let totalAllBoxes = 0;
             let totalPallets = 0;
 
-            // --- Generate Rows for Screen View (Actual Branches Only, No Padding) ---
-            let screenRowsHtml = '';
-            branches.forEach((branch, index) => {
+            const rows = branches.map((branch, index) => {
                 const bCode = branch.code;
                 const branchItems = allLpnsInWave.filter(item => (item.branch || 'Unknown') === bCode);
                 
+                // Get owner from the items (if any item has a valid owner)
                 let owner = 'Unknown';
                 const firstWithOwner = branchItems.find(item => item.owner && item.owner !== 'Unknown');
                 if (firstWithOwner) {
@@ -1209,11 +1032,13 @@
                     owner = branchItems[0].owner || 'Unknown';
                 }
 
+                // Sum quantities by category
                 let mCount = 0;
                 let redCount = 0;
                 let blueCount = 0;
                 let greenCount = 0;
                 let blackCount = 0;
+                let yellowCount = 0;
                 
                 const scannedMasters = new Set();
                 let standalonePallets = 0;
@@ -1225,6 +1050,7 @@
                         const color = String(item.color || '').toUpperCase();
                         const type = String(item.scan_type || '').toUpperCase();
 
+                        // Check if Carton or PR prefix
                         if (prefix === 'PR' || type === 'CARTON' || color === 'REUSE') {
                             mCount += qty;
                         } else if (prefix === 'PP') {
@@ -1236,7 +1062,7 @@
                             else if (color === 'BLUE') blueCount += qty;
                             else if (color === 'GREEN') greenCount += qty;
                             else if (color === 'BLACK') blackCount += qty;
-                            else if (color === 'YELLOW') mCount += qty; // Group yellow under M
+                            else if (color === 'YELLOW') yellowCount += qty;
                             else {
                                 mCount += qty;
                             }
@@ -1251,7 +1077,7 @@
                     }
                 });
 
-                const branchTotalBoxes = mCount + redCount + blueCount + greenCount + blackCount;
+                const branchTotalBoxes = mCount + redCount + blueCount + greenCount + blackCount + yellowCount;
                 const branchPallets = scannedMasters.size + standalonePallets;
 
                 // Accumulate totals
@@ -1260,157 +1086,43 @@
                 totalBlue += blueCount;
                 totalGreen += greenCount;
                 totalBlack += blackCount;
+                totalYellow += yellowCount;
                 totalAllBoxes += branchTotalBoxes;
                 totalPallets += branchPallets;
 
                 const cleanBranchName = branch.name.replace(/\s*\([^)]+\)\s*/g, '').trim();
                 const province = getProvinceFromBranchName(branch.name);
 
-                screenRowsHtml += `
-                    <tr class="hover:bg-slate-50 transition-colors text-center text-slate-700 h-10">
-                        <td class="p-2 border-r border-slate-200 font-medium font-sans text-xs">${index + 1}</td>
-                        <td class="p-2 border-r border-slate-200 font-bold text-slate-900 font-sans text-xs">${escapeDocumentText(owner)}</td>
-                        <td class="p-2 border-r border-slate-200 font-bold text-indigo-600 tracking-wider font-sans text-xs">${escapeDocumentText(bCode)}</td>
-                        <td class="p-2 border-r border-slate-200 text-left font-medium font-sans text-xs pl-2">${escapeDocumentText(cleanBranchName)}</td>
-                        <td class="p-2 border-r border-slate-200 text-slate-600 font-sans text-xs">${escapeDocumentText(province)}</td>
-                        <td class="p-2 border-r border-slate-200 font-bold font-sans text-xs">${mCount || ''}</td>
-                        <td class="p-2 border-r border-slate-200 text-red-600 font-bold font-sans text-xs">${redCount || ''}</td>
-                        <td class="p-2 border-r border-slate-200 text-blue-600 font-bold font-sans text-xs">${blueCount || ''}</td>
-                        <td class="p-2 border-r border-slate-200 text-green-600 font-bold font-sans text-xs">${greenCount || ''}</td>
-                        <td class="p-2 border-r border-slate-200 text-slate-800 font-bold font-sans text-xs">${blackCount || ''}</td>
-                        <td class="p-2 border-r border-slate-200 bg-slate-50/50 font-black text-slate-900 font-sans text-xs">${branchTotalBoxes || ''}</td>
-                        <td class="p-2 font-black bg-slate-50/50 text-indigo-900 font-sans text-xs">${branchPallets || ''}</td>
+                return `
+                    <tr class="hover:bg-slate-50 transition-colors text-center text-slate-700">
+                        <td class="p-3 border-r border-slate-200 font-medium font-sans">${index + 1}</td>
+                        <td class="p-3 border-r border-slate-200 font-bold text-slate-900 font-sans">${escapeDocumentText(owner)}</td>
+                        <td class="p-3 border-r border-slate-200 font-bold text-indigo-600 tracking-wider font-sans">${escapeDocumentText(bCode)}</td>
+                        <td class="p-3 border-r border-slate-200 text-left font-medium font-sans">${escapeDocumentText(cleanBranchName)}</td>
+                        <td class="p-3 border-r border-slate-200 text-slate-600 font-sans">${escapeDocumentText(province)}</td>
+                        <td class="p-3 border-r border-slate-200 font-bold font-sans">${mCount || ''}</td>
+                        <td class="p-3 border-r border-slate-200 text-red-600 font-bold font-sans">${redCount || ''}</td>
+                        <td class="p-3 border-r border-slate-200 text-blue-600 font-bold font-sans">${blueCount || ''}</td>
+                        <td class="p-3 border-r border-slate-200 text-green-600 font-bold font-sans">${greenCount || ''}</td>
+                        <td class="p-3 border-r border-slate-200 text-slate-800 font-bold font-sans">${blackCount || ''}</td>
+                        <td class="p-3 border-r border-slate-200 text-yellow-600 font-bold font-sans">${yellowCount || ''}</td>
+                        <td class="p-3 border-r border-slate-200 bg-slate-50/50 font-black text-slate-900 font-sans">${branchTotalBoxes}</td>
+                        <td class="p-3 font-black bg-slate-50/50 text-indigo-900 font-sans">${branchPallets}</td>
                     </tr>
                 `;
-            });
+            }).join('');
 
-            const screenTotalRow = `
-                <tr class="bg-slate-100 text-center font-black text-slate-900 border-t-2 border-slate-350 h-10">
-                    <td colspan="5" class="p-2 border-r border-slate-200 text-center text-slate-600 font-sans text-xs">รวมจำนวนกล่อง/พาเลท</td>
-                    <td class="p-2 border-r border-slate-200 text-slate-900 font-sans text-xs">${totalM}</td>
-                    <td class="p-2 border-r border-slate-200 text-red-700 font-sans text-xs">${totalRed}</td>
-                    <td class="p-2 border-r border-slate-200 text-blue-700 font-sans text-xs">${totalBlue}</td>
-                    <td class="p-2 border-r border-slate-200 text-green-700 font-sans text-xs">${totalGreen}</td>
-                    <td class="p-2 border-r border-slate-200 text-slate-900 font-sans text-xs">${totalBlack}</td>
-                    <td class="p-2 border-r border-slate-200 bg-slate-200 text-slate-950 font-sans text-xs">${totalAllBoxes}</td>
-                    <td class="p-2 bg-slate-200 text-indigo-950 font-sans text-xs">${totalPallets}</td>
-                </tr>
-            `;
-
-            // --- Generate Rows for Print View (A4 Landscape, 15 Rows Minimum) ---
-            let printRowsHtml = '';
-            const minRows = 15;
-            const totalRowsCount = Math.max(branches.length, minRows);
-
-            for (let index = 0; index < totalRowsCount; index++) {
-                if (index < branches.length) {
-                    const branch = branches[index];
-                    const bCode = branch.code;
-                    const branchItems = allLpnsInWave.filter(item => (item.branch || 'Unknown') === bCode);
-
-                    let owner = 'Unknown';
-                    const firstWithOwner = branchItems.find(item => item.owner && item.owner !== 'Unknown');
-                    if (firstWithOwner) {
-                        owner = firstWithOwner.owner;
-                    } else if (branchItems[0]) {
-                        owner = branchItems[0].owner || 'Unknown';
-                    }
-
-                    let mCount = 0;
-                    let redCount = 0;
-                    let blueCount = 0;
-                    let greenCount = 0;
-                    let blackCount = 0;
-
-                    const scannedMasters = new Set();
-                    let standalonePallets = 0;
-
-                    branchItems.forEach(item => {
-                        if (item.status === 'Scanned') {
-                            const qty = getActualQty(item);
-                            const prefix = String(item.lpn || '').substring(0, 2).toUpperCase();
-                            const color = String(item.color || '').toUpperCase();
-                            const type = String(item.scan_type || '').toUpperCase();
-
-                            if (prefix === 'PR' || type === 'CARTON' || color === 'REUSE') {
-                                mCount += qty;
-                            } else if (prefix === 'PP') {
-                                if (!item.combinedWith && !item.isMaster) {
-                                    standalonePallets += qty;
-                                }
-                            } else {
-                                if (color === 'RED') redCount += qty;
-                                else if (color === 'BLUE') blueCount += qty;
-                                else if (color === 'GREEN') greenCount += qty;
-                                else if (color === 'BLACK') blackCount += qty;
-                                else if (color === 'YELLOW') mCount += qty;
-                                else {
-                                    mCount += qty;
-                                }
-                            }
-
-                            if (item.combinedWith) {
-                                scannedMasters.add(item.combinedWith);
-                            }
-                            if (item.isMaster) {
-                                scannedMasters.add(item.lpn);
-                            }
-                        }
-                    });
-
-                    const branchTotalBoxes = mCount + redCount + blueCount + greenCount + blackCount;
-                    const branchPallets = scannedMasters.size + standalonePallets;
-
-                    const cleanBranchName = branch.name.replace(/\s*\([^)]+\)\s*/g, '').trim();
-                    const province = getProvinceFromBranchName(branch.name);
-
-                    printRowsHtml += `
-                        <tr class="text-center text-slate-700 h-8">
-                            <td class="p-1 border border-slate-300 font-sans text-xs text-center font-bold">${index + 1}</td>
-                            <td class="p-1 border border-slate-300 font-bold text-slate-900 font-sans text-xs text-center">${escapeDocumentText(owner)}</td>
-                            <td class="p-1 border border-slate-300 font-bold text-indigo-600 tracking-wider font-sans text-xs text-center">${escapeDocumentText(bCode)}</td>
-                            <td class="p-1 border border-slate-300 text-left font-medium font-sans text-xs pl-2">${escapeDocumentText(cleanBranchName)}</td>
-                            <td class="p-1 border border-slate-300 text-slate-600 font-sans text-xs text-center">${escapeDocumentText(province)}</td>
-                            <td class="p-1 border border-slate-300 font-bold font-sans text-xs text-center">${mCount || ''}</td>
-                            <td class="p-1 border border-slate-300 text-red-600 font-bold font-sans text-xs text-center">${redCount || ''}</td>
-                            <td class="p-1 border border-slate-300 text-blue-600 font-bold font-sans text-xs text-center">${blueCount || ''}</td>
-                            <td class="p-1 border border-slate-300 text-green-600 font-bold font-sans text-xs text-center">${greenCount || ''}</td>
-                            <td class="p-1 border border-slate-300 text-slate-800 font-bold font-sans text-xs text-center">${blackCount || ''}</td>
-                            <td class="p-1 border border-slate-300 bg-slate-50/50 font-black text-slate-900 font-sans text-xs text-center">${branchTotalBoxes || ''}</td>
-                            <td class="p-1 border border-slate-300 font-black bg-slate-50/50 text-indigo-900 font-sans text-xs text-center">${branchPallets || ''}</td>
-                        </tr>
-                    `;
-                } else {
-                    // Padded empty rows
-                    printRowsHtml += `
-                        <tr class="text-center text-slate-400 h-8">
-                            <td class="p-1 border border-slate-300 font-sans text-xs text-center font-bold">${index + 1}</td>
-                            <td class="p-1 border border-slate-300 font-sans text-xs">&nbsp;</td>
-                            <td class="p-1 border border-slate-300 font-sans text-xs">&nbsp;</td>
-                            <td class="p-1 border border-slate-300 font-sans text-xs">&nbsp;</td>
-                            <td class="p-1 border border-slate-300 font-sans text-xs">&nbsp;</td>
-                            <td class="p-1 border border-slate-300 font-sans text-xs">&nbsp;</td>
-                            <td class="p-1 border border-slate-300 font-sans text-xs">&nbsp;</td>
-                            <td class="p-1 border border-slate-300 font-sans text-xs">&nbsp;</td>
-                            <td class="p-1 border border-slate-300 font-sans text-xs">&nbsp;</td>
-                            <td class="p-1 border border-slate-300 font-sans text-xs">&nbsp;</td>
-                            <td class="p-1 border border-slate-300 font-sans text-xs">&nbsp;</td>
-                            <td class="p-1 border border-slate-300 font-sans text-xs">&nbsp;</td>
-                        </tr>
-                    `;
-                }
-            }
-
-            const printTotalRow = `
-                <tr class="bg-slate-100 text-center font-black text-slate-900 border-t-2 border-slate-300 h-8">
-                    <td colspan="5" class="p-1 border border-slate-300 text-center text-slate-700 font-sans text-xs font-bold">รวมทั้งหมด</td>
-                    <td class="p-1 border border-slate-300 text-slate-900 font-sans text-xs text-center">${totalM}</td>
-                    <td class="p-1 border border-slate-300 text-red-700 font-sans text-xs text-center">${totalRed}</td>
-                    <td class="p-1 border border-slate-300 text-blue-700 font-sans text-xs text-center">${totalBlue}</td>
-                    <td class="p-1 border border-slate-300 text-green-700 font-sans text-xs text-center">${totalGreen}</td>
-                    <td class="p-1 border border-slate-300 text-slate-900 font-sans text-xs text-center">${totalBlack}</td>
-                    <td class="p-1 border border-slate-300 bg-slate-200 text-slate-950 font-sans text-xs text-center">${totalAllBoxes}</td>
-                    <td class="p-1 border border-slate-300 bg-slate-200 text-indigo-950 font-sans text-xs text-center">${totalPallets}</td>
+            const totalRow = `
+                <tr class="bg-slate-100 text-center font-black text-slate-900 border-t-2 border-slate-300">
+                    <td colspan="5" class="p-3 border-r border-slate-200 text-center text-slate-600 font-sans">รวมจำนวนกล่อง/พาเลท</td>
+                    <td class="p-3 border-r border-slate-200 text-slate-900 font-sans">${totalM}</td>
+                    <td class="p-3 border-r border-slate-200 text-red-700 font-sans">${totalRed}</td>
+                    <td class="p-3 border-r border-slate-200 text-blue-700 font-sans">${totalBlue}</td>
+                    <td class="p-3 border-r border-slate-200 text-green-700 font-sans">${totalGreen}</td>
+                    <td class="p-3 border-r border-slate-200 text-slate-900 font-sans">${totalBlack}</td>
+                    <td class="p-3 border-r border-slate-200 text-yellow-700 font-sans">${totalYellow}</td>
+                    <td class="p-3 border-r border-slate-200 bg-slate-200 text-slate-950 font-sans">${totalAllBoxes}</td>
+                    <td class="p-3 bg-slate-200 text-indigo-950 font-sans">${totalPallets}</td>
                 </tr>
             `;
 
@@ -1482,44 +1194,34 @@
             }).join('');
 
             content.innerHTML = `
-                <!-- ==================== 1. SCREEN VIEW (PREVIEW MODE - NO PRINT) ==================== -->
-                <div class="no-print bg-white p-6 md:p-8 shadow-xl border border-slate-200 rounded-xl flex flex-col gap-6" style="font-family: 'Inter', sans-serif;">
+                <div class="branch-document-sheet bg-white p-6 md:p-8 shadow-xl border border-slate-200 rounded-xl flex flex-col gap-6" style="background-color: #ffffff; font-family: 'Inter', sans-serif;">
 
                     <!-- Title Section -->
                     <div class="text-center pb-4 border-b border-slate-100">
-                        <h1 class="text-2xl md:text-3xl font-black text-slate-800 tracking-wide font-sans">Transport Job</h1>
-                        <p class="text-xs md:text-sm text-slate-500 font-bold mt-1 font-sans">เอกสารใบรายการคุมส่งสินค้า (Shipping Document Summary)</p>
+                        <h1 class="text-2xl md:text-3xl font-black text-slate-800 tracking-wide">Transport Job</h1>
+                        <p class="text-xs md:text-sm text-slate-500 font-bold mt-1">เอกสารใบรายการคุมส่งสินค้า (Shipping Document Summary)</p>
                     </div>
 
                     <!-- Metadata Grid -->
-                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-slate-50 rounded-xl border border-slate-150 text-sm">
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-slate-50 rounded-xl border border-slate-100 text-sm">
                         <div class="flex flex-col gap-1">
-                            <span class="text-slate-400 font-bold text-xs uppercase tracking-wider font-sans">Booking No.</span>
-                            <input type="text" id="screenBookingNoInput"
-                                   value="${escapeDocumentText(currentBookingNo)}"
-                                   oninput="currentBookingNo = this.value; const target = document.getElementById('documentBookingNoInput'); if (target) target.value = this.value; saveShippingDocumentMeta()"
-                                   placeholder="พิมพ์ Booking No."
-                                   class="bg-transparent border-b border-slate-300 focus:border-blue-500 focus:outline-none text-slate-800 font-black text-base w-full font-sans" />
+                            <span class="text-slate-400 font-bold text-xs uppercase tracking-wider">Booking No.</span>
+                            <span class="text-slate-800 font-black text-base">${escapeDocumentText(currentBookingNo || '-')}</span>
                         </div>
                         <div class="flex flex-col gap-1">
-                            <span class="text-slate-400 font-bold text-xs uppercase tracking-wider font-sans">Wave No.</span>
-                            <span class="text-slate-800 font-black text-base font-sans">${escapeDocumentText(currentWave || '0000000000')}</span>
+                            <span class="text-slate-400 font-bold text-xs uppercase tracking-wider">Wave No.</span>
+                            <span class="text-slate-800 font-black text-base">${escapeDocumentText(currentWave || '0000000000')}</span>
                         </div>
                         <div class="flex flex-col gap-1">
-                            <span class="text-slate-400 font-bold text-xs uppercase tracking-wider font-sans">ทะเบียนรถ (License Plate)</span>
-                            <input type="text" id="screenLicensePlateInput"
-                                   value="${escapeDocumentText(currentLicensePlate)}"
-                                   oninput="currentLicensePlate = this.value; const target = document.getElementById('documentLicensePlateInput'); if (target) target.value = this.value; saveShippingDocumentMeta()"
-                                   placeholder="พิมพ์ทะเบียนรถ"
-                                   class="bg-transparent border-b border-slate-300 focus:border-blue-500 focus:outline-none text-slate-800 font-black text-base w-full font-sans" />
+                            <span class="text-slate-400 font-bold text-xs uppercase tracking-wider">ทะเบียนรถ (License Plate)</span>
+                            <span class="text-slate-800 font-black text-base">${escapeDocumentText(currentLicensePlate || '-')}</span>
                         </div>
                         <div class="flex flex-col gap-1 md:items-end">
-                            <span class="text-slate-400 font-bold text-xs uppercase tracking-wider font-sans">วันที่ออกเอกสาร</span>
-                            <span class="text-slate-800 font-black text-base font-sans">${escapeDocumentText(dateStr)}</span>
+                            <span class="text-slate-400 font-bold text-xs uppercase tracking-wider">วันที่ออกเอกสาร</span>
+                            <span class="text-slate-800 font-black text-base">${escapeDocumentText(dateStr)}</span>
                         </div>
                     </div>
 
-                    <!-- Table (Actual rows only, no padding) -->
                     <div class="overflow-x-auto rounded-xl border border-slate-200 shadow-sm">
                         <table class="w-full text-left border-collapse text-sm">
                             <thead class="bg-slate-800 text-white font-bold text-center">
@@ -1527,32 +1229,33 @@
                                     <th class="p-3 border-r border-slate-700 w-12 text-center font-sans">No</th>
                                     <th class="p-3 border-r border-slate-700 w-24 text-center font-sans">Owner</th>
                                     <th class="p-3 border-r border-slate-700 w-28 text-center font-sans">รหัสสาขา</th>
-                                    <th class="p-3 border-r border-slate-700 text-left font-sans pl-3">ชื่อสาขา</th>
+                                    <th class="p-3 border-r border-slate-700 text-left font-sans">ชื่อสาขา</th>
                                     <th class="p-3 border-r border-slate-700 w-28 text-center font-sans">จังหวัด</th>
                                     <th class="p-3 border-r border-slate-700 w-20 text-center font-sans">กล่อง M</th>
                                     <th class="p-3 border-r border-slate-700 w-24 text-center font-sans text-red-300">TOTE แดง</th>
                                     <th class="p-3 border-r border-slate-700 w-24 text-center font-sans text-blue-300">TOTE น้ำเงิน</th>
                                     <th class="p-3 border-r border-slate-700 w-24 text-center font-sans text-green-300">TOTE เขียว</th>
-                                    <th class="p-3 border-r border-slate-700 w-24 text-center font-sans text-slate-350">TOTE ดำ</th>
+                                    <th class="p-3 border-r border-slate-700 w-24 text-center font-sans text-slate-300">TOTE ดำ</th>
+                                    <th class="p-3 border-r border-slate-700 w-24 text-center font-sans text-yellow-300">สีเหลือง</th>
                                     <th class="p-3 border-r border-slate-700 w-24 text-center bg-slate-700 font-sans">รวมกล่อง</th>
                                     <th class="p-3 w-20 text-center bg-slate-700 text-indigo-200 font-sans">พาเลท</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-200">
-                                ${screenRowsHtml}
-                                ${screenTotalRow}
+                                ${rows}
+                                ${totalRow}
                             </tbody>
                         </table>
                     </div>
 
-                    <!-- LPN Details Section (Screen preview) -->
+                    <!-- LPN Details Section -->
                     <div class="mt-8 border-t border-slate-200 pt-6">
                         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-3">
                             <div class="min-w-0 flex-1">
                                 <h2 class="text-lg font-black text-slate-800 font-sans">รายละเอียดกล่อง LPN รายสาขา (LPN Barcode Details)</h2>
                                 <p class="text-xs text-slate-400 font-bold mt-0.5 font-sans">* ตรวจสอบรายละเอียดและสถานะความถูกต้องของบาร์โค้ด LPN รายสาขา</p>
                             </div>
-                            <div class="flex items-center gap-2 shrink-0">
+                            <div class="flex items-center gap-2 shrink-0 no-print">
                                 <label for="branchFilter" class="text-xs font-bold text-slate-500 whitespace-nowrap font-sans">เลือกดูเฉพาะสาขา:</label>
                                 <select id="branchFilter" onchange="filterBranchLpns()" class="bg-white border border-slate-300 text-slate-750 text-xs rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2 font-bold font-sans">
                                     <option value="ALL">แสดงทุกสาขา (Show All)</option>
@@ -1562,97 +1265,6 @@
                         </div>
                         <div class="space-y-6">
                             ${lpnDetailsHtml}
-                        </div>
-                    </div>
-                </div>
-
-                <!-- ==================== 2. PRINT VIEW (ONLY-PRINT PAPER FORMAT) ==================== -->
-                <div class="only-print branch-document-sheet bg-white p-6 md:p-8 flex flex-col gap-4" style="background-color: #ffffff; font-family: 'Sarabun', 'Inter', sans-serif;">
-                    <!-- Print Header (PT Logo, Title, Metadata, Date) -->
-                    <div class="print-document-header flex flex-row justify-between items-start w-full pb-4 border-b-2 border-slate-800">
-                        <!-- Left Side: Logo & Meta Info -->
-                        <div class="flex flex-col gap-2 min-w-[280px]">
-                            <img src="logo.png" alt="PT Logo" class="h-12 w-auto object-contain self-start" />
-                            <div class="flex flex-col gap-1 text-xs text-slate-800 font-sans mt-2">
-                                <div class="flex items-center gap-1">
-                                    <span class="font-bold min-w-[70px] text-slate-600">Booking :</span>
-                                    <input type="text" id="documentBookingNoInput"
-                                           value="${escapeDocumentText(currentBookingNo)}"
-                                           oninput="currentBookingNo = this.value; const target = document.getElementById('screenBookingNoInput'); if (target) target.value = this.value; saveShippingDocumentMeta()"
-                                           placeholder="พิมพ์ Booking No."
-                                           class="bg-white border border-slate-200 font-bold px-2 py-0.5 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-slate-900 w-44 font-sans text-xs" />
-                                </div>
-                                <div class="flex items-center gap-1 py-0.5">
-                                    <span class="font-bold min-w-[70px] text-slate-600">WAVE :</span>
-                                    <span class="font-bold text-slate-900">${escapeDocumentText(currentWave || '0000000000')}</span>
-                                </div>
-                                <div class="flex items-center gap-1">
-                                    <span class="font-bold min-w-[70px] text-slate-600">ทะเบียนรถ :</span>
-                                    <input type="text" id="documentLicensePlateInput"
-                                           value="${escapeDocumentText(currentLicensePlate || '-')}"
-                                           oninput="currentLicensePlate = this.value === '-' ? '' : this.value; const target = document.getElementById('screenLicensePlateInput'); if (target) target.value = currentLicensePlate; saveShippingDocumentMeta()"
-                                           placeholder="พิมพ์ทะเบียนรถ"
-                                           class="bg-white border border-slate-200 font-bold px-2 py-0.5 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-slate-900 w-44 font-sans text-xs" />
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Center: Title -->
-                        <div class="flex-1 text-center pt-4">
-                            <h1 class="print-document-title text-xl md:text-2xl font-black text-slate-900 tracking-wide font-sans">Transport Job (เอกสารใบคุมส่งสินค้า)</h1>
-                        </div>
-
-                        <!-- Right Side: Date -->
-                        <div class="text-right pt-4 min-w-[150px] text-xs font-bold text-slate-800 font-sans">
-                            วันที่ : ${escapeDocumentText(dateStr)}<br>
-                            เวลา : ${escapeDocumentText(timeStr)}
-                        </div>
-                    </div>
-
-                    <!-- Table Section (A4 Landscape padded to 15 rows minimum) -->
-                    <div class="print-table-wrap overflow-x-auto rounded-xl border border-slate-200 shadow-sm mt-2">
-                        <table class="print-table w-full text-center border-collapse text-xs">
-                            <thead class="bg-slate-800 text-white font-bold">
-                                <tr>
-                                    <th class="p-2 border border-slate-300 w-10 font-sans text-xs text-center">NO.</th>
-                                    <th class="p-2 border border-slate-300 w-24 font-sans text-xs text-center">ชื่อลูกค้า</th>
-                                    <th class="p-2 border border-slate-300 w-20 font-sans text-xs text-center">รหัสสาขา</th>
-                                    <th class="p-2 border border-slate-300 font-sans text-xs text-left pl-2">สาขา</th>
-                                    <th class="p-2 border border-slate-300 w-24 font-sans text-xs text-center">จังหวัด</th>
-                                    <th class="p-2 border border-slate-300 w-16 font-sans text-xs text-center">กล่อง M</th>
-                                    <th class="p-2 border border-slate-300 w-16 font-sans text-xs text-center text-red-300">TOTE แดง</th>
-                                    <th class="p-2 border border-slate-300 w-16 font-sans text-xs text-center text-blue-300">TOTE น้ำเงิน</th>
-                                    <th class="p-2 border border-slate-300 w-16 font-sans text-xs text-center text-green-300">TOTE เขียว</th>
-                                    <th class="p-2 border border-slate-300 w-16 font-sans text-xs text-center text-slate-300">TOTE ดำ</th>
-                                    <th class="p-2 border border-slate-300 w-16 font-sans text-xs text-center bg-slate-700">รวม</th>
-                                    <th class="p-2 border border-slate-300 w-16 text-center bg-slate-700 text-indigo-200">pallet</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-slate-200">
-                                ${printRowsHtml}
-                                ${printTotalRow}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <!-- Signature Section (Only in print view) -->
-                    <div class="print-signature-section flex flex-row justify-between items-end mt-6 text-xs text-slate-700 font-sans print-break-inside-avoid px-2">
-                        <!-- Left Block: Signature -->
-                        <div class="flex flex-col gap-1 min-w-[300px]">
-                            <div class="flex items-center gap-1">
-                                <span class="font-bold">เจ้าหน้าที่ :</span>
-                                <span class="border-b border-dotted border-slate-400 min-w-[180px] inline-block text-center font-bold px-2 py-0.5 text-slate-800">${escapeDocumentText(loggedInEmpName || '')}</span>
-                            </div>
-                            <div class="pl-16 text-slate-500 font-semibold text-[10px]">(ผู้จัดทำเอกสารใบคุมส่งสินค้า)</div>
-                        </div>
-
-                        <!-- Right Block: Courier sign off -->
-                        <div class="flex flex-col items-end gap-1 min-w-[250px] justify-end">
-                            <div class="flex items-center gap-1">
-                                <span class="font-bold">คนส่ง :</span>
-                                <span class="border-b border-dotted border-slate-400 min-w-[180px] inline-block">&nbsp;</span>
-                            </div>
-                            <div class="pr-16 text-slate-500 font-semibold text-[10px]">(ผู้จัดส่งสินค้า)</div>
                         </div>
                     </div>
                 </div>
@@ -1673,168 +1285,7 @@
         }
 
         function printShippingDocument() {
-            syncShippingDocumentInputs();
-
-            const printable = document.querySelector('#shippingDocumentContent .only-print');
-            if (!printable) {
-                window.print();
-                return;
-            }
-
-            const printableClone = printable.cloneNode(true);
-            printableClone.querySelectorAll('input').forEach(input => {
-                input.setAttribute('value', input.value);
-            });
-            printableClone.querySelectorAll('img[src]').forEach(img => {
-                const src = img.getAttribute('src');
-                if (src && !/^https?:|^data:/i.test(src)) {
-                    img.setAttribute('src', new URL(src, window.location.href).href);
-                }
-            });
-
-            const headHtml = document.head.innerHTML.replace(/<title[\s\S]*?<\/title>/i, '<title>&#8203;</title>');
-            const printUrl = new URL(window.location.href);
-            printUrl.hash = 'print';
-            const printUrlForScript = JSON.stringify(printUrl.href);
-            const printWindow = window.open('', '_blank', 'width=1200,height=800');
-            if (!printWindow) {
-                window.print();
-                return;
-            }
-
-            printWindow.document.open();
-            printWindow.document.write(`
-                <!DOCTYPE html>
-                <html lang="th">
-                <head>
-                    <base href="${escapeDocumentText(window.location.href)}">
-                    ${headHtml}
-                    <title>&#8203;</title>
-                    <style>
-                        @page { size: A4 landscape; margin: 8mm 6mm 8mm; }
-                        html, body {
-                            width: auto;
-                            min-height: auto;
-                            margin: 0;
-                            padding: 0;
-                            background: #ffffff;
-                            overflow: visible;
-                        }
-                        body {
-                            -webkit-print-color-adjust: exact;
-                            print-color-adjust: exact;
-                        }
-                        .no-print { display: none !important; }
-                        .overflow-x-auto { overflow: visible !important; }
-                        .only-print {
-                            display: flex !important;
-                            flex-direction: column !important;
-                            visibility: visible !important;
-                        }
-                        .only-print,
-                        .only-print * {
-                            visibility: visible !important;
-                        }
-                        .branch-document-sheet {
-                            border: none !important;
-                            box-shadow: none !important;
-                            padding: 0 !important;
-                            margin: 0 !important;
-                            width: 100% !important;
-                            min-height: auto !important;
-                            box-sizing: border-box !important;
-                            background: #ffffff !important;
-                            page-break-after: auto !important;
-                            break-after: auto !important;
-                            gap: 3mm !important;
-                        }
-                        .print-document-header {
-                            padding-bottom: 2mm !important;
-                            margin-bottom: 1mm !important;
-                            border-bottom: 1px solid #000000 !important;
-                            flex-shrink: 0 !important;
-                        }
-                        .print-document-header img {
-                            height: 11mm !important;
-                            width: auto !important;
-                        }
-                        .print-document-title {
-                            font-size: 15px !important;
-                            line-height: 1.2 !important;
-                        }
-                        .print-table-wrap {
-                            margin-top: 0 !important;
-                            border-radius: 0 !important;
-                            border: 1px solid #000000 !important;
-                            box-shadow: none !important;
-                            overflow: visible !important;
-                            flex-shrink: 0 !important;
-                        }
-                        .print-table {
-                            table-layout: fixed !important;
-                            width: 100% !important;
-                            font-size: 8px !important;
-                            line-height: 1.1 !important;
-                        }
-                        .print-table th,
-                        .print-table td {
-                            padding: 1mm 0.8mm !important;
-                            height: 5.8mm !important;
-                            line-height: 1.1 !important;
-                            vertical-align: middle !important;
-                        }
-                        .print-table th {
-                            background: #e8edf3 !important;
-                            color: #000000 !important;
-                            font-weight: 800 !important;
-                        }
-                        .print-signature-section {
-                            margin-top: 4mm !important;
-                            flex-shrink: 0 !important;
-                        }
-                        table, th, td {
-                            border: 1px solid #000000 !important;
-                            border-collapse: collapse !important;
-                            color: #000000 !important;
-                        }
-                        thead,
-                        th,
-                        .bg-slate-800,
-                        .bg-slate-700 {
-                            background: #f1f5f9 !important;
-                            color: #000000 !important;
-                        }
-                        th, td, span, div, h1, h2, p, input {
-                            color: #000000 !important;
-                        }
-                        input {
-                            border: none !important;
-                            background: transparent !important;
-                            box-shadow: none !important;
-                            padding: 0 !important;
-                        }
-                        input::placeholder { color: transparent !important; }
-                    </style>
-                </head>
-                <body>
-                    ${printableClone.outerHTML}
-                    <script>
-                        window.addEventListener('load', function () {
-                            document.title = String.fromCharCode(8203);
-                            try { window.history.replaceState(null, '', ${printUrlForScript}); } catch (e) {}
-                            setTimeout(function () {
-                                window.focus();
-                                window.print();
-                            }, 500);
-                        });
-                        window.addEventListener('afterprint', function () {
-                            setTimeout(function () { window.close(); }, 100);
-                        });
-                    <\/script>
-                </body>
-                </html>
-            `);
-            printWindow.document.close();
+            window.print();
         }
 
         // ==================== UI Helper ====================
@@ -2013,24 +1464,42 @@
 
         async function checkAndLoadWave() {
             if (isAlertOpen) return;
-            const waveNo = document.getElementById('waveInput').value.trim().toUpperCase();
-            if (!waveNo) return;
+            const inputVal = document.getElementById('waveInput').value.trim().toUpperCase();
+            if (!inputVal) return;
             showLoading();
             try {
-                const res = await fetch(backendApiUrl + `/api/check-wave?wave_no=${waveNo}`);
-                if (!res.ok) { showAlert('ข้อผิดพลาด', `ไม่พบข้อมูลรหัส Wave\n[${waveNo}]`); document.getElementById('waveInput').value = ''; return; }
+                let url = "";
+                const isWaveOnly = /^\d+$/.test(inputVal);
+                
+                if (isWaveOnly) {
+                    url = backendApiUrl + `/api/check-wave?wave_no=${inputVal}`;
+                } else {
+                    url = backendApiUrl + `/api/check-booking?booking_no=${encodeURIComponent(inputVal)}`;
+                }
+
+                const res = await fetch(url);
+                if (!res.ok) {
+                    showAlert('ข้อผิดพลาด', `ไม่พบข้อมูลงานสำหรับ [${inputVal}]`);
+                    document.getElementById('waveInput').value = '';
+                    return;
+                }
                 const data = await res.json(); 
-                currentWave = data.wave_no; 
+                
+                currentBookingNo = data.booking_no ? String(data.booking_no).trim() : '';
+                currentLicensePlate = data.license_plate ? String(data.license_plate).trim() : '';
+                
+                if (isWaveOnly) {
+                    currentWave = data.wave_no;
+                    activeWavesList = [data.wave_no];
+                } else {
+                    currentWave = data.waves.join(', ');
+                    activeWavesList = data.waves;
+                }
+                
                 allLpnsInWave = data.lpn_list;
-                const savedDocumentMeta = getSavedShippingDocumentMeta(currentWave);
-                currentBookingNo = firstFilledValue(data.booking_no, data.Vehicle_Booking_No, savedDocumentMeta.booking_no);
-                currentLicensePlate = firstFilledValue(
-                    data.license_plate,
-                    data.License_Plate,
-                    data.vehicle_license_plate,
-                    data.Vehicle_License_Plate,
-                    savedDocumentMeta.license_plate
-                );
+                const savedDocumentMeta = getSavedShippingDocumentMeta(isWaveOnly ? currentWave : currentBookingNo);
+                if (savedDocumentMeta.booking_no) currentBookingNo = savedDocumentMeta.booking_no;
+                if (savedDocumentMeta.license_plate) currentLicensePlate = savedDocumentMeta.license_plate;
 
                 allLpnsInWave.forEach(i => { i.childCount = 0; i.combinedWith = null; i.isMaster = false; });
 
@@ -2047,11 +1516,16 @@
                     }
                 });
 
-                // 💡 นำโค้ดดึงบัฟเฟอร์แบบเก่าออกไปแล้ว เพราะ Python ดึงข้อมูลสถานะล่าสุดทั้งหมดมาให้ตั้งแต่รอบแรกแล้ว
-
-                renderBranchGrid(); document.getElementById('waveSelectorModal').classList.add('hidden'); document.getElementById('branchWaveDisplay').innerText = currentWave;
-                document.getElementById('branchSelectorModal').classList.remove('hidden'); document.getElementById('branchSelectorModal').classList.add('flex');
-            } catch (e) { showAlert('ข้อผิดพลาดเครือข่าย', "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้"); } finally { hideLoading(); }
+                renderBranchGrid(); 
+                document.getElementById('waveSelectorModal').classList.add('hidden'); 
+                document.getElementById('branchWaveDisplay').innerText = isWaveOnly ? `WAVE: ${currentWave}` : `BOOKING: ${currentBookingNo}`;
+                document.getElementById('branchSelectorModal').classList.remove('hidden'); 
+                document.getElementById('branchSelectorModal').classList.add('flex');
+            } catch (e) { 
+                showAlert('ข้อผิดพลาดเครือข่าย', "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้"); 
+            } finally { 
+                hideLoading(); 
+            }
         }
 
         function renderBranchGrid() {
@@ -2193,8 +1667,8 @@
             async function undoCombine(masterLpn) {
                 if (!confirm(`คุณต้องการยกเลิกการรวมกล่อง/พาเลท ${masterLpn} และคืนค่ากล่องทั้งหมดกลับไปสถานะค้างตรวจสอบใช่หรือไม่?`)) return;
                 const branchItems = allLpnsInWave.filter(item => (item.branch || "Unknown") === selectedBranchCode);
-                branchItems.forEach(i => { if (i.combinedWith === masterLpn) { i.combinedWith = null; i.status = 'Pending'; i.qty = 0; pushToQueue({ wave_no: currentWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: i.lpn, type: 'CANCEL_COMBINE', color: 'None', qty: 0, emp_id: loggedInEmpId }); } });
-                const master = branchItems.find(i => i.lpn === masterLpn); if (master) { master.isMaster = false; master.childCount = 0; master.status = 'Pending'; master.qty = 0; pushToQueue({ wave_no: currentWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: master.lpn, type: 'CANCEL_COMBINE', color: 'None', qty: 0, emp_id: loggedInEmpId }); }
+                branchItems.forEach(i => { if (i.combinedWith === masterLpn) { i.combinedWith = null; i.status = 'Pending'; i.qty = 0; pushToQueue({ wave_no: i.wave_no || currentWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: i.lpn, type: 'CANCEL_COMBINE', color: 'None', qty: 0, emp_id: loggedInEmpId }); } });
+                const master = branchItems.find(i => i.lpn === masterLpn); if (master) { master.isMaster = false; master.childCount = 0; master.status = 'Pending'; master.qty = 0; pushToQueue({ wave_no: master.wave_no || currentWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: master.lpn, type: 'CANCEL_COMBINE', color: 'None', qty: 0, emp_id: loggedInEmpId }); }
                 updateDashboardUI(); showToast(`🔄 ยกเลิกการรวมกล่อง/พาเลท ${masterLpn} เรียบร้อยแล้ว`);
             }
 
@@ -2202,14 +1676,14 @@
                 const item = allLpnsInWave.find(i => i.lpn === childLpn); if (!item || !item.combinedWith) return;
                 if (!confirm(`คุณต้องการแยกกล่อง ${childLpn} ออกจากพาเลท ${item.combinedWith} ใช่หรือไม่?`)) return;
                 const masterLpn = item.combinedWith; item.combinedWith = null; item.status = 'Pending'; item.qty = 0;
-                pushToQueue({ wave_no: currentWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: childLpn, type: 'CANCEL_COMBINE', color: 'None', qty: 0, emp_id: loggedInEmpId });
-                const master = allLpnsInWave.find(i => i.lpn === masterLpn); if (master) { master.childCount = Math.max(0, (master.childCount || 1) - 1); if (master.childCount === 0) { master.isMaster = false; master.status = 'Pending'; pushToQueue({ wave_no: currentWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: master.lpn, type: 'CANCEL_COMBINE', color: 'None', qty: 0, emp_id: loggedInEmpId }); } }
+                pushToQueue({ wave_no: item.wave_no || currentWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: childLpn, type: 'CANCEL_COMBINE', color: 'None', qty: 0, emp_id: loggedInEmpId });
+                const master = allLpnsInWave.find(i => i.lpn === masterLpn); if (master) { master.childCount = Math.max(0, (master.childCount || 1) - 1); if (master.childCount === 0) { master.isMaster = false; master.status = 'Pending'; pushToQueue({ wave_no: master.wave_no || currentWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: master.lpn, type: 'CANCEL_COMBINE', color: 'None', qty: 0, emp_id: loggedInEmpId }); } }
                 updateDashboardUI(); showToast(`🔄 แยกกล่อง ${childLpn} ออกจากพาเลทเรียบร้อยแล้ว`);
             }
 
             async function resetSingleBox(lpn) {
                 if (!confirm(`คุณต้องการยกเลิกการตรวจสอบกล่อง ${lpn} และคืนค่ากลับเป็นค้างตรวจสอบใช่หรือไม่?`)) return;
-                const item = allLpnsInWave.find(i => i.lpn === lpn); if (item) { item.status = 'Pending'; item.qty = 0; pushToQueue({ wave_no: currentWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: lpn, type: 'RESET_BOX', color: 'None', qty: 0, emp_id: loggedInEmpId }); updateDashboardUI(); showToast(`🔄 คืนค่ากล่อง ${lpn} เรียบร้อยแล้ว`); }
+                const item = allLpnsInWave.find(i => i.lpn === lpn); if (item) { item.status = 'Pending'; item.qty = 0; pushToQueue({ wave_no: item.wave_no || currentWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: lpn, type: 'RESET_BOX', color: 'None', qty: 0, emp_id: loggedInEmpId }); updateDashboardUI(); showToast(`🔄 คืนค่ากล่อง ${lpn} เรียบร้อยแล้ว`); }
             }
 
             function switchTab(mode) { const isScan = mode === 'scan'; document.getElementById('modeScan').classList.toggle('hidden', !isScan); document.getElementById('modeCombine').classList.toggle('hidden', isScan); document.getElementById('tabScan').className = `flex-1 py-3 font-bold flex items-center justify-center gap-2 ${isScan ? 'text-blue-700 border-b-4 border-blue-700' : 'border-b-4 border-transparent text-gray-500'}`; document.getElementById('tabCombine').className = `flex-1 py-3 font-bold flex items-center justify-center gap-2 ${!isScan ? 'text-purple-700 border-b-4 border-purple-700' : 'border-b-4 border-transparent text-gray-500'}`; if (selectedBranchCode !== "") { if (isScan) document.getElementById('lpnInput').focus(); else document.getElementById('masterInput').focus(); } }
@@ -2227,7 +1701,7 @@
             });
             qtyInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') { e.preventDefault(); executeQtyScanSave(); } });
             function executeQtyScanSave() { const qtyVal = parseInt(qtyInput.value); if (isNaN(qtyVal) || qtyVal < 1) return showAlert('ข้อผิดพลาด', 'กรุณาระบุจำนวนกล่องสินค้า (PP) ให้ถูกต้อง'); executeScanSave('None', 'Carton', qtyVal, document.getElementById('displayLpnQty').innerText); }
-            async function executeScanSave(color, type = 'TOTE', qty = 1, forceLpn = null) { const lpn = forceLpn || document.getElementById('displayLpn').innerText; colorSection.classList.add('hidden'); qtySection.classList.add('hidden'); const target = allLpnsInWave.find(item => item.lpn === lpn); if (target) { target.status = 'Scanned'; target.qty = qty; } updateDashboardUI(); showToast(`บันทึกข้อมูล ${lpn} สำเร็จ`); lpnInput.focus(); pushToQueue({ wave_no: currentWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: lpn, type: type, color: color, qty: qty, emp_id: loggedInEmpId }); }
+            async function executeScanSave(color, type = 'TOTE', qty = 1, forceLpn = null) { const lpn = forceLpn || document.getElementById('displayLpn').innerText; colorSection.classList.add('hidden'); qtySection.classList.add('hidden'); const target = allLpnsInWave.find(item => item.lpn === lpn); if (target) { target.status = 'Scanned'; target.qty = qty; } updateDashboardUI(); showToast(`บันทึกข้อมูล ${lpn} สำเร็จ`); lpnInput.focus(); const lpnWave = target ? (target.wave_no || currentWave) : currentWave; pushToQueue({ wave_no: lpnWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: lpn, type: type, color: color, qty: qty, emp_id: loggedInEmpId }); }
 
             // ==================== 💨 BACKGROUND CLOSE LOGIC ====================
             function openConfirmModal() { document.getElementById('confirmModal').classList.remove('hidden'); }
@@ -2236,7 +1710,6 @@
             async function confirmForceClose() {
                 closeConfirm();
                 const branchCodeToClose = selectedBranchCode;
-                const waveToClose = currentWave;
 
                 allLpnsInWave.forEach(item => { if (item.branch === branchCodeToClose && item.status === 'Pending') item.status = 'ForceClosed'; });
                 updateDashboardUI();
@@ -2248,19 +1721,28 @@
                 (async () => {
                     let waitCnt = 0; while (syncQueue.length > 0 && waitCnt < 120) { await new Promise(r => setTimeout(r, 1000)); waitCnt++; }
                     try {
-                        await fetch(backendApiUrl + '/api/close-job', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ wave: waveToClose, branch: branchCodeToClose, emp_id: loggedInEmpId }) });
-
-                        // 💡 แสดงหน้าต่าง Success 
-                        showAlert('ดำเนินการสำเร็จ', `บังคับปิดงานสาขา ${branchCodeToClose} เสร็จสมบูรณ์\nระบบจะเปิดเอกสารเพื่อพิมพ์สรุปยอด`, 'border-green-600', true, () => {
-                            openShippingDocument(branchCodeToClose);
-                        });
+                        let successAll = true;
+                        for (const waveNo of activeWavesList) {
+                            const res = await fetch(backendApiUrl + '/api/close-job', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ wave: waveNo, branch: branchCodeToClose, emp_id: loggedInEmpId })
+                            });
+                            if (!res.ok) successAll = false;
+                        }
+                        if (successAll) {
+                            showAlert('ดำเนินการสำเร็จ', `บังคับปิดงานสาขา ${branchCodeToClose} เสร็จสมบูรณ์\nระบบจะเปิดเอกสารเพื่อพิมพ์สรุปยอด`, 'border-green-600', true, () => {
+                                openShippingDocument(branchCodeToClose);
+                            });
+                        } else {
+                            showAlert('ข้อผิดพลาด', `ไม่สามารถปิดงานบาง Wave สำหรับสาขา ${branchCodeToClose} ได้`, 'border-red-600', false);
+                        }
                     } catch (e) { } finally { backgroundTasks--; }
                 })();
             }
 
             async function finishBranchJob() {
                 const branchCodeToClose = selectedBranchCode;
-                const waveToClose = currentWave;
 
                 backToBranchSelect();
                 showToast('กำลังปิดจบงานสาขาเบื้องหลัง...');
@@ -2269,14 +1751,21 @@
                 (async () => {
                     let waitCnt = 0; while (syncQueue.length > 0 && waitCnt < 120) { await new Promise(r => setTimeout(r, 1000)); waitCnt++; }
                     try {
-                        const res = await fetch(backendApiUrl + '/api/close-job', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ wave: waveToClose, branch: branchCodeToClose, emp_id: loggedInEmpId }) });
-                        if (res.ok) {
-                            // 💡 แสดงหน้าต่าง Success 
+                        let successAll = true;
+                        for (const waveNo of activeWavesList) {
+                            const res = await fetch(backendApiUrl + '/api/close-job', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ wave: waveNo, branch: branchCodeToClose, emp_id: loggedInEmpId })
+                            });
+                            if (!res.ok) successAll = false;
+                        }
+                        if (successAll) {
                             showAlert('ดำเนินการสำเร็จ', `ปิดยอดสาขา ${branchCodeToClose} เรียบร้อยแล้ว\nระบบจะเปิดเอกสารเพื่อพิมพ์สรุปยอด`, 'border-green-600', true, () => {
                                 openShippingDocument(branchCodeToClose);
                             });
                         } else {
-                            showAlert('ข้อผิดพลาด', `ไม่สามารถปิดงานสาขา ${branchCodeToClose} กับส่วนกลางได้`, 'border-red-600', false);
+                            showAlert('ข้อผิดพลาด', `ไม่สามารถปิดงานบาง Wave สำหรับสาขา ${branchCodeToClose} ได้`, 'border-red-600', false);
                         }
                     } catch (e) { } finally { backgroundTasks--; }
                 })();
@@ -2354,7 +1843,11 @@
                 const masterTarget = allLpnsInWave.find(item => item.lpn === master); if (masterTarget) { masterTarget.status = 'Scanned'; masterTarget.isMaster = true; masterTarget.childCount = (masterTarget.childCount || 0) + childLpns.length; }
 
                 updateDashboardUI(); showToast(`รวมกล่อง/พาเลทสำเร็จ (${childLpns.length} รายการ)`);
-                for (const cLpn of childLpns) { pushToQueue({ wave_no: currentWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: cLpn, type: 'COMBINE: ' + master, color: color, qty: 1, emp_id: loggedInEmpId }); }
+                for (const cLpn of childLpns) {
+                    const target = allLpnsInWave.find(item => item.lpn === cLpn);
+                    const lpnWave = target ? (target.wave_no || currentWave) : currentWave;
+                    pushToQueue({ wave_no: lpnWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: cLpn, type: 'COMBINE: ' + master, color: color, qty: 1, emp_id: loggedInEmpId });
+                }
 
                 masterInput.value = ''; childInput.value = ''; childInput.disabled = true; childInput.classList.add('bg-gray-100'); childLpns = []; updateChildUI(); document.getElementById('selectedCombineColor').value = ''; document.querySelectorAll('.color-btn').forEach(btn => btn.classList.remove('color-btn-active'));
                 const cBtn = document.getElementById('childScanBtn'); cBtn.disabled = true; cBtn.classList.replace('bg-purple-800', 'bg-gray-400'); cBtn.classList.remove('hover:bg-purple-900'); masterInput.focus();
