@@ -161,8 +161,18 @@
         @media print {
             @page {
                 size: A4 landscape;
-                margin: 0; /* Hides browser default header (title/date) and footer (URL/page numbers) */
+                margin: 0;
             }
+
+            html,
+            body {
+                width: 297mm !important;
+                min-height: 210mm !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                overflow: visible !important;
+            }
+
             body * {
                 visibility: hidden !important;
             }
@@ -193,9 +203,10 @@
             .branch-document-sheet {
                 border: none !important;
                 box-shadow: none !important;
-                padding: 0.8cm !important; /* Replacement margins to prevent cutting off */
+                padding: 0.8cm !important;
                 margin: 0 !important;
                 width: 100% !important;
+                min-height: 210mm !important;
                 box-sizing: border-box !important;
                 page-break-after: always !important;
                 break-after: page !important;
@@ -224,7 +235,7 @@
                 box-shadow: none !important;
                 padding: 0 !important;
             }
-            
+
             /* Hide placeholder in print */
             input::placeholder {
                 color: transparent !important;
@@ -1173,7 +1184,7 @@
                     const branch = branches[index];
                     const bCode = branch.code;
                     const branchItems = allLpnsInWave.filter(item => (item.branch || 'Unknown') === bCode);
-                    
+
                     let owner = 'Unknown';
                     const firstWithOwner = branchItems.find(item => item.owner && item.owner !== 'Unknown');
                     if (firstWithOwner) {
@@ -1187,7 +1198,7 @@
                     let blueCount = 0;
                     let greenCount = 0;
                     let blackCount = 0;
-                    
+
                     const scannedMasters = new Set();
                     let standalonePallets = 0;
 
@@ -1289,7 +1300,7 @@
             const lpnDetailsHtml = branches.map(branch => {
                 const bCode = branch.code;
                 const branchItems = allLpnsInWave.filter(item => (item.branch || 'Unknown') === bCode);
-                
+
                 const itemRows = branchItems.map((item, index) => {
                     const lpnPrefix = item.lpn.substring(0, 2);
                     let typeBadge = '';
@@ -1350,7 +1361,7 @@
             content.innerHTML = `
                 <!-- ==================== 1. SCREEN VIEW (PREVIEW MODE - NO PRINT) ==================== -->
                 <div class="no-print bg-white p-6 md:p-8 shadow-xl border border-slate-200 rounded-xl flex flex-col gap-6" style="font-family: 'Inter', sans-serif;">
-                    
+
                     <!-- Title Section -->
                     <div class="text-center pb-4 border-b border-slate-100">
                         <h1 class="text-2xl md:text-3xl font-black text-slate-800 tracking-wide font-sans">Transport Job</h1>
@@ -1361,8 +1372,8 @@
                     <div class="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-slate-50 rounded-xl border border-slate-150 text-sm">
                         <div class="flex flex-col gap-1">
                             <span class="text-slate-400 font-bold text-xs uppercase tracking-wider font-sans">Booking No.</span>
-                            <input type="text" id="screenBookingNoInput" 
-                                   value="${escapeDocumentText(currentBookingNo)}" 
+                            <input type="text" id="screenBookingNoInput"
+                                   value="${escapeDocumentText(currentBookingNo)}"
                                    oninput="currentBookingNo = this.value; document.getElementById('documentBookingNoInput').value = this.value"
                                    placeholder="พิมพ์ Booking No."
                                    class="bg-transparent border-b border-slate-300 focus:border-blue-500 focus:outline-none text-slate-800 font-black text-base w-full font-sans" />
@@ -1373,8 +1384,8 @@
                         </div>
                         <div class="flex flex-col gap-1">
                             <span class="text-slate-400 font-bold text-xs uppercase tracking-wider font-sans">ทะเบียนรถ (License Plate)</span>
-                            <input type="text" id="screenLicensePlateInput" 
-                                   value="${escapeDocumentText(currentLicensePlate)}" 
+                            <input type="text" id="screenLicensePlateInput"
+                                   value="${escapeDocumentText(currentLicensePlate)}"
                                    oninput="currentLicensePlate = this.value; document.getElementById('documentLicensePlateInput').value = this.value"
                                    placeholder="พิมพ์ทะเบียนรถ"
                                    class="bg-transparent border-b border-slate-300 focus:border-blue-500 focus:outline-none text-slate-800 font-black text-base w-full font-sans" />
@@ -1434,7 +1445,7 @@
 
                 <!-- ==================== 2. PRINT VIEW (ONLY-PRINT PAPER FORMAT) ==================== -->
                 <div class="only-print branch-document-sheet bg-white p-6 md:p-8 flex flex-col gap-4" style="background-color: #ffffff; font-family: 'Sarabun', 'Inter', sans-serif;">
-                    
+
                     <!-- Print Header (PT Logo, Title, Metadata, Date) -->
                     <div class="flex flex-row justify-between items-start w-full pb-4 border-b-2 border-slate-800">
                         <!-- Left Side: Logo & Meta Info -->
@@ -1443,10 +1454,10 @@
                             <div class="flex flex-col gap-1 text-xs text-slate-800 font-sans mt-2">
                                 <div class="flex items-center gap-1">
                                     <span class="font-bold min-w-[70px] text-slate-600">Booking :</span>
-                                    <input type="text" id="documentBookingNoInput" 
-                                           value="${escapeDocumentText(currentBookingNo)}" 
+                                    <input type="text" id="documentBookingNoInput"
+                                           value="${escapeDocumentText(currentBookingNo)}"
                                            oninput="currentBookingNo = this.value; document.getElementById('screenBookingNoInput').value = this.value"
-                                           placeholder="พิมพ์ Booking No." 
+                                           placeholder="พิมพ์ Booking No."
                                            class="bg-white border border-slate-200 font-bold px-2 py-0.5 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-slate-900 w-44 font-sans text-xs" />
                                 </div>
                                 <div class="flex items-center gap-1 py-0.5">
@@ -1455,10 +1466,10 @@
                                 </div>
                                 <div class="flex items-center gap-1">
                                     <span class="font-bold min-w-[70px] text-slate-600">ทะเบียนรถ :</span>
-                                    <input type="text" id="documentLicensePlateInput" 
-                                           value="${escapeDocumentText(currentLicensePlate)}" 
+                                    <input type="text" id="documentLicensePlateInput"
+                                           value="${escapeDocumentText(currentLicensePlate)}"
                                            oninput="currentLicensePlate = this.value; document.getElementById('screenLicensePlateInput').value = this.value"
-                                           placeholder="พิมพ์ทะเบียนรถ" 
+                                           placeholder="พิมพ์ทะเบียนรถ"
                                            class="bg-white border border-slate-200 font-bold px-2 py-0.5 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-slate-900 w-44 font-sans text-xs" />
                                 </div>
                             </div>
@@ -1510,7 +1521,7 @@
                                 <span class="border-b border-dotted border-slate-400 min-w-[180px] inline-block text-center font-bold px-2 py-0.5 text-slate-800">${escapeDocumentText(loggedInEmpName || '')} (${escapeDocumentText(loggedInEmpId || '')})</span>
                             </div>
                             <div class="pl-16 text-slate-500 font-semibold text-[10px]">(ผู้จัดทำเอกสารใบคุมส่งสินค้า)</div>
-                            
+
                             <div class="mt-4 flex flex-col gap-2">
                                 <div class="flex items-center gap-1">
                                     <span class="font-bold">เวลาออกเดินทาง :</span>
@@ -1550,7 +1561,15 @@
         }
 
         function printShippingDocument() {
+            const originalTitle = document.title;
+            document.title = ' ';
+            const restoreTitle = () => {
+                document.title = originalTitle;
+                window.removeEventListener('afterprint', restoreTitle);
+            };
+            window.addEventListener('afterprint', restoreTitle);
             window.print();
+            setTimeout(restoreTitle, 1000);
         }
 
         // ==================== UI Helper ====================
