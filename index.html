@@ -973,6 +973,51 @@
             }[char]));
         }
 
+        function firstFilledValue(...values) {
+            for (const value of values) {
+                const text = String(value === undefined || value === null ? '' : value).trim();
+                if (text !== '' && text !== '-') return text;
+            }
+            return '';
+        }
+
+        function getShippingDocumentMetaKey(waveNo = currentWave) {
+            return `proScannerShippingDocumentMeta:${waveNo || 'NO_WAVE'}`;
+        }
+
+        function getSavedShippingDocumentMeta(waveNo = currentWave) {
+            try {
+                return JSON.parse(localStorage.getItem(getShippingDocumentMetaKey(waveNo))) || {};
+            } catch (e) {
+                return {};
+            }
+        }
+
+        function saveShippingDocumentMeta() {
+            if (!currentWave) return;
+            localStorage.setItem(getShippingDocumentMetaKey(), JSON.stringify({
+                booking_no: currentBookingNo || '',
+                license_plate: currentLicensePlate || ''
+            }));
+        }
+
+        function syncShippingDocumentInputs() {
+            const screenBooking = document.getElementById('screenBookingNoInput');
+            const screenPlate = document.getElementById('screenLicensePlateInput');
+            const printBooking = document.getElementById('documentBookingNoInput');
+            const printPlate = document.getElementById('documentLicensePlateInput');
+
+            currentBookingNo = firstFilledValue(screenBooking && screenBooking.value, printBooking && printBooking.value, currentBookingNo);
+            currentLicensePlate = firstFilledValue(screenPlate && screenPlate.value, printPlate && printPlate.value, currentLicensePlate);
+
+            if (screenBooking) screenBooking.value = currentBookingNo;
+            if (printBooking) printBooking.value = currentBookingNo;
+            if (screenPlate) screenPlate.value = currentLicensePlate;
+            if (printPlate) printPlate.value = currentLicensePlate;
+
+            saveShippingDocumentMeta();
+        }
+
         function getExpectedQty(item) {
             return parseInt(item.Total_Qty || item.total_qty) || 1;
         }
@@ -1374,7 +1419,7 @@
                             <span class="text-slate-400 font-bold text-xs uppercase tracking-wider font-sans">Booking No.</span>
                             <input type="text" id="screenBookingNoInput"
                                    value="${escapeDocumentText(currentBookingNo)}"
-                                   oninput="currentBookingNo = this.value; document.getElementById('documentBookingNoInput').value = this.value"
+                                   oninput="currentBookingNo = this.value; const target = document.getElementById('documentBookingNoInput'); if (target) target.value = this.value; saveShippingDocumentMeta()"
                                    placeholder="พิมพ์ Booking No."
                                    class="bg-transparent border-b border-slate-300 focus:border-blue-500 focus:outline-none text-slate-800 font-black text-base w-full font-sans" />
                         </div>
@@ -1386,7 +1431,7 @@
                             <span class="text-slate-400 font-bold text-xs uppercase tracking-wider font-sans">ทะเบียนรถ (License Plate)</span>
                             <input type="text" id="screenLicensePlateInput"
                                    value="${escapeDocumentText(currentLicensePlate)}"
-                                   oninput="currentLicensePlate = this.value; document.getElementById('documentLicensePlateInput').value = this.value"
+                                   oninput="currentLicensePlate = this.value; const target = document.getElementById('documentLicensePlateInput'); if (target) target.value = this.value; saveShippingDocumentMeta()"
                                    placeholder="พิมพ์ทะเบียนรถ"
                                    class="bg-transparent border-b border-slate-300 focus:border-blue-500 focus:outline-none text-slate-800 font-black text-base w-full font-sans" />
                         </div>
@@ -1456,7 +1501,7 @@
                                     <span class="font-bold min-w-[70px] text-slate-600">Booking :</span>
                                     <input type="text" id="documentBookingNoInput"
                                            value="${escapeDocumentText(currentBookingNo)}"
-                                           oninput="currentBookingNo = this.value; document.getElementById('screenBookingNoInput').value = this.value"
+                                           oninput="currentBookingNo = this.value; const target = document.getElementById('screenBookingNoInput'); if (target) target.value = this.value; saveShippingDocumentMeta()"
                                            placeholder="พิมพ์ Booking No."
                                            class="bg-white border border-slate-200 font-bold px-2 py-0.5 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-slate-900 w-44 font-sans text-xs" />
                                 </div>
@@ -1467,8 +1512,8 @@
                                 <div class="flex items-center gap-1">
                                     <span class="font-bold min-w-[70px] text-slate-600">ทะเบียนรถ :</span>
                                     <input type="text" id="documentLicensePlateInput"
-                                           value="${escapeDocumentText(currentLicensePlate)}"
-                                           oninput="currentLicensePlate = this.value; document.getElementById('screenLicensePlateInput').value = this.value"
+                                           value="${escapeDocumentText(currentLicensePlate || '-')}"
+                                           oninput="currentLicensePlate = this.value === '-' ? '' : this.value; const target = document.getElementById('screenLicensePlateInput'); if (target) target.value = currentLicensePlate; saveShippingDocumentMeta()"
                                            placeholder="พิมพ์ทะเบียนรถ"
                                            class="bg-white border border-slate-200 font-bold px-2 py-0.5 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-slate-900 w-44 font-sans text-xs" />
                                 </div>
@@ -1561,15 +1606,103 @@
         }
 
         function printShippingDocument() {
-            const originalTitle = document.title;
-            document.title = ' ';
-            const restoreTitle = () => {
-                document.title = originalTitle;
-                window.removeEventListener('afterprint', restoreTitle);
-            };
-            window.addEventListener('afterprint', restoreTitle);
-            window.print();
-            setTimeout(restoreTitle, 1000);
+            syncShippingDocumentInputs();
+
+            const printable = document.querySelector('#shippingDocumentContent .only-print');
+            if (!printable) {
+                window.print();
+                return;
+            }
+
+            const printableClone = printable.cloneNode(true);
+            printableClone.querySelectorAll('input').forEach(input => {
+                input.setAttribute('value', input.value);
+            });
+            printableClone.querySelectorAll('img[src]').forEach(img => {
+                const src = img.getAttribute('src');
+                if (src && !/^https?:|^data:/i.test(src)) {
+                    img.setAttribute('src', new URL(src, window.location.href).href);
+                }
+            });
+
+            const headHtml = document.head.innerHTML.replace(/<title[\s\S]*?<\/title>/i, '<title></title>');
+            const printWindow = window.open('', '_blank', 'width=1200,height=800');
+            if (!printWindow) {
+                window.print();
+                return;
+            }
+
+            printWindow.document.open();
+            printWindow.document.write(`
+                <!DOCTYPE html>
+                <html lang="th">
+                <head>
+                    <base href="${escapeDocumentText(window.location.href)}">
+                    ${headHtml}
+                    <title></title>
+                    <style>
+                        @page { size: A4 landscape; margin: 0; }
+                        html, body {
+                            width: 297mm;
+                            min-height: 210mm;
+                            margin: 0;
+                            padding: 0;
+                            background: #ffffff;
+                            overflow: visible;
+                        }
+                        body {
+                            -webkit-print-color-adjust: exact;
+                            print-color-adjust: exact;
+                        }
+                        .no-print { display: none !important; }
+                        .only-print {
+                            display: flex !important;
+                            visibility: visible !important;
+                        }
+                        .branch-document-sheet {
+                            border: none !important;
+                            box-shadow: none !important;
+                            padding: 0.8cm !important;
+                            margin: 0 !important;
+                            width: 100% !important;
+                            min-height: 210mm !important;
+                            box-sizing: border-box !important;
+                            background: #ffffff !important;
+                        }
+                        table, th, td {
+                            border: 1px solid #000000 !important;
+                            border-collapse: collapse !important;
+                            color: #000000 !important;
+                        }
+                        th, td, span, div, h1, h2, p, input {
+                            color: #000000 !important;
+                        }
+                        input {
+                            border: none !important;
+                            background: transparent !important;
+                            box-shadow: none !important;
+                            padding: 0 !important;
+                        }
+                        input::placeholder { color: transparent !important; }
+                    </style>
+                </head>
+                <body>
+                    ${printableClone.outerHTML}
+                    <script>
+                        window.addEventListener('load', function () {
+                            setTimeout(function () {
+                                window.focus();
+                                window.print();
+                            }, 500);
+                        });
+                        window.addEventListener('afterprint', function () {
+                            setTimeout(function () { window.close(); }, 100);
+                        });
+                    <\/script>
+                </body>
+                </html>
+            `);
+            printWindow.document.close();
         }
 
         // ==================== UI Helper ====================
@@ -1757,8 +1890,15 @@
                 const data = await res.json(); 
                 currentWave = data.wave_no; 
                 allLpnsInWave = data.lpn_list;
-                currentBookingNo = data.booking_no ? String(data.booking_no).trim() : '';
-                currentLicensePlate = data.license_plate ? String(data.license_plate).trim() : '';
+                const savedDocumentMeta = getSavedShippingDocumentMeta(currentWave);
+                currentBookingNo = firstFilledValue(data.booking_no, data.Vehicle_Booking_No, savedDocumentMeta.booking_no);
+                currentLicensePlate = firstFilledValue(
+                    data.license_plate,
+                    data.License_Plate,
+                    data.vehicle_license_plate,
+                    data.Vehicle_License_Plate,
+                    savedDocumentMeta.license_plate
+                );
 
                 allLpnsInWave.forEach(i => { i.childCount = 0; i.combinedWith = null; i.isMaster = false; });
 
