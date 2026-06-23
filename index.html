@@ -1039,6 +1039,12 @@
         // 💡 เพิ่มบรรทัดนี้กลับมา เพื่อให้ระบบ Login ตรวจรหัสพนักงานได้
         const employeeApiUrl = 'https://script.google.com/macros/s/AKfycbybmW6N7TxfsHqEa-Fx6ayy8M8xfjKGmTYO27izmbEoLJmQRrFD3i9c0XogP0fG6tlG/exec';
         const branchProvinceSheetId = '1-qmS7WmLjkbrDxcdo_Ep_FBRWMDpuQQoetKgJ9CQYMY';
+        const waveDataCachePrefix = 'proScannerWaveDataCache:';
+        const waveDataCacheIndexKey = 'proScannerWaveDataCacheIndex';
+        const waveDataCacheMaxItems = 8;
+        const waveDataCacheTtlMs = 30 * 60 * 1000;
+        const pendingWavesCacheKey = 'proScannerPendingWavesCache';
+        const pendingWavesCacheTtlMs = 5 * 60 * 1000;
         const ownerDisplayMap = {
             DM02: 'MAXMART',
             DP02: 'PUNTHAI',
@@ -1055,6 +1061,8 @@
         let branchProvinceMap = {};
         let branchProvinceLoaded = false;
         let branchProvinceLoadPromise = null;
+        let latestWaveLoadRequestId = 0;
+        let currentWaveDataCacheKey = '';
 
         function getSavedShippingDocumentMeta(key) {
             try {
@@ -1062,6 +1070,62 @@
             } catch (e) {
                 return {};
             }
+        }
+
+        function warmBackendApi() {
+            fetch(backendApiUrl + '/', { cache: 'no-store' }).catch(() => { });
+        }
+
+        function getWaveDataCacheKey(inputVal, isWaveOnly) {
+            const type = isWaveOnly ? 'wave' : 'booking';
+            return `${waveDataCachePrefix}${type}:${String(inputVal || '').trim().toUpperCase()}`;
+        }
+
+        function getCachedWaveData(cacheKey) {
+            try {
+                const cached = JSON.parse(localStorage.getItem(cacheKey));
+                if (!cached || !cached.data || !cached.saved_at) return null;
+                if (Date.now() - cached.saved_at > waveDataCacheTtlMs) {
+                    localStorage.removeItem(cacheKey);
+                    return null;
+                }
+                return cached.data;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function saveWaveDataCache(cacheKey, data) {
+            try {
+                localStorage.setItem(cacheKey, JSON.stringify({
+                    saved_at: Date.now(),
+                    data
+                }));
+
+                const index = JSON.parse(localStorage.getItem(waveDataCacheIndexKey)) || [];
+                const nextIndex = [cacheKey, ...index.filter(key => key !== cacheKey)].slice(0, waveDataCacheMaxItems);
+                index.slice(waveDataCacheMaxItems - 1).forEach(key => {
+                    if (!nextIndex.includes(key)) localStorage.removeItem(key);
+                });
+                localStorage.setItem(waveDataCacheIndexKey, JSON.stringify(nextIndex));
+            } catch (e) { }
+        }
+
+        function saveCurrentWaveDataCache() {
+            if (!allLpnsInWave || allLpnsInWave.length === 0) return;
+            const isBookingMode = activeWavesList.length > 1 || String(currentWave || '').includes(',');
+            const cacheInput = isBookingMode ? currentBookingNo : (activeWavesList[0] || currentWave);
+            const cacheKey = currentWaveDataCacheKey || (cacheInput ? getWaveDataCacheKey(cacheInput, !isBookingMode) : '');
+            if (!cacheKey) return;
+
+            saveWaveDataCache(cacheKey, {
+                wave_no: isBookingMode ? undefined : currentWave,
+                waves: isBookingMode ? activeWavesList : undefined,
+                booking_no: currentBookingNo,
+                license_plate: currentLicensePlate,
+                lpn_list: allLpnsInWave,
+                zone_summary: []
+            });
         }
 
         // ==================== 📸 CAMERA SCANNER LOGIC ====================
@@ -1862,6 +1926,8 @@
         // ==================== UI Helper ====================
         window.onload = () => {
             document.getElementById('empInput').focus();
+            warmBackendApi();
+            loadBranchProvinceMap().catch(() => { });
             fetch(employeeApiUrl).then(res => res.json()).then(data => {
                 if (data.success && data.employees) { employeeDB = data.employees; localStorage.setItem('proScannerEmpDB', JSON.stringify(employeeDB)); }
             }).catch(e => console.log(""));
@@ -2001,101 +2067,160 @@
         document.getElementById('empInput').addEventListener('keypress', (e) => { if (e.key === 'Enter') processLogin(); });
 
         // ==================== WAVE LOGIC ====================
+        function getCachedPendingWaves() {
+            try {
+                const cached = JSON.parse(localStorage.getItem(pendingWavesCacheKey));
+                if (!cached || !cached.data || !cached.saved_at) return null;
+                if (Date.now() - cached.saved_at > pendingWavesCacheTtlMs) return null;
+                return cached.data;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function savePendingWavesCache(data) {
+            try {
+                localStorage.setItem(pendingWavesCacheKey, JSON.stringify({
+                    saved_at: Date.now(),
+                    data
+                }));
+            } catch (e) { }
+        }
+
+        function renderPendingWaves(data) {
+            const tbody = document.getElementById('pendingWaveTableBody');
+            if (!data.waves || data.waves.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="2" class="p-4 text-center text-sm text-green-600 font-bold">ไม่มีรายการ Wave ค้างในระบบ</td></tr>';
+                return;
+            }
+
+            let html = '';
+            data.waves.forEach(w => {
+                html += `
+                    <tr class="hover:bg-blue-50 border-b border-gray-200 transition">
+                        <td class="p-3 text-sm md:text-base font-bold text-gray-800 tracking-wider pl-3">${w.wave_no}</td>
+                        <td class="p-2 text-center">
+                            <button onclick="selectWaveFromTable('${w.wave_no}')" class="bg-blue-600 hover:bg-blue-700 text-white text-xs md:text-sm font-bold py-1.5 px-3 rounded-lg shadow active:scale-95 transition">เลือกงาน</button>
+                        </td>
+                    </tr>
+                `;
+            });
+            tbody.innerHTML = html;
+        }
+
         async function loadPendingWaves() {
             const tbody = document.getElementById('pendingWaveTableBody');
-            tbody.innerHTML = '<tr><td colspan="2" class="p-4 text-center text-sm text-gray-500 font-bold animate-pulse">กำลังตรวจสอบข้อมูล...</td></tr>';
+            const cachedData = getCachedPendingWaves();
+            if (cachedData) {
+                renderPendingWaves(cachedData);
+            } else {
+                tbody.innerHTML = '<tr><td colspan="2" class="p-4 text-center text-sm text-gray-500 font-bold animate-pulse">กำลังตรวจสอบข้อมูล...</td></tr>';
+            }
+
             try {
-                const res = await fetch(backendApiUrl + '/api/pending-waves');
+                const res = await fetch(backendApiUrl + '/api/pending-waves', { cache: 'no-store' });
                 if (!res.ok) throw new Error('API Error');
                 const data = await res.json();
-
-                if (!data.waves || data.waves.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="2" class="p-4 text-center text-sm text-green-600 font-bold">ไม่มีรายการ Wave ค้างในระบบ</td></tr>';
-                    return;
-                }
-
-                let html = '';
-                data.waves.forEach(w => {
-                    html += `
-                        <tr class="hover:bg-blue-50 border-b border-gray-200 transition">
-                            <td class="p-3 text-sm md:text-base font-bold text-gray-800 tracking-wider pl-3">${w.wave_no}</td>
-                            <td class="p-2 text-center">
-                                <button onclick="selectWaveFromTable('${w.wave_no}')" class="bg-blue-600 hover:bg-blue-700 text-white text-xs md:text-sm font-bold py-1.5 px-3 rounded-lg shadow active:scale-95 transition">เลือกงาน</button>
-                            </td>
-                        </tr>
-                    `;
-                });
-                tbody.innerHTML = html;
+                savePendingWavesCache(data);
+                renderPendingWaves(data);
             } catch (e) {
-                tbody.innerHTML = '<tr><td colspan="2" class="p-4 text-center text-sm text-red-500 font-bold">ไม่สามารถดึงข้อมูลรายการ Wave ได้</td></tr>';
+                if (!cachedData) {
+                    tbody.innerHTML = '<tr><td colspan="2" class="p-4 text-center text-sm text-red-500 font-bold">ไม่สามารถดึงข้อมูลรายการ Wave ได้</td></tr>';
+                }
             }
         }
 
         function selectWaveFromTable(waveNo) { document.getElementById('waveInput').value = waveNo; checkAndLoadWave(); }
 
+        function applyWaveDataToScreen(data, isWaveOnly) {
+            currentBookingNo = data.booking_no ? String(data.booking_no).trim() : '';
+            currentLicensePlate = data.license_plate ? String(data.license_plate).trim() : '';
+
+            if (isWaveOnly) {
+                currentWave = data.wave_no;
+                activeWavesList = [data.wave_no];
+            } else {
+                activeWavesList = data.waves || [];
+                currentWave = activeWavesList.join(', ');
+            }
+
+            allLpnsInWave = data.lpn_list || [];
+            const savedDocumentMeta = getSavedShippingDocumentMeta(isWaveOnly ? currentWave : currentBookingNo);
+            if (savedDocumentMeta.booking_no) currentBookingNo = savedDocumentMeta.booking_no;
+            if (savedDocumentMeta.license_plate) currentLicensePlate = savedDocumentMeta.license_plate;
+
+            allLpnsInWave.forEach(i => { i.childCount = 0; i.combinedWith = null; i.isMaster = false; });
+
+            allLpnsInWave.forEach(item => {
+                if (item.status === 'Scanned' && item.scan_type && item.scan_type.startsWith('COMBINE: ')) {
+                    const masterLpn = item.scan_type.replace('COMBINE: ', '').trim();
+                    item.combinedWith = masterLpn;
+
+                    const masterTarget = allLpnsInWave.find(m => m.lpn === masterLpn);
+                    if (masterTarget) {
+                        masterTarget.isMaster = true;
+                        masterTarget.childCount = (masterTarget.childCount || 0) + 1;
+                    }
+                }
+            });
+
+            renderBranchGrid();
+            document.getElementById('waveSelectorModal').classList.add('hidden');
+            document.getElementById('branchWaveDisplay').innerText = isWaveOnly ? `WAVE: ${currentWave}` : `BOOKING: ${currentBookingNo}`;
+            document.getElementById('branchSelectorModal').classList.remove('hidden');
+            document.getElementById('branchSelectorModal').classList.add('flex');
+        }
+
         async function checkAndLoadWave() {
             if (isAlertOpen) return;
             const inputVal = document.getElementById('waveInput').value.trim().toUpperCase();
             if (!inputVal) return;
-            showLoading();
+
+            const requestId = ++latestWaveLoadRequestId;
+            const isWaveOnly = /^\d+$/.test(inputVal);
+            const cacheKey = getWaveDataCacheKey(inputVal, isWaveOnly);
+            currentWaveDataCacheKey = cacheKey;
+            const cachedData = getCachedWaveData(cacheKey);
+            let usedCache = false;
+
+            if (cachedData) {
+                usedCache = true;
+                applyWaveDataToScreen(cachedData, isWaveOnly);
+                showToast('โหลดข้อมูลจากเครื่องแล้ว กำลังอัปเดตล่าสุด...');
+            } else {
+                showLoading();
+            }
+
             try {
-                let url = "";
-                const isWaveOnly = /^\d+$/.test(inputVal);
+                const url = isWaveOnly
+                    ? backendApiUrl + `/api/check-wave?wave_no=${inputVal}`
+                    : backendApiUrl + `/api/check-booking?booking_no=${encodeURIComponent(inputVal)}`;
 
-                if (isWaveOnly) {
-                    url = backendApiUrl + `/api/check-wave?wave_no=${inputVal}`;
-                } else {
-                    url = backendApiUrl + `/api/check-booking?booking_no=${encodeURIComponent(inputVal)}`;
-                }
+                const res = await fetch(url, { cache: 'no-store' });
+                if (requestId !== latestWaveLoadRequestId) return;
 
-                const res = await fetch(url);
                 if (!res.ok) {
+                    if (usedCache) {
+                        showToast('ยังใช้ข้อมูลที่โหลดไว้ก่อนหน้าอยู่', true);
+                        return;
+                    }
                     showAlert('ข้อผิดพลาด', `ไม่พบข้อมูลงานสำหรับ [${inputVal}]`);
                     document.getElementById('waveInput').value = '';
                     return;
                 }
+
                 const data = await res.json();
-
-                currentBookingNo = data.booking_no ? String(data.booking_no).trim() : '';
-                currentLicensePlate = data.license_plate ? String(data.license_plate).trim() : '';
-
-                if (isWaveOnly) {
-                    currentWave = data.wave_no;
-                    activeWavesList = [data.wave_no];
-                } else {
-                    currentWave = data.waves.join(', ');
-                    activeWavesList = data.waves;
-                }
-
-                allLpnsInWave = data.lpn_list;
-                const savedDocumentMeta = getSavedShippingDocumentMeta(isWaveOnly ? currentWave : currentBookingNo);
-                if (savedDocumentMeta.booking_no) currentBookingNo = savedDocumentMeta.booking_no;
-                if (savedDocumentMeta.license_plate) currentLicensePlate = savedDocumentMeta.license_plate;
-
-                allLpnsInWave.forEach(i => { i.childCount = 0; i.combinedWith = null; i.isMaster = false; });
-
-                allLpnsInWave.forEach(item => {
-                    if (item.status === 'Scanned' && item.scan_type && item.scan_type.startsWith('COMBINE: ')) {
-                        const masterLpn = item.scan_type.replace('COMBINE: ', '').trim();
-                        item.combinedWith = masterLpn;
-
-                        const masterTarget = allLpnsInWave.find(m => m.lpn === masterLpn);
-                        if (masterTarget) {
-                            masterTarget.isMaster = true;
-                            masterTarget.childCount = (masterTarget.childCount || 0) + 1;
-                        }
-                    }
-                });
-
-                renderBranchGrid();
-                document.getElementById('waveSelectorModal').classList.add('hidden');
-                document.getElementById('branchWaveDisplay').innerText = isWaveOnly ? `WAVE: ${currentWave}` : `BOOKING: ${currentBookingNo}`;
-                document.getElementById('branchSelectorModal').classList.remove('hidden');
-                document.getElementById('branchSelectorModal').classList.add('flex');
+                saveWaveDataCache(cacheKey, data);
+                applyWaveDataToScreen(data, isWaveOnly);
+                if (usedCache) showToast('อัปเดตข้อมูลล่าสุดแล้ว');
             } catch (e) {
-                showAlert('ข้อผิดพลาดเครือข่าย', "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้");
+                if (!usedCache) {
+                    showAlert('ข้อผิดพลาดเครือข่าย', "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้");
+                } else {
+                    showToast('เชื่อมต่อช้า ใช้ข้อมูลที่โหลดไว้ก่อนหน้าอยู่', true);
+                }
             } finally {
-                hideLoading();
+                if (!usedCache) hideLoading();
             }
         }
 
@@ -2140,7 +2265,7 @@
             document.getElementById('waveInput').addEventListener('keypress', (e) => { if (e.key === 'Enter') checkAndLoadWave(); });
 
             function exitWave() {
-                currentWave = ""; allLpnsInWave = []; selectedBranchCode = ""; selectedBranchName = "";
+                currentWave = ""; allLpnsInWave = []; selectedBranchCode = ""; selectedBranchName = ""; currentWaveDataCacheKey = "";
                 document.getElementById('branchSelectorModal').classList.add('hidden');
                 document.getElementById('mainApp').classList.add('hidden');
                 document.getElementById('waveSelectorModal').classList.remove('hidden');
@@ -2240,7 +2365,7 @@
                 const branchItems = allLpnsInWave.filter(item => (item.branch || "Unknown") === selectedBranchCode);
                 branchItems.forEach(i => { if (i.combinedWith === masterLpn) { i.combinedWith = null; i.status = 'Pending'; i.qty = 0; pushToQueue({ wave_no: i.wave_no || currentWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: i.lpn, type: 'CANCEL_COMBINE', color: 'None', qty: 0, emp_id: loggedInEmpId }); } });
                 const master = branchItems.find(i => i.lpn === masterLpn); if (master) { master.isMaster = false; master.childCount = 0; master.status = 'Pending'; master.qty = 0; pushToQueue({ wave_no: master.wave_no || currentWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: master.lpn, type: 'CANCEL_COMBINE', color: 'None', qty: 0, emp_id: loggedInEmpId }); }
-                updateDashboardUI(); showToast(`🔄 ยกเลิกการรวมกล่อง/พาเลท ${masterLpn} เรียบร้อยแล้ว`);
+                updateDashboardUI(); saveCurrentWaveDataCache(); showToast(`🔄 ยกเลิกการรวมกล่อง/พาเลท ${masterLpn} เรียบร้อยแล้ว`);
             }
 
             async function undoSingleChild(childLpn) {
@@ -2249,12 +2374,12 @@
                 const masterLpn = item.combinedWith; item.combinedWith = null; item.status = 'Pending'; item.qty = 0;
                 pushToQueue({ wave_no: item.wave_no || currentWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: childLpn, type: 'CANCEL_COMBINE', color: 'None', qty: 0, emp_id: loggedInEmpId });
                 const master = allLpnsInWave.find(i => i.lpn === masterLpn); if (master) { master.childCount = Math.max(0, (master.childCount || 1) - 1); if (master.childCount === 0) { master.isMaster = false; master.status = 'Pending'; pushToQueue({ wave_no: master.wave_no || currentWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: master.lpn, type: 'CANCEL_COMBINE', color: 'None', qty: 0, emp_id: loggedInEmpId }); } }
-                updateDashboardUI(); showToast(`🔄 แยกกล่อง ${childLpn} ออกจากพาเลทเรียบร้อยแล้ว`);
+                updateDashboardUI(); saveCurrentWaveDataCache(); showToast(`🔄 แยกกล่อง ${childLpn} ออกจากพาเลทเรียบร้อยแล้ว`);
             }
 
             async function resetSingleBox(lpn) {
                 if (!confirm(`คุณต้องการยกเลิกการตรวจสอบกล่อง ${lpn} และคืนค่ากลับเป็นค้างตรวจสอบใช่หรือไม่?`)) return;
-                const item = allLpnsInWave.find(i => i.lpn === lpn); if (item) { item.status = 'Pending'; item.qty = 0; pushToQueue({ wave_no: item.wave_no || currentWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: lpn, type: 'RESET_BOX', color: 'None', qty: 0, emp_id: loggedInEmpId }); updateDashboardUI(); showToast(`🔄 คืนค่ากล่อง ${lpn} เรียบร้อยแล้ว`); }
+                const item = allLpnsInWave.find(i => i.lpn === lpn); if (item) { item.status = 'Pending'; item.qty = 0; pushToQueue({ wave_no: item.wave_no || currentWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: lpn, type: 'RESET_BOX', color: 'None', qty: 0, emp_id: loggedInEmpId }); updateDashboardUI(); saveCurrentWaveDataCache(); showToast(`🔄 คืนค่ากล่อง ${lpn} เรียบร้อยแล้ว`); }
             }
 
             function switchTab(mode) { const isScan = mode === 'scan'; document.getElementById('modeScan').classList.toggle('hidden', !isScan); document.getElementById('modeCombine').classList.toggle('hidden', isScan); document.getElementById('tabScan').className = `flex-1 py-3 font-bold flex items-center justify-center gap-2 ${isScan ? 'text-blue-700 border-b-4 border-blue-700' : 'border-b-4 border-transparent text-gray-500'}`; document.getElementById('tabCombine').className = `flex-1 py-3 font-bold flex items-center justify-center gap-2 ${!isScan ? 'text-purple-700 border-b-4 border-purple-700' : 'border-b-4 border-transparent text-gray-500'}`; if (selectedBranchCode !== "") { if (isScan) document.getElementById('lpnInput').focus(); else document.getElementById('masterInput').focus(); } }
@@ -2272,7 +2397,7 @@
             });
             qtyInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') { e.preventDefault(); executeQtyScanSave(); } });
             function executeQtyScanSave() { const qtyVal = parseInt(qtyInput.value); if (isNaN(qtyVal) || qtyVal < 1) return showAlert('ข้อผิดพลาด', 'กรุณาระบุจำนวนกล่องสินค้า (PP) ให้ถูกต้อง'); executeScanSave('None', 'Carton', qtyVal, document.getElementById('displayLpnQty').innerText); }
-            async function executeScanSave(color, type = 'TOTE', qty = 1, forceLpn = null) { const lpn = forceLpn || document.getElementById('displayLpn').innerText; colorSection.classList.add('hidden'); qtySection.classList.add('hidden'); const target = allLpnsInWave.find(item => item.lpn === lpn); if (target) { target.status = 'Scanned'; target.qty = qty; } updateDashboardUI(); showToast(`บันทึกข้อมูล ${lpn} สำเร็จ`); lpnInput.focus(); const lpnWave = target ? (target.wave_no || currentWave) : currentWave; pushToQueue({ wave_no: lpnWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: lpn, type: type, color: color, qty: qty, emp_id: loggedInEmpId }); }
+            async function executeScanSave(color, type = 'TOTE', qty = 1, forceLpn = null) { const lpn = forceLpn || document.getElementById('displayLpn').innerText; colorSection.classList.add('hidden'); qtySection.classList.add('hidden'); const target = allLpnsInWave.find(item => item.lpn === lpn); if (target) { target.status = 'Scanned'; target.qty = qty; } updateDashboardUI(); saveCurrentWaveDataCache(); showToast(`บันทึกข้อมูล ${lpn} สำเร็จ`); lpnInput.focus(); const lpnWave = target ? (target.wave_no || currentWave) : currentWave; pushToQueue({ wave_no: lpnWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: lpn, type: type, color: color, qty: qty, emp_id: loggedInEmpId }); }
 
             // ==================== 💨 BACKGROUND CLOSE LOGIC ====================
             function openConfirmModal() { document.getElementById('confirmModal').classList.remove('hidden'); }
@@ -2284,6 +2409,7 @@
 
                 allLpnsInWave.forEach(item => { if (item.branch === branchCodeToClose && item.status === 'Pending') item.status = 'ForceClosed'; });
                 updateDashboardUI();
+                saveCurrentWaveDataCache();
 
                 backToBranchSelect();
                 showToast('กำลังบังคับปิดงานสาขาเบื้องหลัง...');
@@ -2413,7 +2539,7 @@
                 childLpns.forEach(cLpn => { const target = allLpnsInWave.find(item => item.lpn === cLpn); if (target) { target.status = 'Scanned'; target.combinedWith = master; } });
                 const masterTarget = allLpnsInWave.find(item => item.lpn === master); if (masterTarget) { masterTarget.status = 'Scanned'; masterTarget.isMaster = true; masterTarget.childCount = (masterTarget.childCount || 0) + childLpns.length; }
 
-                updateDashboardUI(); showToast(`รวมกล่อง/พาเลทสำเร็จ (${childLpns.length} รายการ)`);
+                updateDashboardUI(); saveCurrentWaveDataCache(); showToast(`รวมกล่อง/พาเลทสำเร็จ (${childLpns.length} รายการ)`);
                 for (const cLpn of childLpns) {
                     const target = allLpnsInWave.find(item => item.lpn === cLpn);
                     const lpnWave = target ? (target.wave_no || currentWave) : currentWave;
