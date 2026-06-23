@@ -920,6 +920,9 @@
                         </svg>
                         <span>สแกนตรวจสอบกล่องของสาขานี้เสร็จสิ้นแล้ว!</span>
                     </div>
+                    <div id="branchCompletionTimeDisplay"
+                        class="hidden mb-3 px-3 py-2 rounded-lg bg-green-50 border border-green-200 text-green-800 text-xs font-black">
+                    </div>
                     <div class="grid grid-cols-1 gap-2">
                         <button onclick="openShippingDocument(selectedBranchCode)"
                             class="w-full bg-amber-500 hover:bg-amber-600 text-gray-900 font-black text-lg py-3 rounded-xl shadow border-b-4 border-amber-700 transition flex items-center justify-center gap-2 active:scale-98">
@@ -1045,6 +1048,7 @@
         const waveDataCacheTtlMs = 30 * 60 * 1000;
         const pendingWavesCacheKey = 'proScannerPendingWavesCache';
         const pendingWavesCacheTtlMs = 5 * 60 * 1000;
+        const branchCompletionPrefix = 'proScannerBranchCompletion:';
         const ownerDisplayMap = {
             DM02: 'MAXMART',
             DP02: 'PUNTHAI',
@@ -1126,6 +1130,75 @@
                 lpn_list: allLpnsInWave,
                 zone_summary: []
             });
+        }
+
+        function formatBangkokDateTime(value = new Date()) {
+            const date = value instanceof Date ? value : new Date(value);
+            if (Number.isNaN(date.getTime())) return '-';
+            const dateText = date.toLocaleDateString('en-GB', {
+                timeZone: 'Asia/Bangkok',
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            });
+            const timeText = date.toLocaleTimeString('en-GB', {
+                timeZone: 'Asia/Bangkok',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false
+            });
+            return `${dateText} เวลา ${timeText} น.`;
+        }
+
+        function getCurrentWorkCompletionKey() {
+            const waves = (activeWavesList || [])
+                .map(wave => String(wave || '').trim())
+                .filter(Boolean)
+                .sort((a, b) => a.localeCompare(b));
+            if (waves.length > 0) return `waves:${waves.join(',')}`;
+            if (currentWave) return `wave:${String(currentWave).trim()}`;
+            if (currentBookingNo) return `booking:${String(currentBookingNo).trim()}`;
+            return '';
+        }
+
+        function getBranchCompletionKey(branchCode = selectedBranchCode) {
+            const workKey = getCurrentWorkCompletionKey();
+            const branchKey = normalizeBranchLookupCode(branchCode);
+            if (!workKey || !branchKey) return '';
+            return `${branchCompletionPrefix}${workKey}:${branchKey}`;
+        }
+
+        function getBranchCompletionRecord(branchCode = selectedBranchCode) {
+            try {
+                const key = getBranchCompletionKey(branchCode);
+                if (!key) return null;
+                const record = JSON.parse(localStorage.getItem(key));
+                return record && record.completed_at ? record : null;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function setBranchCompletionRecord(branchCode, completedAtIso, mode = 'finish') {
+            const key = getBranchCompletionKey(branchCode);
+            if (!key) return null;
+            const branchItem = allLpnsInWave.find(item => (item.branch || 'Unknown') === branchCode);
+
+            const record = {
+                branch_code: branchCode,
+                branch_name: selectedBranchName || (branchItem ? branchItem.branch_name : '') || '',
+                completed_at: completedAtIso,
+                completed_at_text: formatBangkokDateTime(completedAtIso),
+                emp_id: loggedInEmpId || '',
+                emp_name: loggedInEmpName || '',
+                mode
+            };
+
+            try {
+                localStorage.setItem(key, JSON.stringify(record));
+            } catch (e) { }
+            return record;
         }
 
         // ==================== 📸 CAMERA SCANNER LOGIC ====================
@@ -2248,12 +2321,17 @@
 
                 let badgeCls = isDone ? 'bg-green-200 text-green-800' : inProgress ? 'bg-orange-200 text-orange-800' : 'bg-blue-100 text-blue-800';
                 let statusBadge = `<div class="font-black text-xl ml-2 whitespace-nowrap px-3 py-1 rounded-full ${badgeCls}">${scannedBoxes}/${totalBoxes}</div>`;
+                const completionRecord = getBranchCompletionRecord(bCode);
+                const completionMeta = completionRecord
+                    ? `<div class="mt-1 text-[11px] font-black text-green-700 truncate">บันทึกจบ: ${escapeDocumentText(formatBangkokDateTime(completionRecord.completed_at))}</div>`
+                    : '';
 
                 htmlParts.push(`
                     <button onclick="selectBranch('${bCode}', '${bName}')" class="flex items-center p-4 rounded-xl border-2 shadow-sm active:scale-95 transition ${btnStyle}">
                         <div class="flex-1 text-left min-w-0 pr-2">
                             <div class="font-black text-xl truncate">${bCode}</div>
                             <div class="text-xs font-bold truncate opacity-70">${bName}</div>
+                            ${completionMeta}
                         </div>
                         ${statusBadge}
                     </button>
@@ -2287,6 +2365,7 @@
             const _elTypeStats = document.getElementById('typeStatsDisplay');
             const _elForceBtn = document.getElementById('forceCloseBtn');
             const _elFinishArea = document.getElementById('finishJobArea');
+            const _elBranchCompletionTime = document.getElementById('branchCompletionTimeDisplay');
 
             function updateDashboardUI() {
                 if (!selectedBranchCode) return;
@@ -2357,6 +2436,17 @@
                 const isFullyScanned = branchItems.every(i => i.status === 'Scanned' || i.status === 'ForceClosed');
                 if (unscannedCount > 0) _elForceBtn.classList.remove('hidden'); else _elForceBtn.classList.add('hidden');
                 if (isFullyScanned && branchItems.length > 0) _elFinishArea.classList.remove('hidden'); else _elFinishArea.classList.add('hidden');
+
+                const completionRecord = getBranchCompletionRecord(selectedBranchCode);
+                if (_elBranchCompletionTime) {
+                    if (completionRecord) {
+                        _elBranchCompletionTime.textContent = `บันทึกนับ Tote ทั้งหมดเสร็จเมื่อ ${formatBangkokDateTime(completionRecord.completed_at)}`;
+                        _elBranchCompletionTime.classList.remove('hidden');
+                    } else {
+                        _elBranchCompletionTime.textContent = '';
+                        _elBranchCompletionTime.classList.add('hidden');
+                    }
+                }
             }
 
             // ==================== 🔄 ฟังก์ชันการแก้ไขงานและการยกเลิก (UNDO) ====================
@@ -2406,6 +2496,8 @@
             async function confirmForceClose() {
                 closeConfirm();
                 const branchCodeToClose = selectedBranchCode;
+                const completedAtIso = new Date().toISOString();
+                const completedAtText = formatBangkokDateTime(completedAtIso);
 
                 allLpnsInWave.forEach(item => { if (item.branch === branchCodeToClose && item.status === 'Pending') item.status = 'ForceClosed'; });
                 updateDashboardUI();
@@ -2419,16 +2511,19 @@
                     let waitCnt = 0; while (syncQueue.length > 0 && waitCnt < 120) { await new Promise(r => setTimeout(r, 1000)); waitCnt++; }
                     try {
                         let successAll = true;
-                        for (const waveNo of activeWavesList) {
+                        const wavesToClose = activeWavesList.length ? activeWavesList : [currentWave].filter(Boolean);
+                        for (const waveNo of wavesToClose) {
                             const res = await fetch(backendApiUrl + '/api/close-job', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ wave: waveNo, branch: branchCodeToClose, emp_id: loggedInEmpId })
+                                body: JSON.stringify({ wave: waveNo, branch: branchCodeToClose, emp_id: loggedInEmpId, completed_at: completedAtIso })
                             });
                             if (!res.ok) successAll = false;
                         }
                         if (successAll) {
-                            showAlert('ดำเนินการสำเร็จ', `บังคับปิดงานสาขา ${branchCodeToClose} เสร็จสมบูรณ์\nระบบจะเปิดเอกสารเพื่อพิมพ์สรุปยอด`, 'border-green-600', true, () => {
+                            setBranchCompletionRecord(branchCodeToClose, completedAtIso, 'force_close');
+                            renderBranchGrid();
+                            showAlert('ดำเนินการสำเร็จ', `บังคับปิดงานสาขา ${branchCodeToClose} เสร็จสมบูรณ์\nบันทึกจบงานเมื่อ: ${completedAtText}\nระบบจะเปิดเอกสารเพื่อพิมพ์สรุปยอด`, 'border-green-600', true, () => {
                                 openShippingDocument(branchCodeToClose);
                             });
                         } else {
@@ -2440,6 +2535,8 @@
 
             async function finishBranchJob() {
                 const branchCodeToClose = selectedBranchCode;
+                const completedAtIso = new Date().toISOString();
+                const completedAtText = formatBangkokDateTime(completedAtIso);
 
                 backToBranchSelect();
                 showToast('กำลังปิดจบงานสาขาเบื้องหลัง...');
@@ -2449,16 +2546,19 @@
                     let waitCnt = 0; while (syncQueue.length > 0 && waitCnt < 120) { await new Promise(r => setTimeout(r, 1000)); waitCnt++; }
                     try {
                         let successAll = true;
-                        for (const waveNo of activeWavesList) {
+                        const wavesToClose = activeWavesList.length ? activeWavesList : [currentWave].filter(Boolean);
+                        for (const waveNo of wavesToClose) {
                             const res = await fetch(backendApiUrl + '/api/close-job', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ wave: waveNo, branch: branchCodeToClose, emp_id: loggedInEmpId })
+                                body: JSON.stringify({ wave: waveNo, branch: branchCodeToClose, emp_id: loggedInEmpId, completed_at: completedAtIso })
                             });
                             if (!res.ok) successAll = false;
                         }
                         if (successAll) {
-                            showAlert('ดำเนินการสำเร็จ', `ปิดยอดสาขา ${branchCodeToClose} เรียบร้อยแล้ว\nระบบจะเปิดเอกสารเพื่อพิมพ์สรุปยอด`, 'border-green-600', true, () => {
+                            setBranchCompletionRecord(branchCodeToClose, completedAtIso, 'finish');
+                            renderBranchGrid();
+                            showAlert('ดำเนินการสำเร็จ', `ปิดยอดสาขา ${branchCodeToClose} เรียบร้อยแล้ว\nนับกล่อง Tote ทั้งหมดเสร็จเมื่อ: ${completedAtText}\nระบบจะเปิดเอกสารเพื่อพิมพ์สรุปยอด`, 'border-green-600', true, () => {
                                 openShippingDocument(branchCodeToClose);
                             });
                         } else {
