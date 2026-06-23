@@ -152,7 +152,31 @@
             }
         }
 
+        .print-only {
+            display: none !important;
+        }
+
         @media print {
+            @page {
+                size: A4 landscape;
+                margin: 8mm 6mm;
+            }
+
+            html,
+            body {
+                height: auto !important;
+                min-height: auto !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                overflow: visible !important;
+                background: #ffffff !important;
+            }
+
+            body {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+
             body * {
                 visibility: hidden !important;
             }
@@ -163,12 +187,30 @@
             }
 
             #shippingDocumentContent {
-                position: absolute !important;
+                position: static !important;
                 left: 0;
                 top: 0;
-                width: 100%;
+                display: block !important;
+                width: 100% !important;
+                max-width: none !important;
+                min-height: 0 !important;
                 padding: 0 !important;
                 color: #111827 !important;
+                background: #ffffff !important;
+                overflow: visible !important;
+            }
+
+            #shippingDocumentModal {
+                position: static !important;
+                display: block !important;
+                height: auto !important;
+                overflow: visible !important;
+                background: #ffffff !important;
+            }
+
+            #shippingDocumentModal > div {
+                overflow: visible !important;
+                padding: 0 !important;
                 background: #ffffff !important;
             }
 
@@ -176,17 +218,215 @@
                 display: none !important;
             }
 
+            .screen-document-sheet {
+                display: none !important;
+            }
+
+            .print-only {
+                display: block !important;
+                visibility: visible !important;
+            }
+
+            .print-only * {
+                visibility: visible !important;
+            }
+
             .branch-document-sheet {
                 border: none !important;
                 box-shadow: none !important;
                 padding: 0 !important;
                 margin: 0 !important;
-                page-break-after: always !important;
-                break-after: page !important;
             }
 
             .print-break-inside-avoid {
                 break-inside: avoid;
+            }
+
+            .print-page {
+                page-break-after: always !important;
+                break-after: page !important;
+            }
+
+            .print-page:last-child {
+                page-break-after: auto !important;
+                break-after: auto !important;
+            }
+
+            .print-page + .print-page {
+                page-break-before: always !important;
+                break-before: page !important;
+            }
+
+            .print-page {
+                display: flex !important;
+                flex-direction: column !important;
+                width: 100%;
+                min-height: 186mm;
+                box-sizing: border-box;
+                background: #ffffff;
+                color: #000000;
+                font-family: 'Sarabun', 'Inter', sans-serif;
+            }
+
+            .print-header {
+                display: grid;
+                grid-template-columns: 1fr 1fr 1fr;
+                align-items: flex-start;
+                gap: 8px;
+                width: 100%;
+                padding-bottom: 8px;
+                margin-bottom: 8px;
+                border-bottom: 1px solid #000000;
+            }
+
+            .print-meta-left {
+                width: 100%;
+                min-width: 0;
+            }
+
+            .print-logo {
+                display: block;
+                height: 42px;
+                width: auto;
+                object-fit: contain;
+                margin-bottom: 6px;
+            }
+
+            .print-meta-lines {
+                font-size: 9px;
+                line-height: 1.35;
+                color: #000000;
+            }
+
+            .print-meta-lines strong {
+                display: inline-block;
+                min-width: 58px;
+            }
+
+            .print-title {
+                text-align: center;
+                padding-top: 20px;
+                justify-self: center;
+                width: 100%;
+            }
+
+            .print-title h1 {
+                margin: 0;
+                font-size: 16px;
+                line-height: 1.2;
+                font-weight: 800;
+                color: #000000;
+            }
+
+            .print-date {
+                width: 100%;
+                text-align: right;
+                font-size: 9px;
+                line-height: 1.35;
+                font-weight: 700;
+                padding-top: 20px;
+                color: #000000;
+            }
+
+            .print-job-table {
+                width: 100% !important;
+                border-collapse: collapse !important;
+                table-layout: fixed !important;
+                color: #000000 !important;
+                font-size: 8px !important;
+                line-height: 1.15 !important;
+            }
+
+            .print-job-table th,
+            .print-job-table td {
+                border: 1px solid #000000 !important;
+                padding: 2px 3px !important;
+                height: 22px !important;
+                line-height: 1.15 !important;
+                vertical-align: middle !important;
+                color: #000000 !important;
+                overflow-wrap: anywhere;
+            }
+
+            .print-job-table th {
+                background: #eef2f7 !important;
+                color: #000000 !important;
+                text-align: center !important;
+                font-weight: 800 !important;
+            }
+
+            .print-job-table .print-no {
+                width: 8mm;
+                text-align: center !important;
+            }
+
+            .print-job-table .print-owner {
+                width: 17mm;
+                text-align: center !important;
+                font-weight: 700;
+            }
+
+            .print-job-table .print-branch-code {
+                width: 17mm;
+                text-align: center !important;
+                font-weight: 700;
+            }
+
+            .print-job-table .print-branch-name {
+                width: 58mm;
+                text-align: left !important;
+            }
+
+            .print-job-table .print-province {
+                width: 20mm;
+                text-align: center !important;
+            }
+
+            .print-job-table .print-number {
+                text-align: center !important;
+                font-weight: 700;
+            }
+
+            .print-total-row td {
+                font-weight: 800 !important;
+                background: #f8fafc !important;
+            }
+
+            .print-total-label {
+                text-align: center !important;
+            }
+
+            .print-signature-section {
+                display: flex;
+                justify-content: space-between;
+                align-items: flex-start;
+                margin-top: auto;
+                padding: 10mm 4px 0;
+                font-size: 9px;
+                color: #000000;
+            }
+
+            .print-officer,
+            .print-courier {
+                width: 45%;
+            }
+
+            .print-courier {
+                text-align: right;
+            }
+
+            .print-dotted-line {
+                display: inline-block;
+                min-width: 42mm;
+                border-bottom: 1px dotted #555555;
+                text-align: center;
+                padding: 0 4px 1px;
+            }
+
+            .print-role {
+                margin-top: 2px;
+                font-size: 8px;
+                color: #000000;
             }
         }
     </style>
@@ -1016,8 +1256,19 @@
                 return;
             }
 
-            const today = new Date();
-            const dateStr = `${today.getMonth() + 1}/${today.getDate()}/${today.getFullYear()}`;
+            const now = new Date();
+            const dateStr = now.toLocaleDateString('en-GB', {
+                timeZone: 'Asia/Bangkok',
+                day: 'numeric',
+                month: 'numeric',
+                year: 'numeric'
+            });
+            const timeStr = `${now.toLocaleTimeString('en-GB', {
+                timeZone: 'Asia/Bangkok',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false
+            })} น.`;
 
             let totalM = 0;
             let totalRed = 0;
@@ -1028,7 +1279,8 @@
             let totalAllBoxes = 0;
             let totalPallets = 0;
 
-            const rows = branches.map((branch, index) => {
+            const printRows = [];
+            const activeRows = branches.map((branch, index) => {
                 const bCode = branch.code;
                 const branchItems = allLpnsInWave.filter(item => (item.branch || 'Unknown') === bCode);
                 
@@ -1102,6 +1354,23 @@
                 const cleanBranchName = branch.name.replace(/\s*\([^)]+\)\s*/g, '').trim();
                 const province = getProvinceFromBranchName(branch.name);
 
+                printRows.push(`
+                    <tr>
+                        <td class="print-cell print-no">${index + 1}</td>
+                        <td class="print-cell print-owner">${escapeDocumentText(owner)}</td>
+                        <td class="print-cell print-branch-code">${escapeDocumentText(bCode)}</td>
+                        <td class="print-cell print-branch-name">${escapeDocumentText(cleanBranchName)}</td>
+                        <td class="print-cell print-province">${escapeDocumentText(province)}</td>
+                        <td class="print-cell print-number">${mCount || ''}</td>
+                        <td class="print-cell print-number">${redCount || ''}</td>
+                        <td class="print-cell print-number">${blueCount || ''}</td>
+                        <td class="print-cell print-number">${greenCount || ''}</td>
+                        <td class="print-cell print-number">${blackCount || ''}</td>
+                        <td class="print-cell print-number">${branchTotalBoxes || ''}</td>
+                        <td class="print-cell print-number">${branchPallets || ''}</td>
+                    </tr>
+                `);
+
                 return `
                     <tr class="hover:bg-slate-50 transition-colors text-center text-slate-700">
                         <td class="p-3 border-r border-slate-200 font-medium font-sans">${index + 1}</td>
@@ -1119,7 +1388,34 @@
                         <td class="p-3 font-black bg-slate-50/50 text-indigo-900 font-sans">${branchPallets}</td>
                     </tr>
                 `;
-            }).join('');
+            });
+
+            let rowsHtml = activeRows.join('');
+
+            // Padding up to 15 rows for neat print alignment
+            const minRows = 15;
+            const activeRowCount = branches.length;
+            if (activeRowCount < minRows) {
+                for (let i = activeRowCount + 1; i <= minRows; i++) {
+                    rowsHtml += `
+                        <tr class="hover:bg-slate-50 transition-colors text-center text-slate-700 opacity-60" style="height: 35px;">
+                            <td class="p-3 border-r border-slate-200 font-medium font-sans">${i}</td>
+                            <td class="p-3 border-r border-slate-200 font-bold font-sans">-</td>
+                            <td class="p-3 border-r border-slate-200 font-bold font-sans">-</td>
+                            <td class="p-3 border-r border-slate-200 text-left font-medium font-sans">-</td>
+                            <td class="p-3 border-r border-slate-200 text-slate-600 font-sans">-</td>
+                            <td class="p-3 border-r border-slate-200 font-bold font-sans"></td>
+                            <td class="p-3 border-r border-slate-200 text-red-600 font-bold font-sans"></td>
+                            <td class="p-3 border-r border-slate-200 text-blue-600 font-bold font-sans"></td>
+                            <td class="p-3 border-r border-slate-200 text-green-600 font-bold font-sans"></td>
+                            <td class="p-3 border-r border-slate-200 text-slate-800 font-bold font-sans"></td>
+                            <td class="p-3 border-r border-slate-200 text-yellow-600 font-bold font-sans"></td>
+                            <td class="p-3 border-r border-slate-200 bg-slate-50/50 font-black text-slate-900 font-sans"></td>
+                            <td class="p-3 font-black bg-slate-50/50 text-indigo-900 font-sans"></td>
+                        </tr>
+                    `;
+                }
+            }
 
             const totalRow = `
                 <tr class="bg-slate-100 text-center font-black text-slate-900 border-t-2 border-slate-300">
@@ -1134,6 +1430,116 @@
                     <td class="p-3 bg-slate-200 text-indigo-950 font-sans">${totalPallets}</td>
                 </tr>
             `;
+
+            const printTotalRow = `
+                <tr class="print-total-row">
+                    <td class="print-cell print-total-label" colspan="5">รวมทั้งหมด</td>
+                    <td class="print-cell print-number">${totalM}</td>
+                    <td class="print-cell print-number">${totalRed}</td>
+                    <td class="print-cell print-number">${totalBlue}</td>
+                    <td class="print-cell print-number">${totalGreen}</td>
+                    <td class="print-cell print-number">${totalBlack}</td>
+                    <td class="print-cell print-number">${totalAllBoxes}</td>
+                    <td class="print-cell print-number">${totalPallets}</td>
+                </tr>
+            `;
+
+            const makeBlankPrintRow = (rowNumber = '&nbsp;') => `
+                <tr>
+                    <td class="print-cell print-no">${rowNumber}</td>
+                    <td class="print-cell">&nbsp;</td>
+                    <td class="print-cell">&nbsp;</td>
+                    <td class="print-cell">&nbsp;</td>
+                    <td class="print-cell">&nbsp;</td>
+                    <td class="print-cell">&nbsp;</td>
+                    <td class="print-cell">&nbsp;</td>
+                    <td class="print-cell">&nbsp;</td>
+                    <td class="print-cell">&nbsp;</td>
+                    <td class="print-cell">&nbsp;</td>
+                    <td class="print-cell">&nbsp;</td>
+                    <td class="print-cell">&nbsp;</td>
+                </tr>
+            `;
+
+            const rowsPerPrintPage = 14;
+            const printChunks = [];
+            for (let i = 0; i < printRows.length; i += rowsPerPrintPage) {
+                printChunks.push(printRows.slice(i, i + rowsPerPrintPage));
+            }
+            if (printChunks.length === 0) printChunks.push([]);
+
+            const printPagesHtml = printChunks.map((chunk, pageIndex) => {
+                const isLastPage = pageIndex === printChunks.length - 1;
+                const blankRows = Array.from(
+                    { length: Math.max(0, rowsPerPrintPage - chunk.length) },
+                    (_, i) => makeBlankPrintRow(pageIndex * rowsPerPrintPage + chunk.length + i + 1)
+                ).join('');
+
+                return `
+                    <section class="print-page">
+                        <div class="print-header">
+                            <div class="print-meta-left">
+                                <img src="logo.png" alt="PT Logo" class="print-logo" />
+                                <div class="print-meta-lines">
+                                    <div><strong>Booking :</strong> ${escapeDocumentText(currentBookingNo || '-')}</div>
+                                    <div><strong>WAVE :</strong> ${escapeDocumentText(currentWave || '0000000000')}</div>
+                                    <div><strong>ทะเบียนรถ :</strong> ${escapeDocumentText(currentLicensePlate || '-')}</div>
+                                </div>
+                            </div>
+                            <div class="print-title">
+                                <h1>Transport Job (เอกสารใบคุมส่งสินค้า)</h1>
+                            </div>
+                            <div class="print-date">
+                                <div>วันที่ : ${escapeDocumentText(dateStr)}</div>
+                                <div>เวลา : ${escapeDocumentText(timeStr)}</div>
+                            </div>
+                        </div>
+
+                        <table class="print-job-table">
+                            <thead>
+                                <tr>
+                                    <th class="print-no">NO.</th>
+                                    <th class="print-owner">ชื่อลูกค้า</th>
+                                    <th class="print-branch-code">รหัสสาขา</th>
+                                    <th class="print-branch-name">สาขา</th>
+                                    <th class="print-province">จังหวัด</th>
+                                    <th>กล่อง M</th>
+                                    <th>TOTE แดง</th>
+                                    <th>TOTE น้ำเงิน</th>
+                                    <th>TOTE เขียว</th>
+                                    <th>TOTE ดำ</th>
+                                    <th>รวม</th>
+                                    <th>pallet</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${chunk.join('')}
+                                ${blankRows}
+                                ${isLastPage ? printTotalRow : ''}
+                            </tbody>
+                        </table>
+
+                        ${isLastPage ? `
+                            <div class="print-signature-section print-break-inside-avoid">
+                                <div class="print-officer">
+                                    <div>
+                                        <strong>เจ้าหน้าที่ :</strong>
+                                        <span class="print-dotted-line">${escapeDocumentText(loggedInEmpName || '')}</span>
+                                    </div>
+                                    <div class="print-role">(ผู้จัดทำเอกสารใบคุมส่งสินค้า)</div>
+                                </div>
+                                <div class="print-courier">
+                                    <div>
+                                        <strong>คนส่ง :</strong>
+                                        <span class="print-dotted-line">&nbsp;</span>
+                                    </div>
+                                    <div class="print-role">(ผู้จัดส่งสินค้า)</div>
+                                </div>
+                            </div>
+                        ` : ''}
+                    </section>
+                `;
+            }).join('');
 
             // Calculate LPN details list grouped by branch
             const branchesOptions = branches.map(branch => {
@@ -1203,7 +1609,7 @@
             }).join('');
 
             content.innerHTML = `
-                <div class="branch-document-sheet bg-white p-6 md:p-8 shadow-xl border border-slate-200 rounded-xl flex flex-col gap-6" style="background-color: #ffffff; font-family: 'Inter', sans-serif;">
+                <div class="screen-document-sheet branch-document-sheet bg-white p-6 md:p-8 shadow-xl border border-slate-200 rounded-xl flex flex-col gap-6" style="background-color: #ffffff; font-family: 'Inter', sans-serif;">
 
                     <!-- Title Section -->
                     <div class="text-center pb-4 border-b border-slate-100">
@@ -1251,10 +1657,17 @@
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-200">
-                                ${rows}
+                                ${rowsHtml}
                                 ${totalRow}
                             </tbody>
                         </table>
+                    </div>
+
+                    <!-- Signature block -->
+                    <div class="grid grid-cols-3 gap-4 mt-6 text-center text-xs print-break-inside-avoid font-sans">
+                        <div class="pt-8 border-t border-slate-300 font-bold text-slate-700">ผู้จัดสินค้า / ผู้ตรวจสอบ</div>
+                        <div class="pt-8 border-t border-slate-300 font-bold text-slate-700">หัวหน้างาน</div>
+                        <div class="pt-8 border-t border-slate-300 font-bold text-slate-700">ผู้รับสินค้า</div>
                     </div>
 
                     <!-- LPN Details Section -->
@@ -1277,6 +1690,10 @@
                         </div>
                     </div>
                 </div>
+
+                <div class="print-only">
+                    ${printPagesHtml}
+                </div>
             `;
         }
 
@@ -1294,7 +1711,15 @@
         }
 
         function printShippingDocument() {
+            const content = document.getElementById('shippingDocumentContent');
+            if (!content) return;
+
+            const originalTitle = document.title;
+            document.title = String.fromCharCode(8203);
             window.print();
+            setTimeout(() => {
+                document.title = originalTitle;
+            }, 1000);
         }
 
         // ==================== UI Helper ====================
@@ -1479,7 +1904,7 @@
             try {
                 let url = "";
                 const isWaveOnly = /^\d+$/.test(inputVal);
-                
+
                 if (isWaveOnly) {
                     url = backendApiUrl + `/api/check-wave?wave_no=${inputVal}`;
                 } else {
@@ -1492,11 +1917,11 @@
                     document.getElementById('waveInput').value = '';
                     return;
                 }
-                const data = await res.json(); 
-                
+                const data = await res.json();
+
                 currentBookingNo = data.booking_no ? String(data.booking_no).trim() : '';
                 currentLicensePlate = data.license_plate ? String(data.license_plate).trim() : '';
-                
+
                 if (isWaveOnly) {
                     currentWave = data.wave_no;
                     activeWavesList = [data.wave_no];
@@ -1504,7 +1929,7 @@
                     currentWave = data.waves.join(', ');
                     activeWavesList = data.waves;
                 }
-                
+
                 allLpnsInWave = data.lpn_list;
                 const savedDocumentMeta = getSavedShippingDocumentMeta(isWaveOnly ? currentWave : currentBookingNo);
                 if (savedDocumentMeta.booking_no) currentBookingNo = savedDocumentMeta.booking_no;
@@ -1525,15 +1950,15 @@
                     }
                 });
 
-                renderBranchGrid(); 
-                document.getElementById('waveSelectorModal').classList.add('hidden'); 
+                renderBranchGrid();
+                document.getElementById('waveSelectorModal').classList.add('hidden');
                 document.getElementById('branchWaveDisplay').innerText = isWaveOnly ? `WAVE: ${currentWave}` : `BOOKING: ${currentBookingNo}`;
-                document.getElementById('branchSelectorModal').classList.remove('hidden'); 
+                document.getElementById('branchSelectorModal').classList.remove('hidden');
                 document.getElementById('branchSelectorModal').classList.add('flex');
-            } catch (e) { 
-                showAlert('ข้อผิดพลาดเครือข่าย', "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้"); 
-            } finally { 
-                hideLoading(); 
+            } catch (e) {
+                showAlert('ข้อผิดพลาดเครือข่าย', "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้");
+            } finally {
+                hideLoading();
             }
         }
 
