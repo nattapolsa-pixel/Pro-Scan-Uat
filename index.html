@@ -804,6 +804,15 @@
         let isAlertOpen = false; let selectedBranchCode = ""; let selectedBranchName = "";
         let employeeDB = JSON.parse(localStorage.getItem('proScannerEmpDB')) || {};
         let backgroundTasks = 0;
+        let activeWavesList = [];
+
+        function getSavedShippingDocumentMeta(key) {
+            try {
+                return JSON.parse(localStorage.getItem('shipping_meta_' + key)) || {};
+            } catch (e) {
+                return {};
+            }
+        }
 
         // ==================== 📸 CAMERA SCANNER LOGIC ====================
         let html5QrcodeScanner = null;
