@@ -1039,6 +1039,12 @@
         // 💡 เพิ่มบรรทัดนี้กลับมา เพื่อให้ระบบ Login ตรวจรหัสพนักงานได้
         const employeeApiUrl = 'https://script.google.com/macros/s/AKfycbybmW6N7TxfsHqEa-Fx6ayy8M8xfjKGmTYO27izmbEoLJmQRrFD3i9c0XogP0fG6tlG/exec';
         const branchProvinceSheetId = '1-qmS7WmLjkbrDxcdo_Ep_FBRWMDpuQQoetKgJ9CQYMY';
+        const ownerDisplayMap = {
+            DM02: 'MAXMART',
+            DP02: 'PUNTHAI',
+            DG02: 'GFA',
+            1115: 'LUBE'
+        };
 
         let loggedInEmpId = ""; let loggedInEmpName = ""; let currentWave = ""; let allLpnsInWave = [];
         let currentBookingNo = ""; let currentLicensePlate = "";
@@ -1373,6 +1379,11 @@
             return province || getProvinceFromBranchName(branchName);
         }
 
+        function getOwnerDisplayName(ownerCode) {
+            const code = normalizeBranchLookupCode(ownerCode);
+            return ownerDisplayMap[code] || ownerCode || '-';
+        }
+
         function renderShippingDocument() {
             const content = document.getElementById('shippingDocumentContent');
             const branches = getDocumentBranches();
@@ -1478,11 +1489,12 @@
 
                 const cleanBranchName = branch.name.replace(/\s*\([^)]+\)\s*/g, '').trim();
                 const province = getProvinceForBranch(bCode, branch.name);
+                const ownerDisplay = getOwnerDisplayName(owner);
 
                 printRows.push(`
                     <tr>
                         <td class="print-cell print-no">${index + 1}</td>
-                        <td class="print-cell print-owner">${escapeDocumentText(owner)}</td>
+                        <td class="print-cell print-owner">${escapeDocumentText(ownerDisplay)}</td>
                         <td class="print-cell print-branch-code">${escapeDocumentText(bCode)}</td>
                         <td class="print-cell print-branch-name">${escapeDocumentText(cleanBranchName)}</td>
                         <td class="print-cell print-province">${escapeDocumentText(province)}</td>
@@ -1499,7 +1511,7 @@
                 return `
                     <tr class="hover:bg-slate-50 transition-colors text-center text-slate-700">
                         <td class="p-3 border-r border-slate-200 font-medium font-sans">${index + 1}</td>
-                        <td class="p-3 border-r border-slate-200 font-bold text-slate-900 font-sans">${escapeDocumentText(owner)}</td>
+                        <td class="p-3 border-r border-slate-200 font-bold text-slate-900 font-sans">${escapeDocumentText(ownerDisplay)}</td>
                         <td class="p-3 border-r border-slate-200 font-bold text-indigo-600 tracking-wider font-sans">${escapeDocumentText(bCode)}</td>
                         <td class="p-3 border-r border-slate-200 text-left font-medium font-sans">${escapeDocumentText(cleanBranchName)}</td>
                         <td class="p-3 border-r border-slate-200 text-slate-600 font-sans">${escapeDocumentText(province)}</td>
