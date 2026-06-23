@@ -1038,6 +1038,7 @@
         const backendApiUrl = 'https://dc-scanner-api.onrender.com';
         // 💡 เพิ่มบรรทัดนี้กลับมา เพื่อให้ระบบ Login ตรวจรหัสพนักงานได้
         const employeeApiUrl = 'https://script.google.com/macros/s/AKfycbybmW6N7TxfsHqEa-Fx6ayy8M8xfjKGmTYO27izmbEoLJmQRrFD3i9c0XogP0fG6tlG/exec';
+        const branchProvinceSheetId = '1-qmS7WmLjkbrDxcdo_Ep_FBRWMDpuQQoetKgJ9CQYMY';
 
         let loggedInEmpId = ""; let loggedInEmpName = ""; let currentWave = ""; let allLpnsInWave = [];
         let currentBookingNo = ""; let currentLicensePlate = "";
@@ -1045,6 +1046,9 @@
         let employeeDB = JSON.parse(localStorage.getItem('proScannerEmpDB')) || {};
         let backgroundTasks = 0;
         let activeWavesList = [];
+        let branchProvinceMap = {};
+        let branchProvinceLoaded = false;
+        let branchProvinceLoadPromise = null;
 
         function getSavedShippingDocumentMeta(key) {
             try {
@@ -1168,6 +1172,116 @@
             }[char]));
         }
 
+        function normalizeBranchLookupCode(value) {
+            return String(value === undefined || value === null ? '' : value)
+                .normalize('NFKC')
+                .replace(/[\u200B-\u200D\uFEFF]/g, '')
+                .trim()
+                .toUpperCase();
+        }
+
+        function getSheetCellText(cell) {
+            if (!cell) return '';
+            return String(cell.v === undefined || cell.v === null ? (cell.f || '') : cell.v).trim();
+        }
+
+        function readCachedBranchProvinceMap() {
+            try {
+                const cached = JSON.parse(localStorage.getItem('proScannerBranchProvinceMap')) || {};
+                if (cached && cached.map && typeof cached.map === 'object') {
+                    branchProvinceMap = cached.map;
+                }
+            } catch (e) {
+                branchProvinceMap = {};
+            }
+        }
+
+        function saveBranchProvinceMap(map) {
+            try {
+                localStorage.setItem('proScannerBranchProvinceMap', JSON.stringify({
+                    updated_at: new Date().toISOString(),
+                    map
+                }));
+            } catch (e) { }
+        }
+
+        function applyBranchProvinceSheetResponse(response) {
+            const rows = response && response.table && response.table.rows ? response.table.rows : [];
+            const nextMap = {};
+
+            rows.forEach(row => {
+                const cells = row.c || [];
+                const branchCode = normalizeBranchLookupCode(getSheetCellText(cells[1]));
+                const province = getSheetCellText(cells[4]);
+                const cmposCode = normalizeBranchLookupCode(getSheetCellText(cells[5]));
+
+                if (!branchCode || !province || branchCode === 'รหัสสาขา' || province === 'จังหวัด') return;
+
+                nextMap[branchCode] = province;
+                if (cmposCode && cmposCode !== 'CMPOS') {
+                    nextMap[cmposCode] = province;
+                }
+            });
+
+            if (Object.keys(nextMap).length > 0) {
+                branchProvinceMap = nextMap;
+                branchProvinceLoaded = true;
+                saveBranchProvinceMap(nextMap);
+            }
+
+            return branchProvinceMap;
+        }
+
+        function loadBranchProvinceMap() {
+            readCachedBranchProvinceMap();
+            if (branchProvinceLoaded) return Promise.resolve(branchProvinceMap);
+            if (branchProvinceLoadPromise) return branchProvinceLoadPromise;
+
+            branchProvinceLoadPromise = new Promise((resolve, reject) => {
+                const callbackName = `branchProvinceSheetCallback_${Date.now()}`;
+                const script = document.createElement('script');
+                let settled = false;
+
+                const finish = (handler, value) => {
+                    if (settled) return;
+                    settled = true;
+                    clearTimeout(timeout);
+                    delete window[callbackName];
+                    script.remove();
+                    handler(value);
+                };
+
+                const timeout = setTimeout(() => {
+                    if (Object.keys(branchProvinceMap).length > 0) {
+                        finish(resolve, branchProvinceMap);
+                    } else {
+                        finish(reject, new Error('โหลดจังหวัดจาก Google Sheet ไม่สำเร็จ'));
+                    }
+                }, 8000);
+
+                window[callbackName] = response => {
+                    finish(resolve, applyBranchProvinceSheetResponse(response));
+                };
+
+                script.onerror = () => {
+                    if (Object.keys(branchProvinceMap).length > 0) {
+                        finish(resolve, branchProvinceMap);
+                    } else {
+                        finish(reject, new Error('โหลดจังหวัดจาก Google Sheet ไม่สำเร็จ'));
+                    }
+                };
+
+                script.src = `https://docs.google.com/spreadsheets/d/${branchProvinceSheetId}/gviz/tq?sheet=Sheet1&tqx=out:json;responseHandler:${callbackName}`;
+                document.head.appendChild(script);
+            }).finally(() => {
+                branchProvinceLoadPromise = null;
+            });
+
+            return branchProvinceLoadPromise;
+        }
+
+        readCachedBranchProvinceMap();
+
         function getExpectedQty(item) {
             return parseInt(item.Total_Qty || item.total_qty) || 1;
         }
@@ -1225,6 +1339,12 @@
             document.getElementById('shippingDocumentModal').classList.remove('hidden');
             document.getElementById('shippingDocumentModal').classList.add('flex');
             renderShippingDocument();
+            loadBranchProvinceMap().then(() => {
+                const modal = document.getElementById('shippingDocumentModal');
+                if (modal && !modal.classList.contains('hidden')) {
+                    renderShippingDocument();
+                }
+            }).catch(() => { });
         }
 
         function closeShippingDocument() {
@@ -1239,13 +1359,18 @@
             if (!name) return '-';
             const match = name.match(/\(([^)]+)\)/);
             if (match) return match[1].trim();
-            
+
             // Check for common provinces as fallback
             const commonProvinces = ['กรุงเทพ', 'นนทบุรี', 'ปทุมธานี', 'สมุทรปราการ', 'ชลบุรี', 'เชียงใหม่', 'นครราชสีมา', 'ขอนแก่น', 'สุราษฎร์ธานี', 'สงขลา', 'ภูเก็ต', 'ชะอำ', 'หัวหิน', 'ระยอง', 'อยุธยา', 'พิษณุโลก', 'ลำปาง', 'นครศรีธรรมราช', 'เชียงราย', 'ราชบุรี', 'กาญจนบุรี'];
             for (let prov of commonProvinces) {
                 if (name.includes(prov)) return prov;
             }
             return '-';
+        }
+
+        function getProvinceForBranch(branchCode, branchName) {
+            const province = branchProvinceMap[normalizeBranchLookupCode(branchCode)];
+            return province || getProvinceFromBranchName(branchName);
         }
 
         function renderShippingDocument() {
@@ -1352,7 +1477,7 @@
                 totalPallets += branchPallets;
 
                 const cleanBranchName = branch.name.replace(/\s*\([^)]+\)\s*/g, '').trim();
-                const province = getProvinceFromBranchName(branch.name);
+                const province = getProvinceForBranch(bCode, branch.name);
 
                 printRows.push(`
                     <tr>
