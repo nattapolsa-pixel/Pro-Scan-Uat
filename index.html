@@ -2209,8 +2209,35 @@
             return pendingWavesFetchPromise;
         }
 
+        async function prefetchWavesDetails(waves) {
+            if (!waves || waves.length === 0) return;
+            for (let i = 0; i < waves.length; i++) {
+                const w = waves[i];
+                if (!w || !w.wave_no) continue;
+                const waveNo = w.wave_no;
+                const cacheKey = getWaveDataCacheKey(waveNo, true);
+                const cached = getCachedWaveData(cacheKey);
+                if (cached) continue;
+
+                await new Promise(resolve => setTimeout(resolve, i === 0 ? 0 : 1500));
+                
+                try {
+                    const url = backendApiUrl + `/api/check-wave?wave_no=${waveNo}`;
+                    const res = await fetch(url, { cache: 'no-store' });
+                    if (res.ok) {
+                        const data = await res.json();
+                        saveWaveDataCache(cacheKey, data);
+                    }
+                } catch (e) {}
+            }
+        }
+
         function prefetchPendingWaves() {
-            fetchPendingWavesFresh().catch(() => { });
+            fetchPendingWavesFresh().then(data => {
+                if (data && data.waves) {
+                    prefetchWavesDetails(data.waves.slice(0, 5));
+                }
+            }).catch(() => { });
         }
 
         async function loadPendingWaves(forceRefresh = false) {
@@ -2226,8 +2253,16 @@
                 const shouldForceFresh = forceRefresh || Boolean(cachedData && !cachedData.cache_is_fresh);
                 const data = await fetchPendingWavesFresh(shouldForceFresh);
                 renderPendingWaves(data);
+                if (data && data.waves) {
+                    prefetchWavesDetails(data.waves.slice(0, 5));
+                }
                 if (data && data.stale && !shouldForceFresh) {
-                    fetchPendingWavesFresh(true).then(renderPendingWaves).catch(() => { });
+                    fetchPendingWavesFresh(true).then(newData => {
+                        renderPendingWaves(newData);
+                        if (newData && newData.waves) {
+                            prefetchWavesDetails(newData.waves.slice(0, 5));
+                        }
+                    }).catch(() => { });
                 }
             } catch (e) {
                 if (!cachedData) {
@@ -2271,10 +2306,14 @@
             });
 
             renderBranchGrid();
-            document.getElementById('waveSelectorModal').classList.add('hidden');
-            document.getElementById('branchWaveDisplay').innerText = isWaveOnly ? `WAVE: ${currentWave}` : `BOOKING: ${currentBookingNo}`;
-            document.getElementById('branchSelectorModal').classList.remove('hidden');
-            document.getElementById('branchSelectorModal').classList.add('flex');
+            if (!selectedBranchCode) {
+                document.getElementById('waveSelectorModal').classList.add('hidden');
+                document.getElementById('branchWaveDisplay').innerText = isWaveOnly ? `WAVE: ${currentWave}` : `BOOKING: ${currentBookingNo}`;
+                document.getElementById('branchSelectorModal').classList.remove('hidden');
+                document.getElementById('branchSelectorModal').classList.add('flex');
+            } else {
+                updateDashboardUI();
+            }
         }
 
         async function checkAndLoadWave() {
