@@ -1264,20 +1264,38 @@
             isSyncing = true; updateSyncStatusUI();
 
             while (syncQueue.length > 0) {
-                const payload = syncQueue[0];
+                const batchSize = Math.min(50, syncQueue.length);
+                const batchItems = syncQueue.slice(0, batchSize);
+
                 try {
-                    const res = await fetch(backendApiUrl + '/api/scan', {
+                    const res = await fetch(backendApiUrl + '/api/scan-batch', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
+                        body: JSON.stringify({ scans: batchItems })
                     });
 
-                    // 💡 แก้ไขจุดนี้: ถ้าส่งผ่าน (res.ok) หรือ เจอข้อมูลเก่าที่พัง (422) ให้ดึงทิ้งออกจากคิวไปเลย ระบบจะได้ไม่ค้าง
-                    if (res.ok || res.status === 422) {
-                        syncQueue.shift();
+                    if (res.ok) {
+                        syncQueue.splice(0, batchSize);
                         localStorage.setItem('proScannerQueue', JSON.stringify(syncQueue));
                         updateSyncStatusUI();
-                        await new Promise(resolve => setTimeout(resolve, 150));
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                    } else if (res.status === 400 || res.status === 422) {
+                        // Batch failed, process one by one to discard invalid item
+                        const singlePayload = syncQueue[0];
+                        const singleRes = await fetch(backendApiUrl + '/api/scan', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(singlePayload)
+                        });
+                        
+                        if (singleRes.ok || singleRes.status === 400 || singleRes.status === 422) {
+                            syncQueue.shift();
+                            localStorage.setItem('proScannerQueue', JSON.stringify(syncQueue));
+                            updateSyncStatusUI();
+                            await new Promise(resolve => setTimeout(resolve, 150));
+                        } else {
+                            break;
+                        }
                     } else {
                         break;
                     }
