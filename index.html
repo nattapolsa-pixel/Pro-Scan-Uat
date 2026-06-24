@@ -1047,9 +1047,19 @@
         const waveDataCacheMaxItems = 8;
         const waveDataCacheTtlMs = 30 * 60 * 1000;
         const pendingWavesCacheKey = 'proScannerPendingWavesCache';
+        const pendingWavesRecentKey = 'proScannerRecentPendingWaves';
         const pendingWavesCacheTtlMs = 5 * 60 * 1000;
         const pendingWavesStaleTtlMs = 24 * 60 * 60 * 1000;
         const branchCompletionPrefix = 'proScannerBranchCompletion:';
+        const bootstrapPendingWaves = [
+            '0000054949',
+            '0000054978',
+            '0000055026',
+            '0000055027',
+            '0000055031',
+            '0000055002',
+            '0000054992'
+        ].map(wave_no => ({ wave_no }));
         const ownerDisplayMap = {
             DM02: 'MAXMART',
             DP02: 'PUNTHAI',
@@ -1069,6 +1079,7 @@
         let latestWaveLoadRequestId = 0;
         let currentWaveDataCacheKey = '';
         let pendingWavesFetchPromise = null;
+        let pendingWavesFetchForce = false;
 
         function getSavedShippingDocumentMeta(key) {
             try {
@@ -1080,7 +1091,7 @@
 
         function warmBackendApi() {
             fetch(backendApiUrl + '/', { cache: 'no-store' }).catch(() => { });
-            prefetchPendingWaves();
+            setTimeout(() => prefetchPendingWaves(), 1200);
         }
 
         function getWaveDataCacheKey(inputVal, isWaveOnly) {
@@ -2197,6 +2208,47 @@
             } catch (e) { }
         }
 
+        function getRecentPendingWaves() {
+            try {
+                const waves = JSON.parse(localStorage.getItem(pendingWavesRecentKey)) || [];
+                return Array.isArray(waves) ? waves : [];
+            } catch (e) {
+                return [];
+            }
+        }
+
+        function rememberRecentWave(waveNo) {
+            const cleanWave = String(waveNo || '').trim();
+            if (!cleanWave) return;
+            try {
+                const current = getRecentPendingWaves();
+                const next = [
+                    { wave_no: cleanWave },
+                    ...current.filter(w => String(w.wave_no || '').trim() !== cleanWave)
+                ].slice(0, 20);
+                localStorage.setItem(pendingWavesRecentKey, JSON.stringify(next));
+            } catch (e) { }
+        }
+
+        function getInstantPendingWaves() {
+            const seen = new Set();
+            const waves = [];
+            [...getRecentPendingWaves(), ...bootstrapPendingWaves].forEach(w => {
+                const waveNo = String(w && w.wave_no ? w.wave_no : '').trim();
+                if (!waveNo || seen.has(waveNo)) return;
+                seen.add(waveNo);
+                waves.push({ wave_no: waveNo });
+            });
+            return {
+                success: true,
+                waves,
+                cached: true,
+                stale: true,
+                instant: true,
+                cache_is_fresh: false
+            };
+        }
+
         function renderPendingWaves(data) {
             const tbody = document.getElementById('pendingWaveTableBody');
             if (!data || !data.waves || data.waves.length === 0) {
@@ -2219,7 +2271,8 @@
         }
 
         async function fetchPendingWavesFresh(forceRefresh = false) {
-            if (pendingWavesFetchPromise) return pendingWavesFetchPromise;
+            if (pendingWavesFetchPromise && (!forceRefresh || pendingWavesFetchForce)) return pendingWavesFetchPromise;
+            pendingWavesFetchForce = forceRefresh;
             const url = backendApiUrl + `/api/pending-waves${forceRefresh ? '?force=true' : ''}`;
             pendingWavesFetchPromise = fetch(url, { cache: 'no-store' })
                 .then(res => {
@@ -2233,73 +2286,40 @@
                 })
                 .finally(() => {
                     pendingWavesFetchPromise = null;
+                    pendingWavesFetchForce = false;
                 });
             return pendingWavesFetchPromise;
         }
 
-        async function prefetchWavesDetails(waves) {
-            if (!waves || waves.length === 0) return;
-            for (let i = 0; i < waves.length; i++) {
-                const w = waves[i];
-                if (!w || !w.wave_no) continue;
-                const waveNo = w.wave_no;
-                const cacheKey = getWaveDataCacheKey(waveNo, true);
-                const cached = getCachedWaveData(cacheKey);
-                if (cached) continue;
-
-                await new Promise(resolve => setTimeout(resolve, i === 0 ? 0 : 1500));
-                
-                try {
-                    const url = backendApiUrl + `/api/check-wave?wave_no=${waveNo}`;
-                    const res = await fetch(url, { cache: 'no-store' });
-                    if (res.ok) {
-                        const data = await res.json();
-                        saveWaveDataCache(cacheKey, data);
-                    }
-                } catch (e) {}
-            }
-        }
-
         function prefetchPendingWaves() {
-            fetchPendingWavesFresh().then(data => {
-                if (data && data.waves) {
-                    prefetchWavesDetails(data.waves.slice(0, 5));
-                }
-            }).catch(() => { });
+            fetchPendingWavesFresh(false).catch(() => { });
         }
 
         async function loadPendingWaves(forceRefresh = false) {
             const tbody = document.getElementById('pendingWaveTableBody');
-            const cachedData = forceRefresh ? null : getCachedPendingWaves();
-            if (cachedData) {
-                renderPendingWaves(cachedData);
+            const instantData = getCachedPendingWaves() || getInstantPendingWaves();
+            if (instantData && instantData.waves.length > 0) {
+                renderPendingWaves(instantData);
             } else {
                 tbody.innerHTML = '<tr><td colspan="2" class="p-4 text-center text-sm text-gray-500 font-bold animate-pulse">กำลังโหลดรายการครั้งแรก...</td></tr>';
             }
 
             try {
-                const shouldForceFresh = forceRefresh || Boolean(cachedData && !cachedData.cache_is_fresh);
-                const data = await fetchPendingWavesFresh(shouldForceFresh);
+                const data = await fetchPendingWavesFresh(forceRefresh);
                 renderPendingWaves(data);
-                if (data && data.waves) {
-                    prefetchWavesDetails(data.waves.slice(0, 5));
-                }
-                if (data && data.stale && !shouldForceFresh) {
-                    fetchPendingWavesFresh(true).then(newData => {
-                        renderPendingWaves(newData);
-                        if (newData && newData.waves) {
-                            prefetchWavesDetails(newData.waves.slice(0, 5));
-                        }
-                    }).catch(() => { });
+                if (data && data.stale && !forceRefresh) {
+                    setTimeout(() => {
+                        fetchPendingWavesFresh(false).then(renderPendingWaves).catch(() => { });
+                    }, 3000);
                 }
             } catch (e) {
-                if (!cachedData) {
+                if (!instantData || instantData.waves.length === 0) {
                     tbody.innerHTML = '<tr><td colspan="2" class="p-4 text-center text-sm text-red-500 font-bold">ไม่สามารถดึงข้อมูลรายการ Wave ได้</td></tr>';
                 }
             }
         }
 
-        function selectWaveFromTable(waveNo) { document.getElementById('waveInput').value = waveNo; checkAndLoadWave(); }
+        function selectWaveFromTable(waveNo) { rememberRecentWave(waveNo); document.getElementById('waveInput').value = waveNo; checkAndLoadWave(); }
 
         function applyWaveDataToScreen(data, isWaveOnly) {
             currentBookingNo = data.booking_no ? String(data.booking_no).trim() : '';
@@ -2384,6 +2404,7 @@
 
                 const data = await res.json();
                 saveWaveDataCache(cacheKey, data);
+                if (isWaveOnly) rememberRecentWave(inputVal);
                 applyWaveDataToScreen(data, isWaveOnly);
                 if (usedCache) showToast('อัปเดตข้อมูลล่าสุดแล้ว');
             } catch (e) {
