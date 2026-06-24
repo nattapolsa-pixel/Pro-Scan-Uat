@@ -1085,11 +1085,7 @@
 
         function getWaveDataCacheKey(inputVal, isWaveOnly) {
             const type = isWaveOnly ? 'wave' : 'booking';
-            let val = String(inputVal || '').trim().toUpperCase();
-            if (isWaveOnly && /^\d+$/.test(val)) {
-                val = val.padStart(10, '0');
-            }
-            return `${waveDataCachePrefix}${type}:${val}`;
+            return `${waveDataCachePrefix}${type}:${String(inputVal || '').trim().toUpperCase()}`;
         }
 
         function getCachedWaveData(cacheKey) {
@@ -1586,16 +1582,25 @@
 
                 branchItems.forEach(item => {
                     if (item.status === 'Scanned') {
+                        if (item.isMaster) {
+                            if (item.combinedWith) {
+                                scannedMasters.add(item.combinedWith);
+                            }
+                            scannedMasters.add(item.lpn);
+                            return;
+                        }
+
                         const qty = getActualQty(item);
                         const prefix = String(item.lpn || '').substring(0, 2).toUpperCase();
                         const color = String(item.color || '').toUpperCase();
                         const type = String(item.scan_type || '').toUpperCase();
 
-                        // Check if Carton or PR prefix
-                        if (prefix === 'PR' || type === 'CARTON' || color === 'REUSE') {
+                        // Check if Carton or PR prefix, but not if it has a tote color
+                        const isToteColor = ['RED', 'BLUE', 'GREEN', 'BLACK', 'YELLOW'].includes(color);
+                        if ((prefix === 'PR' || type === 'CARTON' || color === 'REUSE') && !isToteColor) {
                             mCount += qty;
                         } else if (prefix === 'PP') {
-                            if (!item.combinedWith && !item.isMaster) {
+                            if (!item.combinedWith) {
                                 standalonePallets += qty;
                             }
                         } else {
@@ -1611,9 +1616,6 @@
 
                         if (item.combinedWith) {
                             scannedMasters.add(item.combinedWith);
-                        }
-                        if (item.isMaster) {
-                            scannedMasters.add(item.lpn);
                         }
                     }
                 });
@@ -1647,6 +1649,7 @@
                         <td class="print-cell print-number">${blueCount || ''}</td>
                         <td class="print-cell print-number">${greenCount || ''}</td>
                         <td class="print-cell print-number">${blackCount || ''}</td>
+                        <td class="print-cell print-number">${yellowCount || ''}</td>
                         <td class="print-cell print-number">${branchTotalBoxes || ''}</td>
                         <td class="print-cell print-number">${branchPallets || ''}</td>
                     </tr>
@@ -1720,6 +1723,7 @@
                     <td class="print-cell print-number">${totalBlue}</td>
                     <td class="print-cell print-number">${totalGreen}</td>
                     <td class="print-cell print-number">${totalBlack}</td>
+                    <td class="print-cell print-number">${totalYellow}</td>
                     <td class="print-cell print-number">${totalAllBoxes}</td>
                     <td class="print-cell print-number">${totalPallets}</td>
                 </tr>
@@ -1728,6 +1732,7 @@
             const makeBlankPrintRow = (rowNumber = '&nbsp;') => `
                 <tr>
                     <td class="print-cell print-no">${rowNumber}</td>
+                    <td class="print-cell">&nbsp;</td>
                     <td class="print-cell">&nbsp;</td>
                     <td class="print-cell">&nbsp;</td>
                     <td class="print-cell">&nbsp;</td>
@@ -1789,6 +1794,7 @@
                                     <th>TOTE น้ำเงิน</th>
                                     <th>TOTE เขียว</th>
                                     <th>TOTE ดำ</th>
+                                    <th>TOTE เหลือง</th>
                                     <th>รวม</th>
                                     <th>pallet</th>
                                 </tr>
@@ -2529,23 +2535,66 @@
             async function undoCombine(masterLpn) {
                 if (!confirm(`คุณต้องการยกเลิกการรวมกล่อง/พาเลท ${masterLpn} และคืนค่ากล่องทั้งหมดกลับไปสถานะค้างตรวจสอบใช่หรือไม่?`)) return;
                 const branchItems = allLpnsInWave.filter(item => (item.branch || "Unknown") === selectedBranchCode);
-                branchItems.forEach(i => { if (i.combinedWith === masterLpn) { i.combinedWith = null; i.status = 'Pending'; i.qty = 0; pushToQueue({ wave_no: i.wave_no || currentWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: i.lpn, type: 'CANCEL_COMBINE', color: 'None', qty: 0, emp_id: loggedInEmpId }); } });
-                const master = branchItems.find(i => i.lpn === masterLpn); if (master) { master.isMaster = false; master.childCount = 0; master.status = 'Pending'; master.qty = 0; pushToQueue({ wave_no: master.wave_no || currentWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: master.lpn, type: 'CANCEL_COMBINE', color: 'None', qty: 0, emp_id: loggedInEmpId }); }
+                branchItems.forEach(i => {
+                    if (i.combinedWith === masterLpn) {
+                        i.combinedWith = null;
+                        i.status = 'Pending';
+                        i.qty = 0;
+                        i.color = 'None';
+                        i.scan_type = 'CANCEL_COMBINE';
+                        pushToQueue({ wave_no: i.wave_no || currentWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: i.lpn, type: 'CANCEL_COMBINE', color: 'None', qty: 0, emp_id: loggedInEmpId });
+                    }
+                });
+                const master = branchItems.find(i => i.lpn === masterLpn);
+                if (master) {
+                    master.isMaster = false;
+                    master.childCount = 0;
+                    master.status = 'Pending';
+                    master.qty = 0;
+                    master.color = 'None';
+                    master.scan_type = 'CANCEL_COMBINE';
+                    pushToQueue({ wave_no: master.wave_no || currentWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: master.lpn, type: 'CANCEL_COMBINE', color: 'None', qty: 0, emp_id: loggedInEmpId });
+                }
                 updateDashboardUI(); saveCurrentWaveDataCache(); showToast(`🔄 ยกเลิกการรวมกล่อง/พาเลท ${masterLpn} เรียบร้อยแล้ว`);
             }
 
             async function undoSingleChild(childLpn) {
                 const item = allLpnsInWave.find(i => i.lpn === childLpn); if (!item || !item.combinedWith) return;
                 if (!confirm(`คุณต้องการแยกกล่อง ${childLpn} ออกจากพาเลท ${item.combinedWith} ใช่หรือไม่?`)) return;
-                const masterLpn = item.combinedWith; item.combinedWith = null; item.status = 'Pending'; item.qty = 0;
+                const masterLpn = item.combinedWith;
+                item.combinedWith = null;
+                item.status = 'Pending';
+                item.qty = 0;
+                item.color = 'None';
+                item.scan_type = 'CANCEL_COMBINE';
                 pushToQueue({ wave_no: item.wave_no || currentWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: childLpn, type: 'CANCEL_COMBINE', color: 'None', qty: 0, emp_id: loggedInEmpId });
-                const master = allLpnsInWave.find(i => i.lpn === masterLpn); if (master) { master.childCount = Math.max(0, (master.childCount || 1) - 1); if (master.childCount === 0) { master.isMaster = false; master.status = 'Pending'; pushToQueue({ wave_no: master.wave_no || currentWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: master.lpn, type: 'CANCEL_COMBINE', color: 'None', qty: 0, emp_id: loggedInEmpId }); } }
+                const master = allLpnsInWave.find(i => i.lpn === masterLpn);
+                if (master) {
+                    master.childCount = Math.max(0, (master.childCount || 1) - 1);
+                    if (master.childCount === 0) {
+                        master.isMaster = false;
+                        master.status = 'Pending';
+                        master.color = 'None';
+                        master.scan_type = 'CANCEL_COMBINE';
+                        pushToQueue({ wave_no: master.wave_no || currentWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: master.lpn, type: 'CANCEL_COMBINE', color: 'None', qty: 0, emp_id: loggedInEmpId });
+                    }
+                }
                 updateDashboardUI(); saveCurrentWaveDataCache(); showToast(`🔄 แยกกล่อง ${childLpn} ออกจากพาเลทเรียบร้อยแล้ว`);
             }
 
             async function resetSingleBox(lpn) {
                 if (!confirm(`คุณต้องการยกเลิกการตรวจสอบกล่อง ${lpn} และคืนค่ากลับเป็นค้างตรวจสอบใช่หรือไม่?`)) return;
-                const item = allLpnsInWave.find(i => i.lpn === lpn); if (item) { item.status = 'Pending'; item.qty = 0; pushToQueue({ wave_no: item.wave_no || currentWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: lpn, type: 'RESET_BOX', color: 'None', qty: 0, emp_id: loggedInEmpId }); updateDashboardUI(); saveCurrentWaveDataCache(); showToast(`🔄 คืนค่ากล่อง ${lpn} เรียบร้อยแล้ว`); }
+                const item = allLpnsInWave.find(i => i.lpn === lpn);
+                if (item) {
+                    item.status = 'Pending';
+                    item.qty = 0;
+                    item.color = 'None';
+                    item.scan_type = 'RESET_BOX';
+                    pushToQueue({ wave_no: item.wave_no || currentWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: lpn, type: 'RESET_BOX', color: 'None', qty: 0, emp_id: loggedInEmpId });
+                    updateDashboardUI();
+                    saveCurrentWaveDataCache();
+                    showToast(`🔄 คืนค่ากล่อง ${lpn} เรียบร้อยแล้ว`);
+                }
             }
 
             function switchTab(mode) { const isScan = mode === 'scan'; document.getElementById('modeScan').classList.toggle('hidden', !isScan); document.getElementById('modeCombine').classList.toggle('hidden', isScan); document.getElementById('tabScan').className = `flex-1 py-3 font-bold flex items-center justify-center gap-2 ${isScan ? 'text-blue-700 border-b-4 border-blue-700' : 'border-b-4 border-transparent text-gray-500'}`; document.getElementById('tabCombine').className = `flex-1 py-3 font-bold flex items-center justify-center gap-2 ${!isScan ? 'text-purple-700 border-b-4 border-purple-700' : 'border-b-4 border-transparent text-gray-500'}`; if (selectedBranchCode !== "") { if (isScan) document.getElementById('lpnInput').focus(); else document.getElementById('masterInput').focus(); } }
@@ -2563,7 +2612,24 @@
             });
             qtyInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') { e.preventDefault(); executeQtyScanSave(); } });
             function executeQtyScanSave() { const qtyVal = parseInt(qtyInput.value); if (isNaN(qtyVal) || qtyVal < 1) return showAlert('ข้อผิดพลาด', 'กรุณาระบุจำนวนกล่องสินค้า (PP) ให้ถูกต้อง'); executeScanSave('None', 'Carton', qtyVal, document.getElementById('displayLpnQty').innerText); }
-            async function executeScanSave(color, type = 'TOTE', qty = 1, forceLpn = null) { const lpn = forceLpn || document.getElementById('displayLpn').innerText; colorSection.classList.add('hidden'); qtySection.classList.add('hidden'); const target = allLpnsInWave.find(item => item.lpn === lpn); if (target) { target.status = 'Scanned'; target.qty = qty; } updateDashboardUI(); saveCurrentWaveDataCache(); showToast(`บันทึกข้อมูล ${lpn} สำเร็จ`); lpnInput.focus(); const lpnWave = target ? (target.wave_no || currentWave) : currentWave; pushToQueue({ wave_no: lpnWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: lpn, type: type, color: color, qty: qty, emp_id: loggedInEmpId }); }
+            async function executeScanSave(color, type = 'TOTE', qty = 1, forceLpn = null) {
+                const lpn = forceLpn || document.getElementById('displayLpn').innerText;
+                colorSection.classList.add('hidden');
+                qtySection.classList.add('hidden');
+                const target = allLpnsInWave.find(item => item.lpn === lpn);
+                if (target) {
+                    target.status = 'Scanned';
+                    target.qty = qty;
+                    target.color = color;
+                    target.scan_type = type;
+                }
+                updateDashboardUI();
+                saveCurrentWaveDataCache();
+                showToast(`บันทึกข้อมูล ${lpn} สำเร็จ`);
+                lpnInput.focus();
+                const lpnWave = target ? (target.wave_no || currentWave) : currentWave;
+                pushToQueue({ wave_no: lpnWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: lpn, type: type, color: color, qty: qty, emp_id: loggedInEmpId });
+            }
 
             // ==================== 💨 BACKGROUND CLOSE LOGIC ====================
             function openConfirmModal() { document.getElementById('confirmModal').classList.remove('hidden'); }
@@ -2712,8 +2778,24 @@
 
                 for (let cLpn of childLpns) { const target = allLpnsInWave.find(item => item.lpn === cLpn); if (target && target.status === 'Scanned' && !target.combinedWith) { return showAlert('ข้อมูลซ้ำซ้อน', `กล่อง ${cLpn} ถูกตรวจสอบเสร็จสิ้นไปแล้ว ไม่สามารถนำมารวมกล่อง/พาเลทได้`); } }
 
-                childLpns.forEach(cLpn => { const target = allLpnsInWave.find(item => item.lpn === cLpn); if (target) { target.status = 'Scanned'; target.combinedWith = master; } });
-                const masterTarget = allLpnsInWave.find(item => item.lpn === master); if (masterTarget) { masterTarget.status = 'Scanned'; masterTarget.isMaster = true; masterTarget.childCount = (masterTarget.childCount || 0) + childLpns.length; }
+                childLpns.forEach(cLpn => {
+                    const target = allLpnsInWave.find(item => item.lpn === cLpn);
+                    if (target) {
+                        target.status = 'Scanned';
+                        target.combinedWith = master;
+                        target.color = color;
+                        target.scan_type = 'COMBINE: ' + master;
+                        target.qty = 1;
+                    }
+                });
+                const masterTarget = allLpnsInWave.find(item => item.lpn === master);
+                if (masterTarget) {
+                    masterTarget.status = 'Scanned';
+                    masterTarget.isMaster = true;
+                    masterTarget.childCount = (masterTarget.childCount || 0) + childLpns.length;
+                    masterTarget.color = color;
+                    masterTarget.scan_type = 'COMBINE_MASTER';
+                }
 
                 updateDashboardUI(); saveCurrentWaveDataCache(); showToast(`รวมกล่อง/พาเลทสำเร็จ (${childLpns.length} รายการ)`);
                 for (const cLpn of childLpns) {
