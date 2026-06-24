@@ -1085,7 +1085,11 @@
 
         function getWaveDataCacheKey(inputVal, isWaveOnly) {
             const type = isWaveOnly ? 'wave' : 'booking';
-            return `${waveDataCachePrefix}${type}:${String(inputVal || '').trim().toUpperCase()}`;
+            let val = String(inputVal || '').trim().toUpperCase();
+            if (isWaveOnly && /^\d+$/.test(val)) {
+                val = val.padStart(10, '0');
+            }
+            return `${waveDataCachePrefix}${type}:${val}`;
         }
 
         function getCachedWaveData(cacheKey) {
