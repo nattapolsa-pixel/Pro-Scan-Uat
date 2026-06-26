@@ -1047,19 +1047,9 @@
         const waveDataCacheMaxItems = 8;
         const waveDataCacheTtlMs = 30 * 60 * 1000;
         const pendingWavesCacheKey = 'proScannerPendingWavesCache';
-        const pendingWavesRecentKey = 'proScannerRecentPendingWaves';
         const pendingWavesCacheTtlMs = 5 * 60 * 1000;
         const pendingWavesStaleTtlMs = 24 * 60 * 60 * 1000;
         const branchCompletionPrefix = 'proScannerBranchCompletion:';
-        const bootstrapPendingWaves = [
-            '0000054949',
-            '0000054978',
-            '0000055026',
-            '0000055027',
-            '0000055031',
-            '0000055002',
-            '0000054992'
-        ].map(wave_no => ({ wave_no }));
         const ownerDisplayMap = {
             DM02: 'MAXMART',
             DP02: 'PUNTHAI',
@@ -1079,7 +1069,6 @@
         let latestWaveLoadRequestId = 0;
         let currentWaveDataCacheKey = '';
         let pendingWavesFetchPromise = null;
-        let pendingWavesFetchForce = false;
 
         function getSavedShippingDocumentMeta(key) {
             try {
@@ -1089,9 +1078,24 @@
             }
         }
 
-        function warmBackendApi() {
-            fetch(backendApiUrl + '/', { cache: 'no-store' }).catch(() => { });
-            setTimeout(() => prefetchPendingWaves(), 1200);
+        function keepAliveHeartbeat() {
+            // ✅ Ping /api/health ทุก 10 นาที เพื่อป้องกัน Render.com free-tier cold start
+            const ping = () => {
+                fetch(backendApiUrl + '/api/health', { cache: 'no-store' })
+                    .catch(() => { });
+            };
+            ping();
+            prefetchPendingWaves();
+            // ตั้ง heartbeat ทุก 10 นาที (600,000ms)
+            setInterval(ping, 600000);
+        }
+
+        // ✅ fetchWithTimeout: fetch พร้อม AbortController เพื่อไม่ให้ request ค้างนานโดยไม่จำกัด
+        function fetchWithTimeout(url, options = {}, timeoutMs = 25000) {
+            const controller = new AbortController();
+            const id = setTimeout(() => controller.abort(), timeoutMs);
+            return fetch(url, { ...options, signal: controller.signal })
+                .finally(() => clearTimeout(id));
         }
 
         function getWaveDataCacheKey(inputVal, isWaveOnly) {
@@ -1275,38 +1279,20 @@
             isSyncing = true; updateSyncStatusUI();
 
             while (syncQueue.length > 0) {
-                const batchSize = Math.min(50, syncQueue.length);
-                const batchItems = syncQueue.slice(0, batchSize);
-
+                const payload = syncQueue[0];
                 try {
-                    const res = await fetch(backendApiUrl + '/api/scan-batch', {
+                    // ✅ ใช้ fetchWithTimeout ป้องกัน request ค้างนานโดยไม่มีกำหนด
+                    const res = await fetchWithTimeout(backendApiUrl + '/api/scan', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ scans: batchItems })
-                    });
+                        body: JSON.stringify(payload)
+                    }, 20000);
 
-                    if (res.ok) {
-                        syncQueue.splice(0, batchSize);
+                    if (res.ok || res.status === 422) {
+                        syncQueue.shift();
                         localStorage.setItem('proScannerQueue', JSON.stringify(syncQueue));
                         updateSyncStatusUI();
-                        await new Promise(resolve => setTimeout(resolve, 100));
-                    } else if (res.status === 400 || res.status === 422) {
-                        // Batch failed, process one by one to discard invalid item
-                        const singlePayload = syncQueue[0];
-                        const singleRes = await fetch(backendApiUrl + '/api/scan', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(singlePayload)
-                        });
-                        
-                        if (singleRes.ok || singleRes.status === 400 || singleRes.status === 422) {
-                            syncQueue.shift();
-                            localStorage.setItem('proScannerQueue', JSON.stringify(syncQueue));
-                            updateSyncStatusUI();
-                            await new Promise(resolve => setTimeout(resolve, 150));
-                        } else {
-                            break;
-                        }
+                        await new Promise(resolve => setTimeout(resolve, 150));
                     } else {
                         break;
                     }
@@ -1611,25 +1597,16 @@
 
                 branchItems.forEach(item => {
                     if (item.status === 'Scanned') {
-                        if (item.isMaster) {
-                            if (item.combinedWith) {
-                                scannedMasters.add(item.combinedWith);
-                            }
-                            scannedMasters.add(item.lpn);
-                            return;
-                        }
-
                         const qty = getActualQty(item);
                         const prefix = String(item.lpn || '').substring(0, 2).toUpperCase();
                         const color = String(item.color || '').toUpperCase();
                         const type = String(item.scan_type || '').toUpperCase();
 
-                        // Check if Carton or PR prefix, but not if it has a tote color
-                        const isToteColor = ['RED', 'BLUE', 'GREEN', 'BLACK', 'YELLOW'].includes(color);
-                        if ((prefix === 'PR' || type === 'CARTON' || color === 'REUSE') && !isToteColor) {
+                        // Check if Carton or PR prefix
+                        if (prefix === 'PR' || type === 'CARTON' || color === 'REUSE') {
                             mCount += qty;
                         } else if (prefix === 'PP') {
-                            if (!item.combinedWith) {
+                            if (!item.combinedWith && !item.isMaster) {
                                 standalonePallets += qty;
                             }
                         } else {
@@ -1645,6 +1622,9 @@
 
                         if (item.combinedWith) {
                             scannedMasters.add(item.combinedWith);
+                        }
+                        if (item.isMaster) {
+                            scannedMasters.add(item.lpn);
                         }
                     }
                 });
@@ -1678,7 +1658,6 @@
                         <td class="print-cell print-number">${blueCount || ''}</td>
                         <td class="print-cell print-number">${greenCount || ''}</td>
                         <td class="print-cell print-number">${blackCount || ''}</td>
-                        <td class="print-cell print-number">${yellowCount || ''}</td>
                         <td class="print-cell print-number">${branchTotalBoxes || ''}</td>
                         <td class="print-cell print-number">${branchPallets || ''}</td>
                     </tr>
@@ -1752,7 +1731,6 @@
                     <td class="print-cell print-number">${totalBlue}</td>
                     <td class="print-cell print-number">${totalGreen}</td>
                     <td class="print-cell print-number">${totalBlack}</td>
-                    <td class="print-cell print-number">${totalYellow}</td>
                     <td class="print-cell print-number">${totalAllBoxes}</td>
                     <td class="print-cell print-number">${totalPallets}</td>
                 </tr>
@@ -1761,7 +1739,6 @@
             const makeBlankPrintRow = (rowNumber = '&nbsp;') => `
                 <tr>
                     <td class="print-cell print-no">${rowNumber}</td>
-                    <td class="print-cell">&nbsp;</td>
                     <td class="print-cell">&nbsp;</td>
                     <td class="print-cell">&nbsp;</td>
                     <td class="print-cell">&nbsp;</td>
@@ -1823,7 +1800,6 @@
                                     <th>TOTE น้ำเงิน</th>
                                     <th>TOTE เขียว</th>
                                     <th>TOTE ดำ</th>
-                                    <th>TOTE เหลือง</th>
                                     <th>รวม</th>
                                     <th>pallet</th>
                                 </tr>
@@ -2041,7 +2017,7 @@
         // ==================== UI Helper ====================
         window.onload = () => {
             document.getElementById('empInput').focus();
-            warmBackendApi();
+            keepAliveHeartbeat();
             loadBranchProvinceMap().catch(() => { });
             fetch(employeeApiUrl).then(res => res.json()).then(data => {
                 if (data.success && data.employees) { employeeDB = data.employees; localStorage.setItem('proScannerEmpDB', JSON.stringify(employeeDB)); }
@@ -2208,47 +2184,6 @@
             } catch (e) { }
         }
 
-        function getRecentPendingWaves() {
-            try {
-                const waves = JSON.parse(localStorage.getItem(pendingWavesRecentKey)) || [];
-                return Array.isArray(waves) ? waves : [];
-            } catch (e) {
-                return [];
-            }
-        }
-
-        function rememberRecentWave(waveNo) {
-            const cleanWave = String(waveNo || '').trim();
-            if (!cleanWave) return;
-            try {
-                const current = getRecentPendingWaves();
-                const next = [
-                    { wave_no: cleanWave },
-                    ...current.filter(w => String(w.wave_no || '').trim() !== cleanWave)
-                ].slice(0, 20);
-                localStorage.setItem(pendingWavesRecentKey, JSON.stringify(next));
-            } catch (e) { }
-        }
-
-        function getInstantPendingWaves() {
-            const seen = new Set();
-            const waves = [];
-            [...getRecentPendingWaves(), ...bootstrapPendingWaves].forEach(w => {
-                const waveNo = String(w && w.wave_no ? w.wave_no : '').trim();
-                if (!waveNo || seen.has(waveNo)) return;
-                seen.add(waveNo);
-                waves.push({ wave_no: waveNo });
-            });
-            return {
-                success: true,
-                waves,
-                cached: true,
-                stale: true,
-                instant: true,
-                cache_is_fresh: false
-            };
-        }
-
         function renderPendingWaves(data) {
             const tbody = document.getElementById('pendingWaveTableBody');
             if (!data || !data.waves || data.waves.length === 0) {
@@ -2271,8 +2206,7 @@
         }
 
         async function fetchPendingWavesFresh(forceRefresh = false) {
-            if (pendingWavesFetchPromise && (!forceRefresh || pendingWavesFetchForce)) return pendingWavesFetchPromise;
-            pendingWavesFetchForce = forceRefresh;
+            if (pendingWavesFetchPromise) return pendingWavesFetchPromise;
             const url = backendApiUrl + `/api/pending-waves${forceRefresh ? '?force=true' : ''}`;
             pendingWavesFetchPromise = fetch(url, { cache: 'no-store' })
                 .then(res => {
@@ -2286,40 +2220,73 @@
                 })
                 .finally(() => {
                     pendingWavesFetchPromise = null;
-                    pendingWavesFetchForce = false;
                 });
             return pendingWavesFetchPromise;
         }
 
+        async function prefetchWavesDetails(waves) {
+            if (!waves || waves.length === 0) return;
+            for (let i = 0; i < waves.length; i++) {
+                const w = waves[i];
+                if (!w || !w.wave_no) continue;
+                const waveNo = w.wave_no;
+                const cacheKey = getWaveDataCacheKey(waveNo, true);
+                const cached = getCachedWaveData(cacheKey);
+                if (cached) continue;
+
+                await new Promise(resolve => setTimeout(resolve, i === 0 ? 0 : 1500));
+                
+                try {
+                    const url = backendApiUrl + `/api/check-wave?wave_no=${waveNo}`;
+                    const res = await fetch(url, { cache: 'no-store' });
+                    if (res.ok) {
+                        const data = await res.json();
+                        saveWaveDataCache(cacheKey, data);
+                    }
+                } catch (e) {}
+            }
+        }
+
         function prefetchPendingWaves() {
-            fetchPendingWavesFresh(false).catch(() => { });
+            fetchPendingWavesFresh().then(data => {
+                if (data && data.waves) {
+                    prefetchWavesDetails(data.waves.slice(0, 5));
+                }
+            }).catch(() => { });
         }
 
         async function loadPendingWaves(forceRefresh = false) {
             const tbody = document.getElementById('pendingWaveTableBody');
-            const instantData = getCachedPendingWaves() || getInstantPendingWaves();
-            if (instantData && instantData.waves.length > 0) {
-                renderPendingWaves(instantData);
+            const cachedData = forceRefresh ? null : getCachedPendingWaves();
+            if (cachedData) {
+                renderPendingWaves(cachedData);
             } else {
                 tbody.innerHTML = '<tr><td colspan="2" class="p-4 text-center text-sm text-gray-500 font-bold animate-pulse">กำลังโหลดรายการครั้งแรก...</td></tr>';
             }
 
             try {
-                const data = await fetchPendingWavesFresh(forceRefresh);
+                const shouldForceFresh = forceRefresh || Boolean(cachedData && !cachedData.cache_is_fresh);
+                const data = await fetchPendingWavesFresh(shouldForceFresh);
                 renderPendingWaves(data);
-                if (data && data.stale && !forceRefresh) {
-                    setTimeout(() => {
-                        fetchPendingWavesFresh(false).then(renderPendingWaves).catch(() => { });
-                    }, 3000);
+                if (data && data.waves) {
+                    prefetchWavesDetails(data.waves.slice(0, 5));
+                }
+                if (data && data.stale && !shouldForceFresh) {
+                    fetchPendingWavesFresh(true).then(newData => {
+                        renderPendingWaves(newData);
+                        if (newData && newData.waves) {
+                            prefetchWavesDetails(newData.waves.slice(0, 5));
+                        }
+                    }).catch(() => { });
                 }
             } catch (e) {
-                if (!instantData || instantData.waves.length === 0) {
+                if (!cachedData) {
                     tbody.innerHTML = '<tr><td colspan="2" class="p-4 text-center text-sm text-red-500 font-bold">ไม่สามารถดึงข้อมูลรายการ Wave ได้</td></tr>';
                 }
             }
         }
 
-        function selectWaveFromTable(waveNo) { rememberRecentWave(waveNo); document.getElementById('waveInput').value = waveNo; checkAndLoadWave(); }
+        function selectWaveFromTable(waveNo) { document.getElementById('waveInput').value = waveNo; checkAndLoadWave(); }
 
         function applyWaveDataToScreen(data, isWaveOnly) {
             currentBookingNo = data.booking_no ? String(data.booking_no).trim() : '';
@@ -2389,7 +2356,25 @@
                     ? backendApiUrl + `/api/check-wave?wave_no=${inputVal}`
                     : backendApiUrl + `/api/check-booking?booking_no=${encodeURIComponent(inputVal)}`;
 
-                const res = await fetch(url, { cache: 'no-store' });
+                // ✅ Retry with backoff: ลองใหม่สูงสุด 2 ครั้งถ้าหมดเวลา พร้อม timeout 25 วินาที
+                let res = null;
+                let lastError = null;
+                for (let attempt = 0; attempt <= 2; attempt++) {
+                    try {
+                        if (attempt > 0) {
+                            await new Promise(r => setTimeout(r, attempt * 1500));
+                            if (!usedCache) showToast(`กำลังลองเชื่อมต่อใหม่ (${attempt}/2)...`);
+                        }
+                        res = await fetchWithTimeout(url, { cache: 'no-store' }, 25000);
+                        lastError = null;
+                        break;
+                    } catch (err) {
+                        lastError = err;
+                        if (requestId !== latestWaveLoadRequestId) return;
+                    }
+                }
+
+                if (lastError) throw lastError;
                 if (requestId !== latestWaveLoadRequestId) return;
 
                 if (!res.ok) {
@@ -2404,12 +2389,11 @@
 
                 const data = await res.json();
                 saveWaveDataCache(cacheKey, data);
-                if (isWaveOnly) rememberRecentWave(inputVal);
                 applyWaveDataToScreen(data, isWaveOnly);
                 if (usedCache) showToast('อัปเดตข้อมูลล่าสุดแล้ว');
             } catch (e) {
                 if (!usedCache) {
-                    showAlert('ข้อผิดพลาดเครือข่าย', "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้");
+                    showAlert('ข้อผิดพลาดเครือข่าย', 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ หลังลอง 3 ครั้งแล้ว');
                 } else {
                     showToast('เชื่อมต่อช้า ใช้ข้อมูลที่โหลดไว้ก่อนหน้าอยู่', true);
                 }
@@ -2574,66 +2558,23 @@
             async function undoCombine(masterLpn) {
                 if (!confirm(`คุณต้องการยกเลิกการรวมกล่อง/พาเลท ${masterLpn} และคืนค่ากล่องทั้งหมดกลับไปสถานะค้างตรวจสอบใช่หรือไม่?`)) return;
                 const branchItems = allLpnsInWave.filter(item => (item.branch || "Unknown") === selectedBranchCode);
-                branchItems.forEach(i => {
-                    if (i.combinedWith === masterLpn) {
-                        i.combinedWith = null;
-                        i.status = 'Pending';
-                        i.qty = 0;
-                        i.color = 'None';
-                        i.scan_type = 'CANCEL_COMBINE';
-                        pushToQueue({ wave_no: i.wave_no || currentWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: i.lpn, type: 'CANCEL_COMBINE', color: 'None', qty: 0, emp_id: loggedInEmpId });
-                    }
-                });
-                const master = branchItems.find(i => i.lpn === masterLpn);
-                if (master) {
-                    master.isMaster = false;
-                    master.childCount = 0;
-                    master.status = 'Pending';
-                    master.qty = 0;
-                    master.color = 'None';
-                    master.scan_type = 'CANCEL_COMBINE';
-                    pushToQueue({ wave_no: master.wave_no || currentWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: master.lpn, type: 'CANCEL_COMBINE', color: 'None', qty: 0, emp_id: loggedInEmpId });
-                }
+                branchItems.forEach(i => { if (i.combinedWith === masterLpn) { i.combinedWith = null; i.status = 'Pending'; i.qty = 0; pushToQueue({ wave_no: i.wave_no || currentWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: i.lpn, type: 'CANCEL_COMBINE', color: 'None', qty: 0, emp_id: loggedInEmpId }); } });
+                const master = branchItems.find(i => i.lpn === masterLpn); if (master) { master.isMaster = false; master.childCount = 0; master.status = 'Pending'; master.qty = 0; pushToQueue({ wave_no: master.wave_no || currentWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: master.lpn, type: 'CANCEL_COMBINE', color: 'None', qty: 0, emp_id: loggedInEmpId }); }
                 updateDashboardUI(); saveCurrentWaveDataCache(); showToast(`🔄 ยกเลิกการรวมกล่อง/พาเลท ${masterLpn} เรียบร้อยแล้ว`);
             }
 
             async function undoSingleChild(childLpn) {
                 const item = allLpnsInWave.find(i => i.lpn === childLpn); if (!item || !item.combinedWith) return;
                 if (!confirm(`คุณต้องการแยกกล่อง ${childLpn} ออกจากพาเลท ${item.combinedWith} ใช่หรือไม่?`)) return;
-                const masterLpn = item.combinedWith;
-                item.combinedWith = null;
-                item.status = 'Pending';
-                item.qty = 0;
-                item.color = 'None';
-                item.scan_type = 'CANCEL_COMBINE';
+                const masterLpn = item.combinedWith; item.combinedWith = null; item.status = 'Pending'; item.qty = 0;
                 pushToQueue({ wave_no: item.wave_no || currentWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: childLpn, type: 'CANCEL_COMBINE', color: 'None', qty: 0, emp_id: loggedInEmpId });
-                const master = allLpnsInWave.find(i => i.lpn === masterLpn);
-                if (master) {
-                    master.childCount = Math.max(0, (master.childCount || 1) - 1);
-                    if (master.childCount === 0) {
-                        master.isMaster = false;
-                        master.status = 'Pending';
-                        master.color = 'None';
-                        master.scan_type = 'CANCEL_COMBINE';
-                        pushToQueue({ wave_no: master.wave_no || currentWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: master.lpn, type: 'CANCEL_COMBINE', color: 'None', qty: 0, emp_id: loggedInEmpId });
-                    }
-                }
+                const master = allLpnsInWave.find(i => i.lpn === masterLpn); if (master) { master.childCount = Math.max(0, (master.childCount || 1) - 1); if (master.childCount === 0) { master.isMaster = false; master.status = 'Pending'; pushToQueue({ wave_no: master.wave_no || currentWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: master.lpn, type: 'CANCEL_COMBINE', color: 'None', qty: 0, emp_id: loggedInEmpId }); } }
                 updateDashboardUI(); saveCurrentWaveDataCache(); showToast(`🔄 แยกกล่อง ${childLpn} ออกจากพาเลทเรียบร้อยแล้ว`);
             }
 
             async function resetSingleBox(lpn) {
                 if (!confirm(`คุณต้องการยกเลิกการตรวจสอบกล่อง ${lpn} และคืนค่ากลับเป็นค้างตรวจสอบใช่หรือไม่?`)) return;
-                const item = allLpnsInWave.find(i => i.lpn === lpn);
-                if (item) {
-                    item.status = 'Pending';
-                    item.qty = 0;
-                    item.color = 'None';
-                    item.scan_type = 'RESET_BOX';
-                    pushToQueue({ wave_no: item.wave_no || currentWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: lpn, type: 'RESET_BOX', color: 'None', qty: 0, emp_id: loggedInEmpId });
-                    updateDashboardUI();
-                    saveCurrentWaveDataCache();
-                    showToast(`🔄 คืนค่ากล่อง ${lpn} เรียบร้อยแล้ว`);
-                }
+                const item = allLpnsInWave.find(i => i.lpn === lpn); if (item) { item.status = 'Pending'; item.qty = 0; pushToQueue({ wave_no: item.wave_no || currentWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: lpn, type: 'RESET_BOX', color: 'None', qty: 0, emp_id: loggedInEmpId }); updateDashboardUI(); saveCurrentWaveDataCache(); showToast(`🔄 คืนค่ากล่อง ${lpn} เรียบร้อยแล้ว`); }
             }
 
             function switchTab(mode) { const isScan = mode === 'scan'; document.getElementById('modeScan').classList.toggle('hidden', !isScan); document.getElementById('modeCombine').classList.toggle('hidden', isScan); document.getElementById('tabScan').className = `flex-1 py-3 font-bold flex items-center justify-center gap-2 ${isScan ? 'text-blue-700 border-b-4 border-blue-700' : 'border-b-4 border-transparent text-gray-500'}`; document.getElementById('tabCombine').className = `flex-1 py-3 font-bold flex items-center justify-center gap-2 ${!isScan ? 'text-purple-700 border-b-4 border-purple-700' : 'border-b-4 border-transparent text-gray-500'}`; if (selectedBranchCode !== "") { if (isScan) document.getElementById('lpnInput').focus(); else document.getElementById('masterInput').focus(); } }
@@ -2651,24 +2592,7 @@
             });
             qtyInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') { e.preventDefault(); executeQtyScanSave(); } });
             function executeQtyScanSave() { const qtyVal = parseInt(qtyInput.value); if (isNaN(qtyVal) || qtyVal < 1) return showAlert('ข้อผิดพลาด', 'กรุณาระบุจำนวนกล่องสินค้า (PP) ให้ถูกต้อง'); executeScanSave('None', 'Carton', qtyVal, document.getElementById('displayLpnQty').innerText); }
-            async function executeScanSave(color, type = 'TOTE', qty = 1, forceLpn = null) {
-                const lpn = forceLpn || document.getElementById('displayLpn').innerText;
-                colorSection.classList.add('hidden');
-                qtySection.classList.add('hidden');
-                const target = allLpnsInWave.find(item => item.lpn === lpn);
-                if (target) {
-                    target.status = 'Scanned';
-                    target.qty = qty;
-                    target.color = color;
-                    target.scan_type = type;
-                }
-                updateDashboardUI();
-                saveCurrentWaveDataCache();
-                showToast(`บันทึกข้อมูล ${lpn} สำเร็จ`);
-                lpnInput.focus();
-                const lpnWave = target ? (target.wave_no || currentWave) : currentWave;
-                pushToQueue({ wave_no: lpnWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: lpn, type: type, color: color, qty: qty, emp_id: loggedInEmpId });
-            }
+            async function executeScanSave(color, type = 'TOTE', qty = 1, forceLpn = null) { const lpn = forceLpn || document.getElementById('displayLpn').innerText; colorSection.classList.add('hidden'); qtySection.classList.add('hidden'); const target = allLpnsInWave.find(item => item.lpn === lpn); if (target) { target.status = 'Scanned'; target.qty = qty; } updateDashboardUI(); saveCurrentWaveDataCache(); showToast(`บันทึกข้อมูล ${lpn} สำเร็จ`); lpnInput.focus(); const lpnWave = target ? (target.wave_no || currentWave) : currentWave; pushToQueue({ wave_no: lpnWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: lpn, type: type, color: color, qty: qty, emp_id: loggedInEmpId }); }
 
             // ==================== 💨 BACKGROUND CLOSE LOGIC ====================
             function openConfirmModal() { document.getElementById('confirmModal').classList.remove('hidden'); }
@@ -2817,24 +2741,8 @@
 
                 for (let cLpn of childLpns) { const target = allLpnsInWave.find(item => item.lpn === cLpn); if (target && target.status === 'Scanned' && !target.combinedWith) { return showAlert('ข้อมูลซ้ำซ้อน', `กล่อง ${cLpn} ถูกตรวจสอบเสร็จสิ้นไปแล้ว ไม่สามารถนำมารวมกล่อง/พาเลทได้`); } }
 
-                childLpns.forEach(cLpn => {
-                    const target = allLpnsInWave.find(item => item.lpn === cLpn);
-                    if (target) {
-                        target.status = 'Scanned';
-                        target.combinedWith = master;
-                        target.color = color;
-                        target.scan_type = 'COMBINE: ' + master;
-                        target.qty = 1;
-                    }
-                });
-                const masterTarget = allLpnsInWave.find(item => item.lpn === master);
-                if (masterTarget) {
-                    masterTarget.status = 'Scanned';
-                    masterTarget.isMaster = true;
-                    masterTarget.childCount = (masterTarget.childCount || 0) + childLpns.length;
-                    masterTarget.color = color;
-                    masterTarget.scan_type = 'COMBINE_MASTER';
-                }
+                childLpns.forEach(cLpn => { const target = allLpnsInWave.find(item => item.lpn === cLpn); if (target) { target.status = 'Scanned'; target.combinedWith = master; } });
+                const masterTarget = allLpnsInWave.find(item => item.lpn === master); if (masterTarget) { masterTarget.status = 'Scanned'; masterTarget.isMaster = true; masterTarget.childCount = (masterTarget.childCount || 0) + childLpns.length; }
 
                 updateDashboardUI(); saveCurrentWaveDataCache(); showToast(`รวมกล่อง/พาเลทสำเร็จ (${childLpns.length} รายการ)`);
                 for (const cLpn of childLpns) {
