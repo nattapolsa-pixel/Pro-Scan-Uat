@@ -818,13 +818,25 @@
                                 </span>
                                 <span class="text-xs text-blue-500 font-bold">PT/PN</span>
                             </div>
-                            <label class="block text-gray-700 font-bold text-center text-sm mb-2">ระบุจำนวนกล่องของสีที่เลือก</label>
-                            <input type="number" id="colorQtyInput" autocomplete="off" min="1"
-                                class="w-full text-4xl p-3 border-2 border-blue-300 rounded-lg text-center font-black bg-white focus:border-blue-600"
-                                placeholder="0">
-                            <button onclick="executeColorQtyScanSave()"
-                                class="w-full bg-blue-700 text-white font-black py-4 rounded-lg text-lg shadow-lg mt-4">ยืนยันสีและจำนวน
-                                (Enter)</button>
+                            <div class="grid grid-cols-2 gap-2">
+                                <button id="colorQtySingleBtn" onclick="executeColorQtyScanSave(1)"
+                                    class="bg-blue-700 text-white py-4 rounded-lg font-black shadow text-lg">1 กล่อง
+                                    <span class="block text-xs font-bold opacity-80 mt-1">(Enter)</span>
+                                </button>
+                                <button onclick="showColorQtyInput()"
+                                    class="bg-white text-blue-800 py-4 rounded-lg font-black shadow border border-blue-200 text-lg">มากกว่า 1
+                                    <span class="block text-xs font-bold text-blue-500 mt-1">ใส่จำนวน</span>
+                                </button>
+                            </div>
+                            <div id="colorQtyCustomArea" class="hidden mt-3">
+                                <label class="block text-gray-700 font-bold text-center text-sm mb-2">จำนวนกล่องของสีนี้</label>
+                                <input type="number" id="colorQtyInput" autocomplete="off" min="2"
+                                    class="w-full text-4xl p-3 border-2 border-blue-300 rounded-lg text-center font-black bg-white focus:border-blue-600"
+                                    placeholder="2 ขึ้นไป">
+                                <button onclick="executeColorQtyScanSave()"
+                                    class="w-full bg-blue-700 text-white font-black py-4 rounded-lg text-lg shadow-lg mt-4">ยืนยันจำนวน
+                                    (Enter)</button>
+                            </div>
                         </div>
                     </div>
 
@@ -2141,6 +2153,7 @@
         function cancelColorSelection() {
             document.getElementById('colorSelectionArea').classList.add('hidden');
             document.getElementById('colorQtyArea').classList.add('hidden');
+            document.getElementById('colorQtyCustomArea').classList.add('hidden');
             document.getElementById('selectedScanColor').value = '';
             document.getElementById('selectedScanType').value = 'TOTE';
             document.getElementById('selectedScanColorLabel').innerText = '-';
@@ -2612,7 +2625,7 @@
                     if (!found) { showAlert('ข้อผิดพลาด', `ไม่มีข้อมูล LPN รหัส\n[${lpn}]\nในรอบ Wave นี้`); lpnInput.value = ''; return; }
                     if (found.branch !== selectedBranchCode) { showAlert('รหัสสาขาไม่ตรงกัน', `บาร์โค้ด ${lpn} เป็นของสาขา [${found.branch}]\nกรุณาตรวจสอบและเลือกสาขาให้ถูกต้อง`); lpnInput.value = ''; return; }
                     if (found.status === 'Scanned') { showAlert('ข้อมูลซ้ำซ้อน', `บาร์โค้ด ${lpn}\nได้รับการสแกนไปแล้ว`, 'border-yellow-500'); lpnInput.value = ''; return; }
-                    if (lpn.startsWith('PP')) { document.getElementById('displayLpnQty').innerText = lpn; document.getElementById('guideQty').innerText = found.Total_Qty || found.total_qty || 1; qtyInput.value = ''; qtySection.classList.remove('hidden'); colorSection.classList.add('hidden'); colorQtyArea.classList.add('hidden'); lpnInput.blur(); setTimeout(() => { qtyInput.focus(); }, 10); } else { document.getElementById('displayLpn').innerText = lpn; document.getElementById('selectedScanColor').value = ''; document.getElementById('selectedScanType').value = 'TOTE'; document.getElementById('selectedScanColorLabel').innerText = '-'; colorQtyInput.value = ''; colorQtyArea.classList.add('hidden'); colorSection.classList.remove('hidden'); qtySection.classList.add('hidden'); lpnInput.blur(); } lpnInput.value = '';
+                    if (lpn.startsWith('PP')) { document.getElementById('displayLpnQty').innerText = lpn; document.getElementById('guideQty').innerText = found.Total_Qty || found.total_qty || 1; qtyInput.value = ''; qtySection.classList.remove('hidden'); colorSection.classList.add('hidden'); colorQtyArea.classList.add('hidden'); document.getElementById('colorQtyCustomArea').classList.add('hidden'); lpnInput.blur(); setTimeout(() => { qtyInput.focus(); }, 10); } else { document.getElementById('displayLpn').innerText = lpn; document.getElementById('selectedScanColor').value = ''; document.getElementById('selectedScanType').value = 'TOTE'; document.getElementById('selectedScanColorLabel').innerText = '-'; colorQtyInput.value = ''; colorQtyArea.classList.add('hidden'); document.getElementById('colorQtyCustomArea').classList.add('hidden'); colorSection.classList.remove('hidden'); qtySection.classList.add('hidden'); lpnInput.blur(); } lpnInput.value = '';
                 }
             });
             qtyInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') { e.preventDefault(); executeQtyScanSave(); } });
@@ -2631,15 +2644,24 @@
                 document.getElementById('selectedScanType').value = type;
                 document.getElementById('selectedScanColorLabel').innerText = getColorLabel(color);
                 colorQtyInput.value = '';
+                document.getElementById('colorQtyCustomArea').classList.add('hidden');
                 colorQtyArea.classList.remove('hidden');
+                setTimeout(() => { document.getElementById('colorQtySingleBtn').focus(); }, 10);
+            }
+            function showColorQtyInput() {
+                document.getElementById('colorQtyCustomArea').classList.remove('hidden');
+                colorQtyInput.value = '';
                 setTimeout(() => { colorQtyInput.focus(); }, 10);
             }
-            function executeColorQtyScanSave() {
+            function executeColorQtyScanSave(forceQty = null) {
                 const color = document.getElementById('selectedScanColor').value;
                 const type = document.getElementById('selectedScanType').value || 'TOTE';
-                const qtyVal = parseInt(colorQtyInput.value);
+                const rawQty = colorQtyInput.value.trim();
+                const customAreaOpen = !document.getElementById('colorQtyCustomArea').classList.contains('hidden');
+                const qtyVal = forceQty !== null ? forceQty : parseInt(rawQty, 10);
                 if (!color) return showAlert('ข้อมูลไม่ครบถ้วน', 'กรุณาเลือกสีก่อนระบุจำนวนกล่อง');
-                if (isNaN(qtyVal) || qtyVal < 1) return showAlert('ข้อผิดพลาด', 'กรุณาระบุจำนวนกล่องของสีที่เลือกให้ถูกต้อง');
+                if (forceQty === null && customAreaOpen && (rawQty === '' || isNaN(qtyVal) || qtyVal < 2)) return showAlert('ข้อผิดพลาด', 'กรุณาระบุจำนวนตั้งแต่ 2 กล่องขึ้นไป หรือกดปุ่ม 1 กล่อง');
+                if (isNaN(qtyVal) || qtyVal < 1) return showAlert('ข้อผิดพลาด', 'กรุณาเลือกจำนวนกล่องให้ถูกต้อง');
                 executeScanSave(color, type, qtyVal, document.getElementById('displayLpn').innerText);
             }
             async function executeScanSave(color, type = 'TOTE', qty = 1, forceLpn = null) { const lpn = forceLpn || document.getElementById('displayLpn').innerText; colorSection.classList.add('hidden'); qtySection.classList.add('hidden'); colorQtyArea.classList.add('hidden'); const target = allLpnsInWave.find(item => item.lpn === lpn); if (target) { target.status = 'Scanned'; target.qty = qty; target.color = color; target.scan_type = type; } updateDashboardUI(); saveCurrentWaveDataCache(); showToast(`บันทึกข้อมูล ${lpn} สำเร็จ`); lpnInput.focus(); const lpnWave = target ? (target.wave_no || currentWave) : currentWave; pushToQueue({ wave_no: lpnWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: lpn, type: type, color: color, qty: qty, emp_id: loggedInEmpId }); }
