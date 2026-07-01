@@ -1511,7 +1511,45 @@
             return parseInt(item.Total_Qty || item.total_qty) || 1;
         }
 
+        function getColorBreakdown(item) {
+            if (!item) return [];
+            const normalizePart = (part) => {
+                const color = String(part.color || part.Color || '').trim();
+                const qty = parseInt(part.qty ?? part.Qty);
+                const type = String(part.type || part.scan_type || part.Scan_Type || item.scan_type || 'TOTE').trim();
+                if (!color || color === 'None' || !Number.isFinite(qty) || qty < 1) return null;
+                return { color, qty, type };
+            };
+
+            if (Array.isArray(item.color_breakdown)) {
+                return item.color_breakdown.map(normalizePart).filter(Boolean);
+            }
+
+            if (typeof item.color_breakdown === 'string' && item.color_breakdown.trim()) {
+                return item.color_breakdown.split('|').map(part => {
+                    const pieces = part.includes('~') ? part.split('~') : part.split(':');
+                    return normalizePart({ color: pieces[0], qty: pieces[1], type: pieces[2] });
+                }).filter(Boolean);
+            }
+
+            const color = String(item.color || '').trim();
+            if (color && color !== 'None' && color !== 'Multiple') {
+                const qty = parseInt(item.qty);
+                return [{ color, qty: Number.isFinite(qty) && qty > 0 ? qty : getExpectedQty(item), type: item.scan_type || 'TOTE' }];
+            }
+
+            return [];
+        }
+
+        function getColorBreakdownText(item) {
+            return getColorBreakdown(item)
+                .map(part => `${getColorLabel(part.color)} ${part.qty}`)
+                .join(', ');
+        }
+
         function getActualQty(item) {
+            const breakdown = getColorBreakdown(item);
+            if (breakdown.length > 0) return breakdown.reduce((sum, part) => sum + part.qty, 0);
             const qty = parseInt(item.qty);
             return Number.isFinite(qty) && qty > 0 ? qty : getExpectedQty(item);
         }
@@ -1551,6 +1589,8 @@
                 return `Master รวม ${children.length} รายการ${children.length ? ': ' + children.join(', ') : ''}`;
             }
             if (item.combinedWith) return `รวมอยู่ในพาเลท ${item.combinedWith}`;
+            const colorBreakdownText = getColorBreakdownText(item);
+            if (colorBreakdownText) return colorBreakdownText;
             if (item.scan_type) return item.scan_type;
             return '-';
         }
@@ -1659,6 +1699,22 @@
                 const scannedMasters = new Set();
                 let standalonePallets = 0;
 
+                const addQtyToSummary = (prefix, color, type, qty) => {
+                    const normalizedColor = String(color || '').toUpperCase();
+                    const normalizedType = String(type || '').toUpperCase();
+
+                    if (prefix === 'PR' || normalizedType === 'CARTON' || normalizedColor === 'REUSE') {
+                        mCount += qty;
+                    } else {
+                        if (normalizedColor === 'RED') redCount += qty;
+                        else if (normalizedColor === 'BLUE') blueCount += qty;
+                        else if (normalizedColor === 'GREEN') greenCount += qty;
+                        else if (normalizedColor === 'BLACK') blackCount += qty;
+                        else if (normalizedColor === 'YELLOW') yellowCount += qty;
+                        else mCount += qty;
+                    }
+                };
+
                 branchItems.forEach(item => {
                     if (item.status === 'Scanned') {
                         const qty = getActualQty(item);
@@ -1666,21 +1722,16 @@
                         const color = String(item.color || '').toUpperCase();
                         const type = String(item.scan_type || '').toUpperCase();
 
-                        // Check if Carton or PR prefix
-                        if (prefix === 'PR' || type === 'CARTON' || color === 'REUSE') {
-                            mCount += qty;
-                        } else if (prefix === 'PP') {
+                        if (prefix === 'PP') {
                             if (!item.combinedWith && !item.isMaster) {
                                 standalonePallets += qty;
                             }
                         } else {
-                            if (color === 'RED') redCount += qty;
-                            else if (color === 'BLUE') blueCount += qty;
-                            else if (color === 'GREEN') greenCount += qty;
-                            else if (color === 'BLACK') blackCount += qty;
-                            else if (color === 'YELLOW') yellowCount += qty;
-                            else {
-                                mCount += qty;
+                            const breakdown = getColorBreakdown(item);
+                            if (breakdown.length > 0) {
+                                breakdown.forEach(part => addQtyToSummary(prefix, part.color, part.type, part.qty));
+                            } else {
+                                addQtyToSummary(prefix, color, type, qty);
                             }
                         }
 
@@ -2156,12 +2207,12 @@
                     executeColorQtyScanSave();
                     return;
                 }
-                if (/^\d$/.test(e.key)) {
+                if (scanQtyEntryMode && /^\d$/.test(e.key)) {
                     e.preventDefault();
                     appendSelectedScanQtyDigit(e.key);
                     return;
                 }
-                if (e.key === 'Backspace') {
+                if (scanQtyEntryMode && e.key === 'Backspace') {
                     e.preventDefault();
                     removeSelectedScanQtyDigit();
                     return;
@@ -2591,7 +2642,8 @@
                         scannedCount += actualQty;
                         if (lpnPrefix === 'PR') cntPR += actualQty; else if (lpnPrefix === 'PT' || lpnPrefix === 'PN') cntPTPN += actualQty; else if (lpnPrefix === 'PP') cntPP += actualQty;
                         const qtyText = (lpnPrefix === 'PP' || lpnPrefix === 'PT' || lpnPrefix === 'PN') ? `<span class="text-xs text-green-700 font-black ml-1">(ยอด ${actualQty})</span>` : '';
-                        const colorText = (item.color && item.color !== 'None') ? `<div class="text-[10px] text-green-700 font-bold">สี: ${getColorLabel(item.color)}</div>` : '';
+                        const colorSummaryText = getColorBreakdownText(item);
+                        const colorText = colorSummaryText ? `<div class="text-[10px] text-green-700 font-bold">สี: ${colorSummaryText}</div>` : '';
                         const checkIcon = `<svg class="w-4 h-4 text-green-600 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>`;
 
                         let combineDetails = '';
@@ -2664,7 +2716,7 @@
 
             async function resetSingleBox(lpn) {
                 if (!confirm(`คุณต้องการยกเลิกการตรวจสอบกล่อง ${lpn} และคืนค่ากลับเป็นค้างตรวจสอบใช่หรือไม่?`)) return;
-                const item = allLpnsInWave.find(i => i.lpn === lpn); if (item) { item.status = 'Pending'; item.qty = 0; item.color = 'None'; item.scan_type = ''; pushToQueue({ wave_no: item.wave_no || currentWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: lpn, type: 'RESET_BOX', color: 'None', qty: 0, emp_id: loggedInEmpId }); updateDashboardUI(); saveCurrentWaveDataCache(); showToast(`🔄 คืนค่ากล่อง ${lpn} เรียบร้อยแล้ว`); }
+                const item = allLpnsInWave.find(i => i.lpn === lpn); if (item) { item.status = 'Pending'; item.qty = 0; item.color = 'None'; item.scan_type = ''; item.color_breakdown = []; pushToQueue({ wave_no: item.wave_no || currentWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: lpn, type: 'RESET_BOX', color: 'None', qty: 0, emp_id: loggedInEmpId }); updateDashboardUI(); saveCurrentWaveDataCache(); showToast(`🔄 คืนค่ากล่อง ${lpn} เรียบร้อยแล้ว`); }
             }
 
             function switchTab(mode) { const isScan = mode === 'scan'; document.getElementById('modeScan').classList.toggle('hidden', !isScan); document.getElementById('modeCombine').classList.toggle('hidden', isScan); document.getElementById('tabScan').className = `flex-1 py-3 font-bold flex items-center justify-center gap-2 ${isScan ? 'text-blue-700 border-b-4 border-blue-700' : 'border-b-4 border-transparent text-gray-500'}`; document.getElementById('tabCombine').className = `flex-1 py-3 font-bold flex items-center justify-center gap-2 ${!isScan ? 'text-purple-700 border-b-4 border-purple-700' : 'border-b-4 border-transparent text-gray-500'}`; if (selectedBranchCode !== "") { if (isScan) document.getElementById('lpnInput').focus(); else document.getElementById('masterInput').focus(); } }
@@ -2690,53 +2742,95 @@
                 return labels[normalizedColor] || color;
             }
             let selectedScanQtyBuffer = '';
+            let selectedScanColorEntries = {};
+            let scanQtyEntryMode = false;
+            function getScanColorKey(color) {
+                return String(color || '').toUpperCase();
+            }
             function getSelectedScanColorButton() {
-                const selectedColor = String(document.getElementById('selectedScanColor').value || '').toUpperCase();
+                const selectedColor = getScanColorKey(document.getElementById('selectedScanColor').value);
                 return [...document.querySelectorAll('#scanColorGrid .scan-color-btn')]
-                    .find(btn => String(btn.dataset.scanColor || '').toUpperCase() === selectedColor);
+                    .find(btn => getScanColorKey(btn.dataset.scanColor) === selectedColor);
+            }
+            function getPendingScanColorEntries() {
+                const entries = { ...selectedScanColorEntries };
+                const color = document.getElementById('selectedScanColor').value;
+                if (color) {
+                    const key = getScanColorKey(color);
+                    const existing = entries[key];
+                    const rawQty = selectedScanQtyBuffer || colorQtyInput.value.trim();
+                    const qty = rawQty === '' ? (existing ? existing.qty : 1) : parseInt(rawQty, 10);
+                    if (Number.isFinite(qty) && qty > 0) {
+                        entries[key] = { color, type: document.getElementById('selectedScanType').value || 'TOTE', qty };
+                    }
+                }
+                return Object.values(entries).filter(entry => entry.qty > 0);
+            }
+            function commitSelectedScanColorEntry(defaultToOne = false) {
+                const color = document.getElementById('selectedScanColor').value;
+                if (!color) return;
+                const key = getScanColorKey(color);
+                const rawQty = selectedScanQtyBuffer || colorQtyInput.value.trim();
+                const existing = selectedScanColorEntries[key];
+                const qty = rawQty === '' ? (existing ? existing.qty : (defaultToOne ? 1 : 0)) : parseInt(rawQty, 10);
+                if (!Number.isFinite(qty) || qty < 1) {
+                    delete selectedScanColorEntries[key];
+                    return;
+                }
+                selectedScanColorEntries[key] = { color, type: document.getElementById('selectedScanType').value || 'TOTE', qty };
             }
             function updateSelectedScanQtyBadge() {
                 document.querySelectorAll('#scanColorGrid .scan-qty-badge').forEach(badge => badge.remove());
                 updateColorQtyActionText();
-                if (!selectedScanQtyBuffer) return;
-                const selectedBtn = getSelectedScanColorButton();
-                if (!selectedBtn) return;
-                const badge = document.createElement('span');
-                badge.className = 'scan-qty-badge scan-qty-badge-active';
-                badge.textContent = selectedScanQtyBuffer;
-                selectedBtn.appendChild(badge);
+                getPendingScanColorEntries().forEach(entry => {
+                    const btn = [...document.querySelectorAll('#scanColorGrid .scan-color-btn')]
+                        .find(colorBtn => getScanColorKey(colorBtn.dataset.scanColor) === getScanColorKey(entry.color));
+                    if (!btn) return;
+                    const badge = document.createElement('span');
+                    badge.className = 'scan-qty-badge scan-qty-badge-active';
+                    badge.textContent = entry.qty;
+                    btn.appendChild(badge);
+                });
+                updateScanColorVisuals();
             }
             function updateColorQtyActionText() {
-                const qty = selectedScanQtyBuffer || '1';
+                const entries = getPendingScanColorEntries();
+                const qty = entries.reduce((sum, entry) => sum + entry.qty, 0) || 1;
                 const saveLabel = document.getElementById('colorQtySaveLabel');
                 const hint = document.getElementById('colorQtyHint');
-                if (saveLabel) saveLabel.innerText = `บันทึก ${qty} กล่อง`;
+                if (saveLabel) saveLabel.innerText = `บันทึกทั้งหมด ${qty} กล่อง`;
                 if (hint) {
-                    hint.innerText = selectedScanQtyBuffer
-                        ? `จำนวน ${selectedScanQtyBuffer} กล่อง - กด Enter เพื่อบันทึก`
-                        : 'ถ้า 1 กล่อง กด Enter ได้เลย';
+                    hint.innerText = scanQtyEntryMode
+                        ? 'พิมพ์จำนวนของสีที่เลือก แล้วกด Enter เพื่อบันทึกทั้งหมด'
+                        : entries.length > 1
+                        ? `เลือกไว้ ${entries.length} สี - กด Enter เพื่อบันทึกทั้งหมด`
+                        : 'ถ้า 1 กล่อง กด Enter ได้เลย หรือเลือกสีอื่นเพื่อเพิ่มสี';
                 }
             }
             function activateScanQtyEntry() {
+                scanQtyEntryMode = true;
                 const hint = document.getElementById('colorQtyHint');
-                if (hint) hint.innerText = 'พิมพ์เลขบนปุ่มสีที่เลือก แล้วกด Enter เพื่อบันทึก';
+                if (hint) hint.innerText = 'พิมพ์จำนวนของสีที่เลือก แล้วกด Enter เพื่อบันทึกทั้งหมด';
                 const selectedBtn = getSelectedScanColorButton();
                 if (selectedBtn) selectedBtn.focus();
             }
             function appendSelectedScanQtyDigit(digit) {
                 if (selectedScanQtyBuffer.length >= 3) return;
                 selectedScanQtyBuffer = `${selectedScanQtyBuffer}${digit}`.replace(/^0+/, '');
-                if (!selectedScanQtyBuffer) selectedScanQtyBuffer = '0';
                 colorQtyInput.value = selectedScanQtyBuffer;
+                commitSelectedScanColorEntry(false);
                 updateSelectedScanQtyBadge();
             }
             function removeSelectedScanQtyDigit() {
                 selectedScanQtyBuffer = selectedScanQtyBuffer.slice(0, -1);
                 colorQtyInput.value = selectedScanQtyBuffer;
+                commitSelectedScanColorEntry(false);
                 updateSelectedScanQtyBadge();
             }
             function resetScanColorButtons() {
                 selectedScanQtyBuffer = '';
+                selectedScanColorEntries = {};
+                scanQtyEntryMode = false;
                 if (colorQtyInput) colorQtyInput.value = '';
                 document.querySelectorAll('#scanColorGrid .scan-qty-badge').forEach(badge => badge.remove());
                 updateColorQtyActionText();
@@ -2750,28 +2844,40 @@
                     btn.style.zIndex = '';
                 });
             }
-            function highlightScanColorButton(color) {
-                const selectedColor = String(color || '').toUpperCase();
+            function updateScanColorVisuals() {
+                const selectedColor = getScanColorKey(document.getElementById('selectedScanColor').value);
                 document.querySelectorAll('#scanColorGrid .scan-color-btn').forEach(btn => {
-                    const isSelected = String(btn.dataset.scanColor || '').toUpperCase() === selectedColor;
-                    btn.style.opacity = isSelected ? '1' : '0.35';
-                    btn.style.filter = isSelected ? 'none' : 'grayscale(65%)';
-                    btn.style.transform = isSelected ? 'scale(1.04)' : 'scale(0.98)';
+                    const btnColor = getScanColorKey(btn.dataset.scanColor);
+                    const isSelected = btnColor === selectedColor;
+                    const hasEntry = Boolean(selectedScanColorEntries[btnColor]);
+                    btn.style.opacity = isSelected ? '1' : (hasEntry ? '0.9' : '0.35');
+                    btn.style.filter = (isSelected || hasEntry) ? 'none' : 'grayscale(65%)';
+                    btn.style.transform = isSelected ? 'scale(1.04)' : (hasEntry ? 'scale(1)' : 'scale(0.98)');
                     btn.style.boxShadow = isSelected ? '0 0 0 4px rgba(30, 64, 175, 0.35), 0 12px 22px rgba(15, 23, 42, 0.25)' : '';
-                    btn.style.outline = isSelected ? '3px solid #111827' : '';
-                    btn.style.outlineOffset = isSelected ? '2px' : '';
-                    btn.style.zIndex = isSelected ? '1' : '';
+                    btn.style.outline = isSelected ? '3px solid #111827' : (hasEntry ? '2px solid rgba(17, 24, 39, 0.45)' : '');
+                    btn.style.outlineOffset = isSelected || hasEntry ? '2px' : '';
+                    btn.style.zIndex = isSelected ? '2' : (hasEntry ? '1' : '');
                 });
+            }
+            function highlightScanColorButton(color) {
+                document.getElementById('selectedScanColor').value = color;
+                updateScanColorVisuals();
             }
             function selectScanColor(color, type = 'TOTE') {
                 const lpn = document.getElementById('displayLpn').innerText;
                 if (!requiresColorQty(lpn)) return executeScanSave(color, type);
+                const previousColor = document.getElementById('selectedScanColor').value;
+                if (previousColor && getScanColorKey(previousColor) !== getScanColorKey(color)) {
+                    commitSelectedScanColorEntry(true);
+                }
+                scanQtyEntryMode = false;
                 highlightScanColorButton(color);
                 document.getElementById('selectedScanColor').value = color;
                 document.getElementById('selectedScanType').value = type;
                 document.getElementById('selectedScanColorLabel').innerText = getColorLabel(color);
-                colorQtyInput.value = '';
-                selectedScanQtyBuffer = '';
+                const existing = selectedScanColorEntries[getScanColorKey(color)];
+                selectedScanQtyBuffer = existing ? String(existing.qty) : '';
+                colorQtyInput.value = selectedScanQtyBuffer;
                 updateSelectedScanQtyBadge();
                 updateColorQtyActionText();
                 colorQtyArea.classList.remove('hidden');
@@ -2781,15 +2887,38 @@
                 }, 10);
             }
             function executeColorQtyScanSave() {
-                const color = document.getElementById('selectedScanColor').value;
-                const type = document.getElementById('selectedScanType').value || 'TOTE';
-                const rawQty = selectedScanQtyBuffer || colorQtyInput.value.trim();
-                const qtyVal = rawQty === '' ? 1 : parseInt(rawQty, 10);
-                if (!color) return showAlert('ข้อมูลไม่ครบถ้วน', 'กรุณาเลือกสีก่อนระบุจำนวนกล่อง');
-                if (isNaN(qtyVal) || qtyVal < 1) return showAlert('ข้อผิดพลาด', 'กรุณาเลือกจำนวนกล่องให้ถูกต้อง');
-                executeScanSave(color, type, qtyVal, document.getElementById('displayLpn').innerText);
+                if (!document.getElementById('selectedScanColor').value) return showAlert('ข้อมูลไม่ครบถ้วน', 'กรุณาเลือกสีก่อนระบุจำนวนกล่อง');
+                commitSelectedScanColorEntry(true);
+                const entries = getPendingScanColorEntries();
+                if (entries.length === 0) return showAlert('ข้อผิดพลาด', 'กรุณาเลือกจำนวนกล่องให้ถูกต้อง');
+                if (entries.some(entry => !Number.isFinite(entry.qty) || entry.qty < 1)) return showAlert('ข้อผิดพลาด', 'กรุณาเลือกจำนวนกล่องให้ถูกต้อง');
+                executeMultiColorScanSave(entries, document.getElementById('displayLpn').innerText);
             }
-            async function executeScanSave(color, type = 'TOTE', qty = 1, forceLpn = null) { const lpn = forceLpn || document.getElementById('displayLpn').innerText; colorSection.classList.add('hidden'); qtySection.classList.add('hidden'); colorQtyArea.classList.add('hidden'); resetScanColorButtons(); const target = allLpnsInWave.find(item => item.lpn === lpn); if (target) { target.status = 'Scanned'; target.qty = qty; target.color = color; target.scan_type = type; } updateDashboardUI(); saveCurrentWaveDataCache(); showToast(`บันทึกข้อมูล ${lpn} สำเร็จ`); lpnInput.focus(); const lpnWave = target ? (target.wave_no || currentWave) : currentWave; pushToQueue({ wave_no: lpnWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: lpn, type: type, color: color, qty: qty, emp_id: loggedInEmpId }); }
+            async function executeMultiColorScanSave(entries, forceLpn = null) {
+                const lpn = forceLpn || document.getElementById('displayLpn').innerText;
+                colorSection.classList.add('hidden');
+                qtySection.classList.add('hidden');
+                colorQtyArea.classList.add('hidden');
+                const target = allLpnsInWave.find(item => item.lpn === lpn);
+                const totalQty = entries.reduce((sum, entry) => sum + entry.qty, 0);
+                if (target) {
+                    target.status = 'Scanned';
+                    target.qty = totalQty;
+                    target.color = entries.length === 1 ? entries[0].color : 'Multiple';
+                    target.scan_type = entries.length === 1 ? entries[0].type : 'TOTE_MULTI';
+                    target.color_breakdown = entries.map(entry => ({ color: entry.color, type: entry.type, qty: entry.qty }));
+                }
+                resetScanColorButtons();
+                updateDashboardUI();
+                saveCurrentWaveDataCache();
+                showToast(`บันทึกข้อมูล ${lpn} สำเร็จ (${totalQty} กล่อง / ${entries.length} สี)`);
+                lpnInput.focus();
+                const lpnWave = target ? (target.wave_no || currentWave) : currentWave;
+                entries.forEach(entry => {
+                    pushToQueue({ wave_no: lpnWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: lpn, type: entry.type, color: entry.color, qty: entry.qty, emp_id: loggedInEmpId });
+                });
+            }
+            async function executeScanSave(color, type = 'TOTE', qty = 1, forceLpn = null) { const lpn = forceLpn || document.getElementById('displayLpn').innerText; colorSection.classList.add('hidden'); qtySection.classList.add('hidden'); colorQtyArea.classList.add('hidden'); resetScanColorButtons(); const target = allLpnsInWave.find(item => item.lpn === lpn); if (target) { target.status = 'Scanned'; target.qty = qty; target.color = color; target.scan_type = type; target.color_breakdown = []; } updateDashboardUI(); saveCurrentWaveDataCache(); showToast(`บันทึกข้อมูล ${lpn} สำเร็จ`); lpnInput.focus(); const lpnWave = target ? (target.wave_no || currentWave) : currentWave; pushToQueue({ wave_no: lpnWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: lpn, type: type, color: color, qty: qty, emp_id: loggedInEmpId }); }
 
             // ==================== 💨 BACKGROUND CLOSE LOGIC ====================
             function openConfirmModal() { document.getElementById('confirmModal').classList.remove('hidden'); }
