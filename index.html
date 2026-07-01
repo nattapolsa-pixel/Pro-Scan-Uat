@@ -785,22 +785,22 @@
                                 ยกเลิก
                             </button>
                         </div>
-                        <div class="grid grid-cols-2 gap-2">
-                            <button onclick="selectScanColor('Black')"
-                                class="bg-gray-800 text-white py-3 rounded font-bold shadow text-lg">[1] ดำ</button>
-                            <button onclick="selectScanColor('Blue')"
-                                class="bg-blue-600 text-white py-3 rounded font-bold shadow text-lg">[2]
+                        <div id="scanColorGrid" class="grid grid-cols-2 gap-2">
+                            <button data-scan-color="Black" onclick="selectScanColor('Black')"
+                                class="scan-color-btn bg-gray-800 text-white py-3 rounded font-bold shadow text-lg transition duration-150">[1] ดำ</button>
+                            <button data-scan-color="Blue" onclick="selectScanColor('Blue')"
+                                class="scan-color-btn bg-blue-600 text-white py-3 rounded font-bold shadow text-lg transition duration-150">[2]
                                 น้ำเงิน</button>
-                            <button onclick="selectScanColor('Yellow')"
-                                class="bg-yellow-400 text-gray-900 py-3 rounded font-bold shadow text-lg">[3]
+                            <button data-scan-color="Yellow" onclick="selectScanColor('Yellow')"
+                                class="scan-color-btn bg-yellow-400 text-gray-900 py-3 rounded font-bold shadow text-lg transition duration-150">[3]
                                 เหลือง</button>
-                            <button onclick="selectScanColor('Green')"
-                                class="bg-green-600 text-white py-3 rounded font-bold shadow text-lg">[4] เขียว</button>
-                            <button onclick="selectScanColor('Red')"
-                                class="bg-red-600 text-white py-3 rounded font-bold col-span-2 shadow text-lg">[5]
+                            <button data-scan-color="Green" onclick="selectScanColor('Green')"
+                                class="scan-color-btn bg-green-600 text-white py-3 rounded font-bold shadow text-lg transition duration-150">[4] เขียว</button>
+                            <button data-scan-color="Red" onclick="selectScanColor('Red')"
+                                class="scan-color-btn bg-red-600 text-white py-3 rounded font-bold col-span-2 shadow text-lg transition duration-150">[5]
                                 แดง</button>
-                            <button onclick="selectScanColor('Reuse', 'Carton')"
-                                class="bg-orange-100 hover:bg-orange-200 text-orange-900 py-3 rounded font-bold col-span-2 border border-orange-300 shadow text-lg flex items-center justify-center gap-2">
+                            <button data-scan-color="Reuse" onclick="selectScanColor('Reuse', 'Carton')"
+                                class="scan-color-btn bg-orange-100 hover:bg-orange-200 text-orange-900 py-3 rounded font-bold col-span-2 border border-orange-300 shadow text-lg flex items-center justify-center gap-2 transition duration-150">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                         d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
@@ -2154,6 +2154,7 @@
             document.getElementById('colorSelectionArea').classList.add('hidden');
             document.getElementById('colorQtyArea').classList.add('hidden');
             document.getElementById('colorQtyCustomArea').classList.add('hidden');
+            resetScanColorButtons();
             document.getElementById('selectedScanColor').value = '';
             document.getElementById('selectedScanType').value = 'TOTE';
             document.getElementById('selectedScanColorLabel').innerText = '-';
@@ -2625,6 +2626,7 @@
                     if (!found) { showAlert('ข้อผิดพลาด', `ไม่มีข้อมูล LPN รหัส\n[${lpn}]\nในรอบ Wave นี้`); lpnInput.value = ''; return; }
                     if (found.branch !== selectedBranchCode) { showAlert('รหัสสาขาไม่ตรงกัน', `บาร์โค้ด ${lpn} เป็นของสาขา [${found.branch}]\nกรุณาตรวจสอบและเลือกสาขาให้ถูกต้อง`); lpnInput.value = ''; return; }
                     if (found.status === 'Scanned') { showAlert('ข้อมูลซ้ำซ้อน', `บาร์โค้ด ${lpn}\nได้รับการสแกนไปแล้ว`, 'border-yellow-500'); lpnInput.value = ''; return; }
+                    resetScanColorButtons();
                     if (lpn.startsWith('PP')) { document.getElementById('displayLpnQty').innerText = lpn; document.getElementById('guideQty').innerText = found.Total_Qty || found.total_qty || 1; qtyInput.value = ''; qtySection.classList.remove('hidden'); colorSection.classList.add('hidden'); colorQtyArea.classList.add('hidden'); document.getElementById('colorQtyCustomArea').classList.add('hidden'); lpnInput.blur(); setTimeout(() => { qtyInput.focus(); }, 10); } else { document.getElementById('displayLpn').innerText = lpn; document.getElementById('selectedScanColor').value = ''; document.getElementById('selectedScanType').value = 'TOTE'; document.getElementById('selectedScanColorLabel').innerText = '-'; colorQtyInput.value = ''; colorQtyArea.classList.add('hidden'); document.getElementById('colorQtyCustomArea').classList.add('hidden'); colorSection.classList.remove('hidden'); qtySection.classList.add('hidden'); lpnInput.blur(); } lpnInput.value = '';
                 }
             });
@@ -2637,9 +2639,34 @@
                 const labels = { BLACK: 'ดำ', BLUE: 'น้ำเงิน', YELLOW: 'เหลือง', GREEN: 'เขียว', RED: 'แดง', REUSE: 'กล่องกระดาษ (Reuse)' };
                 return labels[normalizedColor] || color;
             }
+            function resetScanColorButtons() {
+                document.querySelectorAll('#scanColorGrid .scan-color-btn').forEach(btn => {
+                    btn.style.opacity = '';
+                    btn.style.filter = '';
+                    btn.style.transform = '';
+                    btn.style.boxShadow = '';
+                    btn.style.outline = '';
+                    btn.style.outlineOffset = '';
+                    btn.style.zIndex = '';
+                });
+            }
+            function highlightScanColorButton(color) {
+                const selectedColor = String(color || '').toUpperCase();
+                document.querySelectorAll('#scanColorGrid .scan-color-btn').forEach(btn => {
+                    const isSelected = String(btn.dataset.scanColor || '').toUpperCase() === selectedColor;
+                    btn.style.opacity = isSelected ? '1' : '0.35';
+                    btn.style.filter = isSelected ? 'none' : 'grayscale(65%)';
+                    btn.style.transform = isSelected ? 'scale(1.04)' : 'scale(0.98)';
+                    btn.style.boxShadow = isSelected ? '0 0 0 4px rgba(30, 64, 175, 0.35), 0 12px 22px rgba(15, 23, 42, 0.25)' : '';
+                    btn.style.outline = isSelected ? '3px solid #111827' : '';
+                    btn.style.outlineOffset = isSelected ? '2px' : '';
+                    btn.style.zIndex = isSelected ? '1' : '';
+                });
+            }
             function selectScanColor(color, type = 'TOTE') {
                 const lpn = document.getElementById('displayLpn').innerText;
                 if (!requiresColorQty(lpn)) return executeScanSave(color, type);
+                highlightScanColorButton(color);
                 document.getElementById('selectedScanColor').value = color;
                 document.getElementById('selectedScanType').value = type;
                 document.getElementById('selectedScanColorLabel').innerText = getColorLabel(color);
@@ -2664,7 +2691,7 @@
                 if (isNaN(qtyVal) || qtyVal < 1) return showAlert('ข้อผิดพลาด', 'กรุณาเลือกจำนวนกล่องให้ถูกต้อง');
                 executeScanSave(color, type, qtyVal, document.getElementById('displayLpn').innerText);
             }
-            async function executeScanSave(color, type = 'TOTE', qty = 1, forceLpn = null) { const lpn = forceLpn || document.getElementById('displayLpn').innerText; colorSection.classList.add('hidden'); qtySection.classList.add('hidden'); colorQtyArea.classList.add('hidden'); const target = allLpnsInWave.find(item => item.lpn === lpn); if (target) { target.status = 'Scanned'; target.qty = qty; target.color = color; target.scan_type = type; } updateDashboardUI(); saveCurrentWaveDataCache(); showToast(`บันทึกข้อมูล ${lpn} สำเร็จ`); lpnInput.focus(); const lpnWave = target ? (target.wave_no || currentWave) : currentWave; pushToQueue({ wave_no: lpnWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: lpn, type: type, color: color, qty: qty, emp_id: loggedInEmpId }); }
+            async function executeScanSave(color, type = 'TOTE', qty = 1, forceLpn = null) { const lpn = forceLpn || document.getElementById('displayLpn').innerText; colorSection.classList.add('hidden'); qtySection.classList.add('hidden'); colorQtyArea.classList.add('hidden'); resetScanColorButtons(); const target = allLpnsInWave.find(item => item.lpn === lpn); if (target) { target.status = 'Scanned'; target.qty = qty; target.color = color; target.scan_type = type; } updateDashboardUI(); saveCurrentWaveDataCache(); showToast(`บันทึกข้อมูล ${lpn} สำเร็จ`); lpnInput.focus(); const lpnWave = target ? (target.wave_no || currentWave) : currentWave; pushToQueue({ wave_no: lpnWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: lpn, type: type, color: color, qty: qty, emp_id: loggedInEmpId }); }
 
             // ==================== 💨 BACKGROUND CLOSE LOGIC ====================
             function openConfirmModal() { document.getElementById('confirmModal').classList.remove('hidden'); }
