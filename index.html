@@ -35,13 +35,23 @@
         }
 
         .color-btn-active {
-            border: 4px solid #3498db;
-            transform: scale(0.95);
+            outline: 3px solid #111827;
+            outline-offset: 2px;
+            transform: scale(1.04);
             opacity: 1 !important;
+            filter: none !important;
+            box-shadow: 0 0 0 4px rgba(126, 34, 206, 0.28), 0 12px 22px rgba(15, 23, 42, 0.22) !important;
+            z-index: 1;
+        }
+
+        .color-btn-dimmed {
+            opacity: 0.35 !important;
+            filter: grayscale(65%);
+            transform: scale(0.98);
         }
 
         .color-btn {
-            opacity: 0.7;
+            opacity: 1;
             transition: all 0.2s;
         }
 
@@ -2832,7 +2842,18 @@
             });
             function updateChildUI() { childList.innerHTML = childLpns.map(lpn => `<li class="bg-white p-2 rounded shadow-sm border text-sm flex justify-between"><b>${lpn}</b> <span class="text-red-500 font-bold px-2 cursor-pointer" onclick="removeChild('${lpn}')">X</span></li>`).reverse().join(''); }
             function removeChild(lpn) { childLpns = childLpns.filter(item => item !== lpn); updateChildUI(); }
-            function selectCombineColor(color, btnElem) { document.getElementById('selectedCombineColor').value = color; document.querySelectorAll('.color-btn').forEach(btn => btn.classList.remove('color-btn-active')); btnElem.classList.add('color-btn-active'); }
+            function resetCombineColorButtons() {
+                document.querySelectorAll('#combineColorGrid .color-btn').forEach(btn => {
+                    btn.classList.remove('color-btn-active', 'color-btn-dimmed');
+                });
+            }
+            function selectCombineColor(color, btnElem) {
+                document.getElementById('selectedCombineColor').value = color;
+                document.querySelectorAll('#combineColorGrid .color-btn').forEach(btn => {
+                    btn.classList.toggle('color-btn-active', btn === btnElem);
+                    btn.classList.toggle('color-btn-dimmed', btn !== btnElem);
+                });
+            }
 
             function executeCombineSave() {
                 const master = masterInput.value.trim().toUpperCase(); const color = document.getElementById('selectedCombineColor').value;
@@ -2850,7 +2871,7 @@
                     pushToQueue({ wave_no: lpnWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: cLpn, type: 'COMBINE: ' + master, color: color, qty: 1, emp_id: loggedInEmpId });
                 }
 
-                masterInput.value = ''; childInput.value = ''; childInput.disabled = true; childInput.classList.add('bg-gray-100'); childLpns = []; updateChildUI(); document.getElementById('selectedCombineColor').value = ''; document.querySelectorAll('.color-btn').forEach(btn => btn.classList.remove('color-btn-active'));
+                masterInput.value = ''; childInput.value = ''; childInput.disabled = true; childInput.classList.add('bg-gray-100'); childLpns = []; updateChildUI(); document.getElementById('selectedCombineColor').value = ''; resetCombineColorButtons();
                 const cBtn = document.getElementById('childScanBtn'); cBtn.disabled = true; cBtn.classList.replace('bg-purple-800', 'bg-gray-400'); cBtn.classList.remove('hover:bg-purple-900'); masterInput.focus();
             }
     </script>
