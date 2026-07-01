@@ -55,6 +55,36 @@
             transition: all 0.2s;
         }
 
+        .scan-color-btn {
+            position: relative;
+            overflow: visible;
+        }
+
+        .scan-qty-badge {
+            position: absolute;
+            top: -10px;
+            right: -10px;
+            min-width: 44px;
+            height: 44px;
+            padding: 0 10px;
+            border-radius: 9999px;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: #ffffff;
+            color: #111827;
+            border: 3px solid #111827;
+            box-shadow: 0 10px 20px rgba(15, 23, 42, 0.25);
+            font-size: 22px;
+            font-weight: 900;
+            line-height: 1;
+            z-index: 3;
+        }
+
+        .scan-qty-badge-active {
+            display: flex;
+        }
+
         .toast-msg {
             position: fixed;
             top: 20px;
@@ -819,33 +849,16 @@
                             </button>
                         </div>
                         <div id="colorQtyArea"
-                            class="hidden mt-3 bg-blue-50 border border-blue-200 rounded-lg p-3 shadow-inner">
+                            class="hidden mt-3 bg-blue-50 border border-blue-200 rounded-lg p-2 text-center shadow-inner">
                             <input type="hidden" id="selectedScanColor" value="">
                             <input type="hidden" id="selectedScanType" value="TOTE">
-                            <div class="flex items-center justify-between gap-2 mb-2">
-                                <span class="text-sm text-blue-700 font-black">สีที่เลือก:
-                                    <span id="selectedScanColorLabel" class="text-blue-900">-</span>
-                                </span>
-                                <span class="text-xs text-blue-500 font-bold">PT/PN</span>
-                            </div>
-                            <div class="grid grid-cols-2 gap-2">
-                                <button id="colorQtySingleBtn" onclick="executeColorQtyScanSave(1)"
-                                    class="bg-blue-700 text-white py-4 rounded-lg font-black shadow text-lg">1 กล่อง
-                                    <span class="block text-xs font-bold opacity-80 mt-1">(Enter)</span>
-                                </button>
-                                <button onclick="showColorQtyInput()"
-                                    class="bg-white text-blue-800 py-4 rounded-lg font-black shadow border border-blue-200 text-lg">มากกว่า 1
-                                    <span class="block text-xs font-bold text-blue-500 mt-1">ใส่จำนวน</span>
-                                </button>
-                            </div>
-                            <div id="colorQtyCustomArea" class="hidden mt-3">
-                                <label class="block text-gray-700 font-bold text-center text-sm mb-2">จำนวนกล่องของสีนี้</label>
-                                <input type="number" id="colorQtyInput" autocomplete="off" min="2"
-                                    class="w-full text-4xl p-3 border-2 border-blue-300 rounded-lg text-center font-black bg-white focus:border-blue-600"
-                                    placeholder="2 ขึ้นไป">
-                                <button onclick="executeColorQtyScanSave()"
-                                    class="w-full bg-blue-700 text-white font-black py-4 rounded-lg text-lg shadow-lg mt-4">ยืนยันจำนวน
-                                    (Enter)</button>
+                            <input type="hidden" id="colorQtyInput" value="">
+                            <div class="text-sm text-blue-800 font-black">
+                                สีที่เลือก: <span id="selectedScanColorLabel" class="text-blue-950">-</span>
+                                <span class="mx-1">|</span>
+                                Enter = 1 กล่อง
+                                <span class="mx-1">|</span>
+                                ถ้ามากกว่า 1 ให้พิมพ์เลขบนปุ่มสี
                             </div>
                         </div>
                     </div>
@@ -2126,6 +2139,24 @@
             if (e.key === 'Enter' && isAlertOpen) { e.preventDefault(); closeAlert(); }
             if (!document.getElementById('shippingDocumentModal').classList.contains('hidden')) return;
 
+            if (!isAlertOpen && !document.getElementById('colorSelectionArea').classList.contains('hidden') && document.getElementById('selectedScanColor').value) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    executeColorQtyScanSave();
+                    return;
+                }
+                if (/^\d$/.test(e.key)) {
+                    e.preventDefault();
+                    appendSelectedScanQtyDigit(e.key);
+                    return;
+                }
+                if (e.key === 'Backspace') {
+                    e.preventDefault();
+                    removeSelectedScanQtyDigit();
+                    return;
+                }
+            }
+
             // 💡 ระบบ Shortcut กดปุ่มตัวเลข 1-6 เพื่อเลือกสีสำหรับ Handheld
             if (e.key >= '1' && e.key <= '6' && !isAlertOpen) {
                 const activeId = document.activeElement.id;
@@ -2163,7 +2194,6 @@
         function cancelColorSelection() {
             document.getElementById('colorSelectionArea').classList.add('hidden');
             document.getElementById('colorQtyArea').classList.add('hidden');
-            document.getElementById('colorQtyCustomArea').classList.add('hidden');
             resetScanColorButtons();
             document.getElementById('selectedScanColor').value = '';
             document.getElementById('selectedScanType').value = 'TOTE';
@@ -2637,11 +2667,10 @@
                     if (found.branch !== selectedBranchCode) { showAlert('รหัสสาขาไม่ตรงกัน', `บาร์โค้ด ${lpn} เป็นของสาขา [${found.branch}]\nกรุณาตรวจสอบและเลือกสาขาให้ถูกต้อง`); lpnInput.value = ''; return; }
                     if (found.status === 'Scanned') { showAlert('ข้อมูลซ้ำซ้อน', `บาร์โค้ด ${lpn}\nได้รับการสแกนไปแล้ว`, 'border-yellow-500'); lpnInput.value = ''; return; }
                     resetScanColorButtons();
-                    if (lpn.startsWith('PP')) { document.getElementById('displayLpnQty').innerText = lpn; document.getElementById('guideQty').innerText = found.Total_Qty || found.total_qty || 1; qtyInput.value = ''; qtySection.classList.remove('hidden'); colorSection.classList.add('hidden'); colorQtyArea.classList.add('hidden'); document.getElementById('colorQtyCustomArea').classList.add('hidden'); lpnInput.blur(); setTimeout(() => { qtyInput.focus(); }, 10); } else { document.getElementById('displayLpn').innerText = lpn; document.getElementById('selectedScanColor').value = ''; document.getElementById('selectedScanType').value = 'TOTE'; document.getElementById('selectedScanColorLabel').innerText = '-'; colorQtyInput.value = ''; colorQtyArea.classList.add('hidden'); document.getElementById('colorQtyCustomArea').classList.add('hidden'); colorSection.classList.remove('hidden'); qtySection.classList.add('hidden'); lpnInput.blur(); } lpnInput.value = '';
+                    if (lpn.startsWith('PP')) { document.getElementById('displayLpnQty').innerText = lpn; document.getElementById('guideQty').innerText = found.Total_Qty || found.total_qty || 1; qtyInput.value = ''; qtySection.classList.remove('hidden'); colorSection.classList.add('hidden'); colorQtyArea.classList.add('hidden'); lpnInput.blur(); setTimeout(() => { qtyInput.focus(); }, 10); } else { document.getElementById('displayLpn').innerText = lpn; document.getElementById('selectedScanColor').value = ''; document.getElementById('selectedScanType').value = 'TOTE'; document.getElementById('selectedScanColorLabel').innerText = '-'; colorQtyInput.value = ''; colorQtyArea.classList.add('hidden'); colorSection.classList.remove('hidden'); qtySection.classList.add('hidden'); lpnInput.blur(); } lpnInput.value = '';
                 }
             });
             qtyInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') { e.preventDefault(); executeQtyScanSave(); } });
-            colorQtyInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') { e.preventDefault(); executeColorQtyScanSave(); } });
             function executeQtyScanSave() { const qtyVal = parseInt(qtyInput.value); if (isNaN(qtyVal) || qtyVal < 1) return showAlert('ข้อผิดพลาด', 'กรุณาระบุจำนวนกล่องสินค้า (PP) ให้ถูกต้อง'); executeScanSave('None', 'Carton', qtyVal, document.getElementById('displayLpnQty').innerText); }
             function requiresColorQty(lpn) { return lpn.startsWith('PT') || lpn.startsWith('PN'); }
             function getColorLabel(color) {
@@ -2649,7 +2678,38 @@
                 const labels = { BLACK: 'ดำ', BLUE: 'น้ำเงิน', YELLOW: 'เหลือง', GREEN: 'เขียว', RED: 'แดง', REUSE: 'กล่องกระดาษ (Reuse)' };
                 return labels[normalizedColor] || color;
             }
+            let selectedScanQtyBuffer = '';
+            function getSelectedScanColorButton() {
+                const selectedColor = String(document.getElementById('selectedScanColor').value || '').toUpperCase();
+                return [...document.querySelectorAll('#scanColorGrid .scan-color-btn')]
+                    .find(btn => String(btn.dataset.scanColor || '').toUpperCase() === selectedColor);
+            }
+            function updateSelectedScanQtyBadge() {
+                document.querySelectorAll('#scanColorGrid .scan-qty-badge').forEach(badge => badge.remove());
+                if (!selectedScanQtyBuffer) return;
+                const selectedBtn = getSelectedScanColorButton();
+                if (!selectedBtn) return;
+                const badge = document.createElement('span');
+                badge.className = 'scan-qty-badge scan-qty-badge-active';
+                badge.textContent = selectedScanQtyBuffer;
+                selectedBtn.appendChild(badge);
+            }
+            function appendSelectedScanQtyDigit(digit) {
+                if (selectedScanQtyBuffer.length >= 3) return;
+                selectedScanQtyBuffer = `${selectedScanQtyBuffer}${digit}`.replace(/^0+/, '');
+                if (!selectedScanQtyBuffer) selectedScanQtyBuffer = '0';
+                colorQtyInput.value = selectedScanQtyBuffer;
+                updateSelectedScanQtyBadge();
+            }
+            function removeSelectedScanQtyDigit() {
+                selectedScanQtyBuffer = selectedScanQtyBuffer.slice(0, -1);
+                colorQtyInput.value = selectedScanQtyBuffer;
+                updateSelectedScanQtyBadge();
+            }
             function resetScanColorButtons() {
+                selectedScanQtyBuffer = '';
+                if (colorQtyInput) colorQtyInput.value = '';
+                document.querySelectorAll('#scanColorGrid .scan-qty-badge').forEach(badge => badge.remove());
                 document.querySelectorAll('#scanColorGrid .scan-color-btn').forEach(btn => {
                     btn.style.opacity = '';
                     btn.style.filter = '';
@@ -2681,23 +2741,20 @@
                 document.getElementById('selectedScanType').value = type;
                 document.getElementById('selectedScanColorLabel').innerText = getColorLabel(color);
                 colorQtyInput.value = '';
-                document.getElementById('colorQtyCustomArea').classList.add('hidden');
+                selectedScanQtyBuffer = '';
+                updateSelectedScanQtyBadge();
                 colorQtyArea.classList.remove('hidden');
-                setTimeout(() => { document.getElementById('colorQtySingleBtn').focus(); }, 10);
+                setTimeout(() => {
+                    const selectedBtn = getSelectedScanColorButton();
+                    if (selectedBtn) selectedBtn.focus();
+                }, 10);
             }
-            function showColorQtyInput() {
-                document.getElementById('colorQtyCustomArea').classList.remove('hidden');
-                colorQtyInput.value = '';
-                setTimeout(() => { colorQtyInput.focus(); }, 10);
-            }
-            function executeColorQtyScanSave(forceQty = null) {
+            function executeColorQtyScanSave() {
                 const color = document.getElementById('selectedScanColor').value;
                 const type = document.getElementById('selectedScanType').value || 'TOTE';
-                const rawQty = colorQtyInput.value.trim();
-                const customAreaOpen = !document.getElementById('colorQtyCustomArea').classList.contains('hidden');
-                const qtyVal = forceQty !== null ? forceQty : parseInt(rawQty, 10);
+                const rawQty = selectedScanQtyBuffer || colorQtyInput.value.trim();
+                const qtyVal = rawQty === '' ? 1 : parseInt(rawQty, 10);
                 if (!color) return showAlert('ข้อมูลไม่ครบถ้วน', 'กรุณาเลือกสีก่อนระบุจำนวนกล่อง');
-                if (forceQty === null && customAreaOpen && (rawQty === '' || isNaN(qtyVal) || qtyVal < 2)) return showAlert('ข้อผิดพลาด', 'กรุณาระบุจำนวนตั้งแต่ 2 กล่องขึ้นไป หรือกดปุ่ม 1 กล่อง');
                 if (isNaN(qtyVal) || qtyVal < 1) return showAlert('ข้อผิดพลาด', 'กรุณาเลือกจำนวนกล่องให้ถูกต้อง');
                 executeScanSave(color, type, qtyVal, document.getElementById('displayLpn').innerText);
             }
