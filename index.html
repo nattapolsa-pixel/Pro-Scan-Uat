@@ -60,6 +60,12 @@
             overflow: visible;
         }
 
+        .touch-qty-key {
+            min-height: 54px;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
         .scan-qty-badge {
             position: absolute;
             top: -10px;
@@ -178,6 +184,7 @@
         button, input {
             /* ป้องกัน highlight สีเทาเมื่อแตะบน Android */
             -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
         }
 
         button:active {
@@ -857,19 +864,33 @@
                                 สีที่เลือก: <span id="selectedScanColorLabel" class="text-blue-950">-</span>
                             </div>
                             <div class="grid grid-cols-2 gap-2">
-                                <button id="colorQtySaveBtn" onclick="executeColorQtyScanSave()"
-                                    class="bg-blue-700 text-white py-3 rounded-lg font-black shadow text-base md:text-lg">
+                                <button type="button" id="colorQtySaveBtn" onclick="executeColorQtyScanSave()"
+                                    class="bg-blue-700 text-white py-3 rounded-lg font-black shadow text-base md:text-lg touch-manipulation">
                                     <span id="colorQtySaveLabel">บันทึก 1 กล่อง</span>
-                                    <span class="block text-xs font-bold opacity-80 mt-1">(Enter)</span>
+                                    <span class="block text-xs font-bold opacity-80 mt-1">แตะปุ่มนี้ / Enter</span>
                                 </button>
-                                <button id="colorQtyMoreBtn" onclick="activateScanQtyEntry()"
-                                    class="bg-white text-blue-800 py-3 rounded-lg font-black shadow border border-blue-200 text-base md:text-lg">
-                                    ใส่เลขกล่อง
-                                    <span class="block text-xs font-bold text-blue-500 mt-1">กดเลขได้เลย</span>
+                                <button type="button" id="colorQtyMoreBtn" onclick="activateScanQtyEntry()"
+                                    class="bg-white text-blue-800 py-3 rounded-lg font-black shadow border border-blue-200 text-base md:text-lg touch-manipulation">
+                                    มากกว่า 1 กล่อง
+                                    <span class="block text-xs font-bold text-blue-500 mt-1">แตะเลขด้านล่าง</span>
                                 </button>
                             </div>
                             <div id="colorQtyHint" class="text-xs text-blue-700 font-bold mt-2">
-                                ถ้า 1 กล่อง กด Enter ได้เลย
+                                ถ้า 1 กล่อง แตะบันทึกได้เลย
+                            </div>
+                            <div id="colorQtyTouchKeypad" class="grid grid-cols-3 gap-2 mt-3">
+                                <button type="button" onclick="appendSelectedScanQtyDigit('1')" class="touch-qty-key bg-white text-gray-900 border border-blue-200 rounded-lg py-3 text-2xl font-black shadow">1</button>
+                                <button type="button" onclick="appendSelectedScanQtyDigit('2')" class="touch-qty-key bg-white text-gray-900 border border-blue-200 rounded-lg py-3 text-2xl font-black shadow">2</button>
+                                <button type="button" onclick="appendSelectedScanQtyDigit('3')" class="touch-qty-key bg-white text-gray-900 border border-blue-200 rounded-lg py-3 text-2xl font-black shadow">3</button>
+                                <button type="button" onclick="appendSelectedScanQtyDigit('4')" class="touch-qty-key bg-white text-gray-900 border border-blue-200 rounded-lg py-3 text-2xl font-black shadow">4</button>
+                                <button type="button" onclick="appendSelectedScanQtyDigit('5')" class="touch-qty-key bg-white text-gray-900 border border-blue-200 rounded-lg py-3 text-2xl font-black shadow">5</button>
+                                <button type="button" onclick="appendSelectedScanQtyDigit('6')" class="touch-qty-key bg-white text-gray-900 border border-blue-200 rounded-lg py-3 text-2xl font-black shadow">6</button>
+                                <button type="button" onclick="appendSelectedScanQtyDigit('7')" class="touch-qty-key bg-white text-gray-900 border border-blue-200 rounded-lg py-3 text-2xl font-black shadow">7</button>
+                                <button type="button" onclick="appendSelectedScanQtyDigit('8')" class="touch-qty-key bg-white text-gray-900 border border-blue-200 rounded-lg py-3 text-2xl font-black shadow">8</button>
+                                <button type="button" onclick="appendSelectedScanQtyDigit('9')" class="touch-qty-key bg-white text-gray-900 border border-blue-200 rounded-lg py-3 text-2xl font-black shadow">9</button>
+                                <button type="button" onclick="removeSelectedScanQtyDigit()" class="touch-qty-key bg-gray-200 text-gray-800 border border-gray-300 rounded-lg py-3 text-base font-black shadow">ลบ</button>
+                                <button type="button" onclick="appendSelectedScanQtyDigit('0')" class="touch-qty-key bg-white text-gray-900 border border-blue-200 rounded-lg py-3 text-2xl font-black shadow">0</button>
+                                <button type="button" onclick="clearSelectedScanQty()" class="touch-qty-key bg-red-50 text-red-700 border border-red-200 rounded-lg py-3 text-base font-black shadow">ล้าง</button>
                             </div>
                         </div>
                     </div>
@@ -2801,14 +2822,14 @@
                 if (saveLabel) saveLabel.innerText = `บันทึกทั้งหมด ${qty} กล่อง`;
                 if (hint) {
                     hint.innerText = entries.length > 1
-                        ? `เลือกไว้ ${entries.length} สี - กด Enter เพื่อบันทึกทั้งหมด`
-                        : 'ถ้า 1 กล่อง กด Enter ได้เลย | ถ้ามากกว่า 1 ให้กดเลขของสีนั้น';
+                        ? `เลือกไว้ ${entries.length} สี รวม ${qty} กล่อง - แตะบันทึก/Enter`
+                        : '1 กล่อง: แตะบันทึก/Enter | มากกว่า 1: แตะเลขด้านล่าง';
                 }
             }
             function activateScanQtyEntry() {
                 scanQtyEntryMode = true;
                 const hint = document.getElementById('colorQtyHint');
-                if (hint) hint.innerText = 'กดเลขจำนวนของสีที่เลือก แล้วกด Enter เพื่อบันทึกทั้งหมด';
+                if (hint) hint.innerText = 'แตะเลขด้านล่าง หรือกดเลขบนเครื่อง แล้วแตะบันทึก/Enter';
                 const selectedBtn = getSelectedScanColorButton();
                 if (selectedBtn) selectedBtn.focus();
             }
@@ -2824,6 +2845,13 @@
                 colorQtyInput.value = selectedScanQtyBuffer;
                 commitSelectedScanColorEntry(false);
                 updateSelectedScanQtyBadge();
+            }
+            function clearSelectedScanQty() {
+                selectedScanQtyBuffer = '';
+                colorQtyInput.value = '';
+                commitSelectedScanColorEntry(false);
+                updateSelectedScanQtyBadge();
+                activateScanQtyEntry();
             }
             function resetScanColorButtons() {
                 selectedScanQtyBuffer = '';
