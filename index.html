@@ -909,7 +909,7 @@
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                             d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
                                     </svg>
-                                    สแกนกล่อง PP
+                                    <span id="qtyScanTitle">สแกนกล่อง PP</span>
                                 </span>
                                 <h2 id="displayLpnQty" class="text-2xl font-black text-gray-800 tracking-wider mt-1"></h2>
                             </div>
@@ -931,9 +931,23 @@
                         </div>
                         <label
                             class="block text-gray-700 font-bold text-center text-sm mb-2">ระบุจำนวนที่นับได้จริง</label>
-                        <input type="number" id="qtyInput" autocomplete="off" min="1"
+                        <input type="number" id="qtyInput" autocomplete="off" inputmode="numeric" pattern="[0-9]*" min="1"
                             class="w-full text-4xl p-3 border-2 border-gray-400 rounded-lg text-center font-black bg-white focus:border-orange-500"
                             placeholder="0">
+                        <div id="directQtyTouchKeypad" class="grid grid-cols-3 gap-2 mt-3">
+                            <button type="button" onclick="appendDirectQtyDigit('1')" class="touch-qty-key bg-white text-gray-900 border border-orange-200 rounded-lg py-3 text-2xl font-black shadow">1</button>
+                            <button type="button" onclick="appendDirectQtyDigit('2')" class="touch-qty-key bg-white text-gray-900 border border-orange-200 rounded-lg py-3 text-2xl font-black shadow">2</button>
+                            <button type="button" onclick="appendDirectQtyDigit('3')" class="touch-qty-key bg-white text-gray-900 border border-orange-200 rounded-lg py-3 text-2xl font-black shadow">3</button>
+                            <button type="button" onclick="appendDirectQtyDigit('4')" class="touch-qty-key bg-white text-gray-900 border border-orange-200 rounded-lg py-3 text-2xl font-black shadow">4</button>
+                            <button type="button" onclick="appendDirectQtyDigit('5')" class="touch-qty-key bg-white text-gray-900 border border-orange-200 rounded-lg py-3 text-2xl font-black shadow">5</button>
+                            <button type="button" onclick="appendDirectQtyDigit('6')" class="touch-qty-key bg-white text-gray-900 border border-orange-200 rounded-lg py-3 text-2xl font-black shadow">6</button>
+                            <button type="button" onclick="appendDirectQtyDigit('7')" class="touch-qty-key bg-white text-gray-900 border border-orange-200 rounded-lg py-3 text-2xl font-black shadow">7</button>
+                            <button type="button" onclick="appendDirectQtyDigit('8')" class="touch-qty-key bg-white text-gray-900 border border-orange-200 rounded-lg py-3 text-2xl font-black shadow">8</button>
+                            <button type="button" onclick="appendDirectQtyDigit('9')" class="touch-qty-key bg-white text-gray-900 border border-orange-200 rounded-lg py-3 text-2xl font-black shadow">9</button>
+                            <button type="button" onclick="removeDirectQtyDigit()" class="touch-qty-key bg-gray-200 text-gray-800 border border-gray-300 rounded-lg py-3 text-base font-black shadow">ลบ</button>
+                            <button type="button" onclick="appendDirectQtyDigit('0')" class="touch-qty-key bg-white text-gray-900 border border-orange-200 rounded-lg py-3 text-2xl font-black shadow">0</button>
+                            <button type="button" onclick="clearDirectQtyInput()" class="touch-qty-key bg-red-50 text-red-700 border border-red-200 rounded-lg py-3 text-base font-black shadow">ล้าง</button>
+                        </div>
                         <button onclick="executeQtyScanSave()"
                             class="w-full bg-orange-600 text-white font-black py-4 rounded-lg text-lg shadow-lg mt-4">ยืนยันยอด
                             & บันทึก (Enter)</button>
@@ -2756,11 +2770,22 @@
                     if (found.branch !== selectedBranchCode) { showAlert('รหัสสาขาไม่ตรงกัน', `บาร์โค้ด ${lpn} เป็นของสาขา [${found.branch}]\nกรุณาตรวจสอบและเลือกสาขาให้ถูกต้อง`); lpnInput.value = ''; return; }
                     if (found.status === 'Scanned') { showAlert('ข้อมูลซ้ำซ้อน', `บาร์โค้ด ${lpn}\nได้รับการสแกนไปแล้ว`, 'border-yellow-500'); lpnInput.value = ''; return; }
                     resetScanColorButtons();
-                    if (lpn.startsWith('PP')) { document.getElementById('displayLpnQty').innerText = lpn; document.getElementById('guideQty').innerText = found.Total_Qty || found.total_qty || 1; qtyInput.value = ''; qtySection.classList.remove('hidden'); colorSection.classList.add('hidden'); colorQtyArea.classList.add('hidden'); lpnInput.blur(); setTimeout(() => { qtyInput.focus(); }, 10); } else { document.getElementById('displayLpn').innerText = lpn; document.getElementById('selectedScanColor').value = ''; document.getElementById('selectedScanType').value = 'TOTE'; document.getElementById('selectedScanColorLabel').innerText = '-'; colorQtyInput.value = ''; colorQtyArea.classList.add('hidden'); colorSection.classList.remove('hidden'); qtySection.classList.add('hidden'); lpnInput.blur(); } lpnInput.value = '';
+                    if (requiresDirectQty(lpn)) { document.getElementById('displayLpnQty').innerText = lpn; document.getElementById('qtyScanTitle').innerText = `สแกนกล่อง ${lpn.substring(0, 2)}`; document.getElementById('guideQty').innerText = found.Total_Qty || found.total_qty || 1; qtyInput.value = ''; qtySection.classList.remove('hidden'); colorSection.classList.add('hidden'); colorQtyArea.classList.add('hidden'); lpnInput.blur(); setTimeout(() => { qtyInput.focus(); }, 10); } else { document.getElementById('displayLpn').innerText = lpn; document.getElementById('selectedScanColor').value = ''; document.getElementById('selectedScanType').value = 'TOTE'; document.getElementById('selectedScanColorLabel').innerText = '-'; colorQtyInput.value = ''; colorQtyArea.classList.add('hidden'); colorSection.classList.remove('hidden'); qtySection.classList.add('hidden'); lpnInput.blur(); } lpnInput.value = '';
                 }
             });
             qtyInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') { e.preventDefault(); executeQtyScanSave(); } });
-            function executeQtyScanSave() { const qtyVal = parseInt(qtyInput.value); if (isNaN(qtyVal) || qtyVal < 1) return showAlert('ข้อผิดพลาด', 'กรุณาระบุจำนวนกล่องสินค้า (PP) ให้ถูกต้อง'); executeScanSave('None', 'Carton', qtyVal, document.getElementById('displayLpnQty').innerText); }
+            function appendDirectQtyDigit(digit) {
+                if (qtyInput.value.length >= 4) return;
+                qtyInput.value = `${qtyInput.value}${digit}`.replace(/^0+/, '');
+            }
+            function removeDirectQtyDigit() {
+                qtyInput.value = qtyInput.value.slice(0, -1);
+            }
+            function clearDirectQtyInput() {
+                qtyInput.value = '';
+            }
+            function executeQtyScanSave() { const qtyVal = parseInt(qtyInput.value); if (isNaN(qtyVal) || qtyVal < 1) return showAlert('ข้อผิดพลาด', 'กรุณาระบุจำนวนกล่องสินค้าให้ถูกต้อง'); executeScanSave('None', 'Carton', qtyVal, document.getElementById('displayLpnQty').innerText); }
+            function requiresDirectQty(lpn) { return lpn.startsWith('PP') || lpn.startsWith('SP'); }
             function requiresColorQty(lpn) { return lpn.startsWith('PT') || lpn.startsWith('PN'); }
             function getColorLabel(color) {
                 const normalizedColor = String(color || '').toUpperCase();
