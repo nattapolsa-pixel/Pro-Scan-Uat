@@ -890,8 +890,13 @@
                                 <button type="button" onclick="appendSelectedScanQtyDigit('9')" class="touch-qty-key bg-white text-gray-900 border border-blue-200 rounded-lg py-3 text-2xl font-black shadow">9</button>
                                 <button type="button" onclick="removeSelectedScanQtyDigit()" class="touch-qty-key bg-gray-200 text-gray-800 border border-gray-300 rounded-lg py-3 text-base font-black shadow">ลบ</button>
                                 <button type="button" onclick="appendSelectedScanQtyDigit('0')" class="touch-qty-key bg-white text-gray-900 border border-blue-200 rounded-lg py-3 text-2xl font-black shadow">0</button>
-                                <button type="button" onclick="clearSelectedScanQty()" class="touch-qty-key bg-red-50 text-red-700 border border-red-200 rounded-lg py-3 text-base font-black shadow">ล้าง</button>
+                                <button type="button" onclick="clearSelectedScanQty()" class="touch-qty-key bg-red-50 text-red-700 border border-red-200 rounded-lg py-3 text-base font-black shadow">ล้างเลข</button>
                             </div>
+                            <button type="button" id="removeScanColorBtn" onclick="removeSelectedScanColor()"
+                                class="mt-2 w-full bg-red-600 hover:bg-red-700 text-white rounded-lg py-3 font-black shadow text-base touch-manipulation">
+                                ยกเลิกสีนี้
+                                <span class="block text-xs font-bold opacity-80 mt-1">ลบสีที่เลือกผิดออก</span>
+                            </button>
                         </div>
                     </div>
 
@@ -2819,11 +2824,20 @@
                 const qty = entries.reduce((sum, entry) => sum + entry.qty, 0) || 1;
                 const saveLabel = document.getElementById('colorQtySaveLabel');
                 const hint = document.getElementById('colorQtyHint');
+                const hasSelectedColor = Boolean(document.getElementById('selectedScanColor').value);
+                const removeColorBtn = document.getElementById('removeScanColorBtn');
                 if (saveLabel) saveLabel.innerText = `บันทึกทั้งหมด ${qty} กล่อง`;
+                if (removeColorBtn) removeColorBtn.classList.toggle('hidden', !hasSelectedColor);
                 if (hint) {
-                    hint.innerText = entries.length > 1
-                        ? `เลือกไว้ ${entries.length} สี รวม ${qty} กล่อง - แตะบันทึก/Enter`
-                        : '1 กล่อง: แตะบันทึก/Enter | มากกว่า 1: แตะเลขด้านล่าง';
+                    if (!hasSelectedColor && entries.length > 0) {
+                        hint.innerText = `เลือกไว้ ${entries.length} สี รวม ${qty} กล่อง - เลือกสีต่อหรือแตะบันทึก/Enter`;
+                    } else if (!hasSelectedColor) {
+                        hint.innerText = 'เลือกสีที่ต้องการก่อน';
+                    } else {
+                        hint.innerText = entries.length > 1
+                            ? `เลือกไว้ ${entries.length} สี รวม ${qty} กล่อง - แตะบันทึก/Enter`
+                            : '1 กล่อง: แตะบันทึก/Enter | มากกว่า 1: แตะเลขด้านล่าง | สีผิด: ยกเลิกสีนี้';
+                    }
                 }
             }
             function activateScanQtyEntry() {
@@ -2834,6 +2848,7 @@
                 if (selectedBtn) selectedBtn.focus();
             }
             function appendSelectedScanQtyDigit(digit) {
+                if (!document.getElementById('selectedScanColor').value) return;
                 if (selectedScanQtyBuffer.length >= 3) return;
                 selectedScanQtyBuffer = `${selectedScanQtyBuffer}${digit}`.replace(/^0+/, '');
                 colorQtyInput.value = selectedScanQtyBuffer;
@@ -2841,17 +2856,38 @@
                 updateSelectedScanQtyBadge();
             }
             function removeSelectedScanQtyDigit() {
+                if (!document.getElementById('selectedScanColor').value) return;
                 selectedScanQtyBuffer = selectedScanQtyBuffer.slice(0, -1);
                 colorQtyInput.value = selectedScanQtyBuffer;
                 commitSelectedScanColorEntry(false);
                 updateSelectedScanQtyBadge();
             }
             function clearSelectedScanQty() {
+                if (!document.getElementById('selectedScanColor').value) return;
                 selectedScanQtyBuffer = '';
                 colorQtyInput.value = '';
                 commitSelectedScanColorEntry(false);
                 updateSelectedScanQtyBadge();
                 activateScanQtyEntry();
+            }
+            function removeSelectedScanColor() {
+                const colorInput = document.getElementById('selectedScanColor');
+                const typeInput = document.getElementById('selectedScanType');
+                const color = colorInput.value;
+                if (!color) return;
+                delete selectedScanColorEntries[getScanColorKey(color)];
+                selectedScanQtyBuffer = '';
+                colorQtyInput.value = '';
+                colorInput.value = '';
+                typeInput.value = 'TOTE';
+                document.getElementById('selectedScanColorLabel').innerText = '-';
+                scanQtyEntryMode = false;
+                if (Object.keys(selectedScanColorEntries).length === 0) {
+                    colorQtyArea.classList.add('hidden');
+                    resetScanColorButtons();
+                    return;
+                }
+                updateSelectedScanQtyBadge();
             }
             function resetScanColorButtons() {
                 selectedScanQtyBuffer = '';
@@ -2876,6 +2912,16 @@
                     const btnColor = getScanColorKey(btn.dataset.scanColor);
                     const isSelected = btnColor === selectedColor;
                     const hasEntry = Boolean(selectedScanColorEntries[btnColor]);
+                    if (!selectedColor) {
+                        btn.style.opacity = hasEntry ? '0.9' : '1';
+                        btn.style.filter = 'none';
+                        btn.style.transform = 'scale(1)';
+                        btn.style.boxShadow = '';
+                        btn.style.outline = hasEntry ? '2px solid rgba(17, 24, 39, 0.45)' : '';
+                        btn.style.outlineOffset = hasEntry ? '2px' : '';
+                        btn.style.zIndex = hasEntry ? '1' : '';
+                        return;
+                    }
                     btn.style.opacity = isSelected ? '1' : (hasEntry ? '0.9' : '0.35');
                     btn.style.filter = (isSelected || hasEntry) ? 'none' : 'grayscale(65%)';
                     btn.style.transform = isSelected ? 'scale(1.04)' : (hasEntry ? 'scale(1)' : 'scale(0.98)');
@@ -2913,10 +2959,11 @@
                 }, 10);
             }
             function executeColorQtyScanSave() {
-                if (!document.getElementById('selectedScanColor').value) return showAlert('ข้อมูลไม่ครบถ้วน', 'กรุณาเลือกสีก่อนระบุจำนวนกล่อง');
-                commitSelectedScanColorEntry(true);
+                if (document.getElementById('selectedScanColor').value) {
+                    commitSelectedScanColorEntry(true);
+                }
                 const entries = getPendingScanColorEntries();
-                if (entries.length === 0) return showAlert('ข้อผิดพลาด', 'กรุณาเลือกจำนวนกล่องให้ถูกต้อง');
+                if (entries.length === 0) return showAlert('ข้อมูลไม่ครบถ้วน', 'กรุณาเลือกสีอย่างน้อย 1 สี');
                 if (entries.some(entry => !Number.isFinite(entry.qty) || entry.qty < 1)) return showAlert('ข้อผิดพลาด', 'กรุณาเลือกจำนวนกล่องให้ถูกต้อง');
                 executeMultiColorScanSave(entries, document.getElementById('displayLpn').innerText);
             }
