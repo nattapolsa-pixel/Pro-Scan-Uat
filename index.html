@@ -1710,6 +1710,7 @@
             let totalBlue = 0;
             let totalGreen = 0;
             let totalBlack = 0;
+            let totalPaperBoxes = 0;
             let totalAllBoxes = 0;
             let totalPallets = 0;
 
@@ -1734,15 +1735,20 @@
                 let greenCount = 0;
                 let blackCount = 0;
                 let yellowCount = 0;
-                
+                let paperBoxCount = 0;
+
                 const scannedMasters = new Set();
-                let standalonePallets = 0;
 
                 const addQtyToSummary = (prefix, color, type, qty) => {
                     const normalizedColor = String(color || '').toUpperCase();
                     const normalizedType = String(type || '').toUpperCase();
+                    const normalizedPrefix = String(prefix || '').toUpperCase();
+                    const isPaperTote = (normalizedPrefix === 'PT' || normalizedPrefix === 'PN')
+                        && (normalizedType === 'CARTON' || normalizedColor === 'REUSE');
 
-                    if (prefix === 'PR' || normalizedType === 'CARTON' || normalizedColor === 'REUSE') {
+                    if (isPaperTote) {
+                        paperBoxCount += qty;
+                    } else if (normalizedPrefix === 'PR' || normalizedPrefix === 'PP' || normalizedPrefix === 'SP' || normalizedType === 'CARTON' || normalizedColor === 'REUSE') {
                         mCount += qty;
                     } else {
                         if (normalizedColor === 'RED') redCount += qty;
@@ -1763,7 +1769,7 @@
 
                         if (prefix === 'PP') {
                             if (!item.combinedWith && !item.isMaster) {
-                                standalonePallets += qty;
+                                mCount += qty;
                             }
                         } else {
                             const breakdown = getColorBreakdown(item);
@@ -1783,8 +1789,8 @@
                     }
                 });
 
-                const branchTotalBoxes = mCount + redCount + blueCount + greenCount + blackCount + yellowCount;
-                const branchPallets = scannedMasters.size + standalonePallets;
+                const branchTotalBoxes = mCount + redCount + blueCount + greenCount + blackCount + paperBoxCount + yellowCount;
+                const branchPallets = scannedMasters.size;
 
                 // Accumulate totals
                 totalM += mCount;
@@ -1792,6 +1798,7 @@
                 totalBlue += blueCount;
                 totalGreen += greenCount;
                 totalBlack += blackCount;
+                totalPaperBoxes += paperBoxCount;
                 totalAllBoxes += branchTotalBoxes;
                 totalPallets += branchPallets;
 
@@ -1811,6 +1818,7 @@
                         <td class="print-cell print-number">${blueCount || ''}</td>
                         <td class="print-cell print-number">${greenCount || ''}</td>
                         <td class="print-cell print-number">${blackCount || ''}</td>
+                        <td class="print-cell print-number">${paperBoxCount || ''}</td>
                         <td class="print-cell print-number">${branchTotalBoxes || ''}</td>
                         <td class="print-cell print-number">${branchPallets || ''}</td>
                     </tr>
@@ -1828,6 +1836,7 @@
                         <td class="p-3 border-r border-slate-200 text-blue-600 font-bold font-sans">${blueCount || ''}</td>
                         <td class="p-3 border-r border-slate-200 text-green-600 font-bold font-sans">${greenCount || ''}</td>
                         <td class="p-3 border-r border-slate-200 text-slate-800 font-bold font-sans">${blackCount || ''}</td>
+                        <td class="p-3 border-r border-slate-200 text-orange-700 font-bold font-sans">${paperBoxCount || ''}</td>
                         <td class="p-3 border-r border-slate-200 bg-slate-50/50 font-black text-slate-900 font-sans">${branchTotalBoxes}</td>
                         <td class="p-3 font-black bg-slate-50/50 text-indigo-900 font-sans">${branchPallets}</td>
                     </tr>
@@ -1853,6 +1862,7 @@
                             <td class="p-3 border-r border-slate-200 text-blue-600 font-bold font-sans"></td>
                             <td class="p-3 border-r border-slate-200 text-green-600 font-bold font-sans"></td>
                             <td class="p-3 border-r border-slate-200 text-slate-800 font-bold font-sans"></td>
+                            <td class="p-3 border-r border-slate-200 text-orange-700 font-bold font-sans"></td>
                             <td class="p-3 border-r border-slate-200 bg-slate-50/50 font-black text-slate-900 font-sans"></td>
                             <td class="p-3 font-black bg-slate-50/50 text-indigo-900 font-sans"></td>
                         </tr>
@@ -1868,6 +1878,7 @@
                     <td class="p-3 border-r border-slate-200 text-blue-700 font-sans">${totalBlue}</td>
                     <td class="p-3 border-r border-slate-200 text-green-700 font-sans">${totalGreen}</td>
                     <td class="p-3 border-r border-slate-200 text-slate-900 font-sans">${totalBlack}</td>
+                    <td class="p-3 border-r border-slate-200 text-orange-800 font-sans">${totalPaperBoxes}</td>
                     <td class="p-3 border-r border-slate-200 bg-slate-200 text-slate-950 font-sans">${totalAllBoxes}</td>
                     <td class="p-3 bg-slate-200 text-indigo-950 font-sans">${totalPallets}</td>
                 </tr>
@@ -1881,6 +1892,7 @@
                     <td class="print-cell print-number">${totalBlue}</td>
                     <td class="print-cell print-number">${totalGreen}</td>
                     <td class="print-cell print-number">${totalBlack}</td>
+                    <td class="print-cell print-number">${totalPaperBoxes}</td>
                     <td class="print-cell print-number">${totalAllBoxes}</td>
                     <td class="print-cell print-number">${totalPallets}</td>
                 </tr>
@@ -1950,6 +1962,7 @@
                                     <th>TOTE น้ำเงิน</th>
                                     <th>TOTE เขียว</th>
                                     <th>TOTE ดำ</th>
+                                    <th>กล่องกระดาษ</th>
                                     <th>รวม</th>
                                     <th>pallet</th>
                                 </tr>
@@ -2093,6 +2106,7 @@
                                     <th class="p-3 border-r border-slate-700 w-24 text-center font-sans text-blue-300">TOTE น้ำเงิน</th>
                                     <th class="p-3 border-r border-slate-700 w-24 text-center font-sans text-green-300">TOTE เขียว</th>
                                     <th class="p-3 border-r border-slate-700 w-24 text-center font-sans text-slate-300">TOTE ดำ</th>
+                                    <th class="p-3 border-r border-slate-700 w-28 text-center font-sans text-orange-300">กล่องกระดาษ</th>
                                     <th class="p-3 border-r border-slate-700 w-24 text-center bg-slate-700 font-sans">รวมกล่อง</th>
                                     <th class="p-3 w-20 text-center bg-slate-700 text-indigo-200 font-sans">พาเลท</th>
                                 </tr>
