@@ -1223,6 +1223,48 @@
                 .finally(() => clearTimeout(id));
         }
 
+        async function fetchJobDataWithRetry(url, usedCache, showRetryToast = true) {
+            let res = null;
+            let lastError = null;
+            for (let attempt = 0; attempt <= 2; attempt++) {
+                try {
+                    if (attempt > 0) {
+                        await new Promise(r => setTimeout(r, attempt * 1500));
+                        if (!usedCache && showRetryToast) showToast(`กำลังลองเชื่อมต่อใหม่ (${attempt}/2)...`);
+                    }
+                    res = await fetchWithTimeout(url, { cache: 'no-store' }, 25000);
+                    lastError = null;
+                    break;
+                } catch (err) {
+                    lastError = err;
+                    if (attempt === 2) throw lastError;
+                }
+            }
+            return res;
+        }
+
+        function getBookingLookupCandidates(inputVal) {
+            const raw = String(inputVal || '').trim().toUpperCase().replace(/\s+/g, '');
+            const compact = raw.replace(/-/g, '');
+            const candidates = [];
+            const add = (value) => {
+                const clean = String(value || '').trim().toUpperCase();
+                if (clean && !candidates.includes(clean)) candidates.push(clean);
+            };
+
+            add(raw);
+
+            const bookingMatch = compact.match(/^B(\d{3})(\d+)$/);
+            if (bookingMatch) add(`B${bookingMatch[1]}-${bookingMatch[2]}`);
+
+            const branchBookingMatch = compact.length >= 12 ? compact.match(/^(\d{3})(\d{6,})$/) : null;
+            if (branchBookingMatch) add(`B${branchBookingMatch[1]}-${branchBookingMatch[2]}`);
+
+            if (/^\d{6,}$/.test(compact) && !branchBookingMatch) add(`B001-${compact}`);
+
+            return candidates;
+        }
+
         function getWaveDataCacheKey(inputVal, isWaveOnly) {
             const type = isWaveOnly ? 'wave' : 'booking';
             return `${waveDataCachePrefix}${type}:${String(inputVal || '').trim().toUpperCase()}`;
@@ -2582,41 +2624,48 @@
                     ? backendApiUrl + `/api/check-wave?wave_no=${inputVal}`
                     : backendApiUrl + `/api/check-booking?booking_no=${encodeURIComponent(inputVal)}`;
 
-                // ✅ Retry with backoff: ลองใหม่สูงสุด 2 ครั้งถ้าหมดเวลา พร้อม timeout 25 วินาที
-                let res = null;
-                let lastError = null;
-                for (let attempt = 0; attempt <= 2; attempt++) {
-                    try {
-                        if (attempt > 0) {
-                            await new Promise(r => setTimeout(r, attempt * 1500));
-                            if (!usedCache) showToast(`กำลังลองเชื่อมต่อใหม่ (${attempt}/2)...`);
-                        }
-                        res = await fetchWithTimeout(url, { cache: 'no-store' }, 25000);
-                        lastError = null;
-                        break;
-                    } catch (err) {
-                        lastError = err;
+                let res = await fetchJobDataWithRetry(url, usedCache);
+                if (requestId !== latestWaveLoadRequestId) return;
+
+                let lookupIsWaveOnly = isWaveOnly;
+                let lookupCacheKey = cacheKey;
+                let fallbackBookingNo = '';
+
+                if (!res.ok) {
+                    const bookingCandidates = getBookingLookupCandidates(inputVal)
+                        .filter(candidate => candidate !== inputVal || isWaveOnly);
+
+                    for (const bookingCandidate of bookingCandidates) {
+                        const bookingUrl = backendApiUrl + `/api/check-booking?booking_no=${encodeURIComponent(bookingCandidate)}`;
+                        const bookingRes = await fetchJobDataWithRetry(bookingUrl, true, false);
                         if (requestId !== latestWaveLoadRequestId) return;
+                        if (bookingRes.ok) {
+                            res = bookingRes;
+                            lookupIsWaveOnly = false;
+                            lookupCacheKey = getWaveDataCacheKey(bookingCandidate, false);
+                            fallbackBookingNo = bookingCandidate;
+                            currentWaveDataCacheKey = lookupCacheKey;
+                            break;
+                        }
                     }
                 }
-
-                if (lastError) throw lastError;
-                if (requestId !== latestWaveLoadRequestId) return;
 
                 if (!res.ok) {
                     if (usedCache) {
                         showToast('ยังใช้ข้อมูลที่โหลดไว้ก่อนหน้าอยู่', true);
                         return;
                     }
-                    showAlert('ข้อผิดพลาด', `ไม่พบข้อมูลงานสำหรับ [${inputVal}]`);
+                    showAlert('ข้อผิดพลาด', `ไม่พบ Wave/Booking สำหรับ [${inputVal}]\nถ้ามี Booking No. ให้ลองใส่เช่น B001-260755319`);
                     document.getElementById('waveInput').value = '';
                     return;
                 }
 
                 const data = await res.json();
-                saveWaveDataCache(cacheKey, data);
-                applyWaveDataToScreen(data, isWaveOnly);
-                if (usedCache) showToast('อัปเดตข้อมูลล่าสุดแล้ว');
+                saveWaveDataCache(lookupCacheKey, data);
+                applyWaveDataToScreen(data, lookupIsWaveOnly);
+                if (fallbackBookingNo && isWaveOnly) showToast(`ไม่พบ Wave [${inputVal}] โหลดด้วย Booking [${data.booking_no || fallbackBookingNo}] แทน`);
+                else if (fallbackBookingNo) showToast(`โหลดด้วย Booking [${data.booking_no || fallbackBookingNo}]`);
+                else if (usedCache) showToast('อัปเดตข้อมูลล่าสุดแล้ว');
             } catch (e) {
                 if (!usedCache) {
                     showAlert('ข้อผิดพลาดเครือข่าย', 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ หลังลอง 3 ครั้งแล้ว');
