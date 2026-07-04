@@ -1203,6 +1203,50 @@
             });
         }
 
+        function getDocumentPalletCounts() {
+            const mergedCounts = {};
+            getShippingDocumentMetaKeys().forEach(key => {
+                const saved = getSavedShippingDocumentMeta(key);
+                if (saved && saved.pallet_counts && typeof saved.pallet_counts === 'object') {
+                    Object.assign(mergedCounts, saved.pallet_counts);
+                }
+            });
+            return mergedCounts;
+        }
+
+        function getDocumentPalletCount(branchCode) {
+            const counts = getDocumentPalletCounts();
+            const key = normalizeBranchLookupCode(branchCode);
+            const value = counts[key];
+            return value === undefined || value === null || value === '' ? '' : String(value);
+        }
+
+        function updateDocumentPalletCount(branchCode, value) {
+            const key = normalizeBranchLookupCode(branchCode);
+            const rawValue = String(value || '').trim();
+            const counts = getDocumentPalletCounts();
+
+            if (rawValue === '') {
+                delete counts[key];
+            } else {
+                const numericValue = Number(rawValue);
+                if (!Number.isFinite(numericValue) || numericValue < 0) {
+                    showToast('กรุณาระบุจำนวนพาเลทเป็นตัวเลข 0 ขึ้นไป', true);
+                    renderShippingDocument();
+                    return;
+                }
+                counts[key] = String(Math.floor(numericValue));
+            }
+
+            saveShippingDocumentMeta({
+                booking_no: currentBookingNo,
+                license_plate: currentLicensePlate,
+                pallet_counts: counts
+            });
+            renderShippingDocument();
+            showToast(rawValue === '' ? `ล้างจำนวนพาเลทสาขา ${key} แล้ว` : `บันทึกพาเลทสาขา ${key} แล้ว`);
+        }
+
         function keepAliveHeartbeat() {
             // ✅ Ping /api/health ทุก 10 นาที เพื่อป้องกัน Render.com free-tier cold start
             const ping = () => {
@@ -1787,6 +1831,7 @@
             let totalPaperBoxes = 0;
             let totalAllBoxes = 0;
             let totalPallets = 0;
+            let allBranchesHavePalletCount = true;
 
             const printRows = [];
             const activeRows = branches.map((branch, index) => {
@@ -1810,8 +1855,6 @@
                 let blackCount = 0;
                 let yellowCount = 0;
                 let paperBoxCount = 0;
-
-                const scannedMasters = new Set();
 
                 const addQtyToSummary = (prefix, color, type, qty) => {
                     const normalizedColor = String(color || '').toUpperCase();
@@ -1854,17 +1897,14 @@
                             }
                         }
 
-                        if (item.combinedWith) {
-                            scannedMasters.add(item.combinedWith);
-                        }
-                        if (item.isMaster) {
-                            scannedMasters.add(item.lpn);
-                        }
                     }
                 });
 
                 const branchTotalBoxes = mCount + redCount + blueCount + greenCount + blackCount + paperBoxCount + yellowCount;
-                const branchPallets = scannedMasters.size;
+                const branchPalletInputValue = getDocumentPalletCount(bCode);
+                if (branchPalletInputValue === '') allBranchesHavePalletCount = false;
+                const branchPallets = branchPalletInputValue === '' ? 0 : Number(branchPalletInputValue);
+                const branchPalletDisplay = branchPalletInputValue === '' ? '-' : branchPalletInputValue;
 
                 // Accumulate totals
                 totalM += mCount;
@@ -1894,7 +1934,7 @@
                         <td class="print-cell print-number">${blackCount || ''}</td>
                         <td class="print-cell print-number">${paperBoxCount || ''}</td>
                         <td class="print-cell print-number">${branchTotalBoxes || ''}</td>
-                        <td class="print-cell print-number">${branchPallets || ''}</td>
+                        <td class="print-cell print-number">${escapeDocumentText(branchPalletDisplay)}</td>
                     </tr>
                 `);
 
@@ -1912,7 +1952,18 @@
                         <td class="p-3 border-r border-slate-200 text-slate-800 font-bold font-sans">${blackCount || ''}</td>
                         <td class="p-3 border-r border-slate-200 text-orange-700 font-bold font-sans">${paperBoxCount || ''}</td>
                         <td class="p-3 border-r border-slate-200 bg-slate-50/50 font-black text-slate-900 font-sans">${branchTotalBoxes}</td>
-                        <td class="p-3 font-black bg-slate-50/50 text-indigo-900 font-sans">${branchPallets}</td>
+                        <td class="p-3 font-black bg-slate-50/50 text-indigo-900 font-sans">
+                            <input type="number"
+                                min="0"
+                                step="1"
+                                value="${escapeDocumentText(branchPalletInputValue)}"
+                                placeholder="-"
+                                data-branch="${escapeDocumentText(bCode)}"
+                                onchange="updateDocumentPalletCount(this.dataset.branch, this.value)"
+                                onkeydown="if (event.key === 'Enter') this.blur()"
+                                class="no-print w-16 max-w-full text-center bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-indigo-900 font-black outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
+                            <span class="print-only">${escapeDocumentText(branchPalletDisplay)}</span>
+                        </td>
                     </tr>
                 `;
             });
@@ -1944,6 +1995,8 @@
                 }
             }
 
+            const totalPalletDisplay = allBranchesHavePalletCount ? String(totalPallets) : '-';
+
             const totalRow = `
                 <tr class="bg-slate-100 text-center font-black text-slate-900 border-t-2 border-slate-300">
                     <td colspan="5" class="p-3 border-r border-slate-200 text-center text-slate-600 font-sans">รวมจำนวนกล่อง/พาเลท</td>
@@ -1954,7 +2007,7 @@
                     <td class="p-3 border-r border-slate-200 text-slate-900 font-sans">${totalBlack}</td>
                     <td class="p-3 border-r border-slate-200 text-orange-800 font-sans">${totalPaperBoxes}</td>
                     <td class="p-3 border-r border-slate-200 bg-slate-200 text-slate-950 font-sans">${totalAllBoxes}</td>
-                    <td class="p-3 bg-slate-200 text-indigo-950 font-sans">${totalPallets}</td>
+                    <td class="p-3 bg-slate-200 text-indigo-950 font-sans">${escapeDocumentText(totalPalletDisplay)}</td>
                 </tr>
             `;
 
@@ -1968,7 +2021,7 @@
                     <td class="print-cell print-number">${totalBlack}</td>
                     <td class="print-cell print-number">${totalPaperBoxes}</td>
                     <td class="print-cell print-number">${totalAllBoxes}</td>
-                    <td class="print-cell print-number">${totalPallets}</td>
+                    <td class="print-cell print-number">${escapeDocumentText(totalPalletDisplay)}</td>
                 </tr>
             `;
 
@@ -2245,9 +2298,23 @@
             });
         }
 
+        function getBranchesMissingPalletCount() {
+            return getDocumentBranches()
+                .filter(branch => getDocumentPalletCount(branch.code) === '')
+                .map(branch => branch.code);
+        }
+
         function printShippingDocument() {
             const content = document.getElementById('shippingDocumentContent');
             if (!content) return;
+
+            const missingPalletBranches = getBranchesMissingPalletCount();
+            if (missingPalletBranches.length > 0) {
+                const shouldPrint = window.confirm(
+                    `ยังไม่ได้ระบุจำนวนพาเลทของสาขา: ${missingPalletBranches.join(', ')}\n\nต้องการพิมพ์ต่อโดยให้ช่องพาเลทเป็น "-" ใช่หรือไม่?`
+                );
+                if (!shouldPrint) return;
+            }
 
             const originalTitle = document.title;
             document.title = String.fromCharCode(8203);
