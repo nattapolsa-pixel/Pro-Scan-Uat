@@ -1050,6 +1050,24 @@
             </section>
 
             <section id="modeCombine" class="hidden flex flex-col h-full min-h-0 overflow-y-auto p-3 gap-2">
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-purple-200 shrink-0">
+                    <label for="branchPalletCountInput" class="block text-purple-900 font-bold mb-2 text-sm">
+                        จำนวนพาเลททั้งหมดของสาขานี้
+                    </label>
+                    <div class="flex gap-2">
+                        <input type="number" id="branchPalletCountInput" inputmode="numeric" min="0" step="1"
+                            class="w-full text-xl p-3 border-2 border-purple-200 rounded-lg bg-purple-50 focus:bg-white focus:border-purple-500 font-black text-purple-950"
+                            placeholder="ใส่จำนวนพาเลท...">
+                        <button type="button" onclick="saveBranchPalletCountFromInput()"
+                            class="bg-purple-700 hover:bg-purple-800 text-white px-5 rounded-lg shadow transition flex items-center justify-center gap-2 flex-shrink-0 font-black">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            บันทึก
+                        </button>
+                    </div>
+                </div>
                 <div class="bg-white p-4 rounded-xl shadow-sm border-2 border-purple-300 shrink-0">
                     <label class="block text-purple-900 font-bold mb-2 text-sm">1. สแกนพาเลทหลัก (Pallet/Tote)</label>
                     <div class="flex gap-2">
@@ -1243,8 +1261,22 @@
                 license_plate: currentLicensePlate,
                 pallet_counts: counts
             });
+            syncBranchPalletCountInput();
             renderShippingDocument();
             showToast(rawValue === '' ? `ล้างจำนวนพาเลทสาขา ${key} แล้ว` : `บันทึกพาเลทสาขา ${key} แล้ว`);
+        }
+
+        function syncBranchPalletCountInput() {
+            const input = document.getElementById('branchPalletCountInput');
+            if (!input) return;
+            input.value = selectedBranchCode ? getDocumentPalletCount(selectedBranchCode) : '';
+            input.disabled = !selectedBranchCode;
+        }
+
+        function saveBranchPalletCountFromInput() {
+            const input = document.getElementById('branchPalletCountInput');
+            if (!input || !selectedBranchCode) return;
+            updateDocumentPalletCount(selectedBranchCode, input.value);
         }
 
         function keepAliveHeartbeat() {
@@ -2807,8 +2839,8 @@
                 setTimeout(() => document.getElementById('waveInput').focus(), 100);
             }
 
-            function selectBranch(code, name) { selectedBranchCode = code; selectedBranchName = name; document.getElementById('branchSelectorModal').classList.add('hidden'); document.getElementById('mainApp').classList.remove('hidden'); document.getElementById('mainApp').classList.add('flex'); document.getElementById('currentBranchDisplay').innerText = code; document.getElementById('currentBranchNameDisplay').innerText = name; updateDashboardUI(); switchTab('scan'); }
-            function backToBranchSelect() { selectedBranchCode = ""; document.getElementById('mainApp').classList.add('hidden'); renderBranchGrid(); document.getElementById('branchSelectorModal').classList.remove('hidden'); document.getElementById('branchSelectorModal').classList.add('flex'); }
+            function selectBranch(code, name) { selectedBranchCode = code; selectedBranchName = name; document.getElementById('branchSelectorModal').classList.add('hidden'); document.getElementById('mainApp').classList.remove('hidden'); document.getElementById('mainApp').classList.add('flex'); document.getElementById('currentBranchDisplay').innerText = code; document.getElementById('currentBranchNameDisplay').innerText = name; syncBranchPalletCountInput(); updateDashboardUI(); switchTab('scan'); }
+            function backToBranchSelect() { selectedBranchCode = ""; syncBranchPalletCountInput(); document.getElementById('mainApp').classList.add('hidden'); renderBranchGrid(); document.getElementById('branchSelectorModal').classList.remove('hidden'); document.getElementById('branchSelectorModal').classList.add('flex'); }
 
             // ==================== REFACTOR UI ====================
             // Cache DOM elements ที่ใช้บ่อยใน updateDashboardUI
@@ -2929,7 +2961,7 @@
                 const item = allLpnsInWave.find(i => i.lpn === lpn); if (item) { item.status = 'Pending'; item.qty = 0; item.color = 'None'; item.scan_type = ''; item.color_breakdown = []; pushToQueue({ wave_no: item.wave_no || currentWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: lpn, type: 'RESET_BOX', color: 'None', qty: 0, emp_id: loggedInEmpId }); updateDashboardUI(); saveCurrentWaveDataCache(); showToast(`🔄 คืนค่ากล่อง ${lpn} เรียบร้อยแล้ว`); }
             }
 
-            function switchTab(mode) { const isScan = mode === 'scan'; document.getElementById('modeScan').classList.toggle('hidden', !isScan); document.getElementById('modeCombine').classList.toggle('hidden', isScan); document.getElementById('tabScan').className = `flex-1 py-3 font-bold flex items-center justify-center gap-2 ${isScan ? 'text-blue-700 border-b-4 border-blue-700' : 'border-b-4 border-transparent text-gray-500'}`; document.getElementById('tabCombine').className = `flex-1 py-3 font-bold flex items-center justify-center gap-2 ${!isScan ? 'text-purple-700 border-b-4 border-purple-700' : 'border-b-4 border-transparent text-gray-500'}`; if (selectedBranchCode !== "") { if (isScan) document.getElementById('lpnInput').focus(); else document.getElementById('masterInput').focus(); } }
+            function switchTab(mode) { const isScan = mode === 'scan'; document.getElementById('modeScan').classList.toggle('hidden', !isScan); document.getElementById('modeCombine').classList.toggle('hidden', isScan); document.getElementById('tabScan').className = `flex-1 py-3 font-bold flex items-center justify-center gap-2 ${isScan ? 'text-blue-700 border-b-4 border-blue-700' : 'border-b-4 border-transparent text-gray-500'}`; document.getElementById('tabCombine').className = `flex-1 py-3 font-bold flex items-center justify-center gap-2 ${!isScan ? 'text-purple-700 border-b-4 border-purple-700' : 'border-b-4 border-transparent text-gray-500'}`; syncBranchPalletCountInput(); if (selectedBranchCode !== "") { if (isScan) document.getElementById('lpnInput').focus(); else document.getElementById('masterInput').focus(); } }
 
             // ==================== SCAN LOGIC ====================
             const lpnInput = document.getElementById('lpnInput'); const colorSection = document.getElementById('colorSelectionArea'); const qtySection = document.getElementById('qtySelectionArea'); const qtyInput = document.getElementById('qtyInput'); const colorQtyArea = document.getElementById('colorQtyArea'); const colorQtyInput = document.getElementById('colorQtyInput');
@@ -3269,6 +3301,14 @@
 
             // ==================== COMBINE LOGIC ====================
             const masterInput = document.getElementById('masterInput'); const childInput = document.getElementById('childInput'); const childList = document.getElementById('childList'); let childLpns = [];
+            const branchPalletCountInput = document.getElementById('branchPalletCountInput');
+            branchPalletCountInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    saveBranchPalletCountFromInput();
+                    masterInput.focus();
+                }
+            });
             // ✅ แก้แล้ว — เช็คก่อนว่ามีใน Wave และยังไม่ถูกสแกนแบบเดี่ยว
             masterInput.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter' && e.target.value.trim() !== "" && !isAlertOpen) {
