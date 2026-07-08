@@ -557,6 +557,25 @@
         </div>
     </div>
 
+    <!-- ✅ กล่องยืนยันแบบ ใช่/ไม่ (ใช้ซ้ำได้: ยิงซ้ำ PP, เตือนปิดจบไม่ครบ ฯลฯ) -->
+    <div id="genericConfirmModal"
+        class="hidden fixed inset-0 bg-gray-900 bg-opacity-80 flex items-center justify-center p-4 z-[130]">
+        <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm text-center border-t-8 border-orange-500">
+            <svg class="w-12 h-12 text-orange-500 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
+            </svg>
+            <h2 id="genericConfirmTitle" class="text-xl font-black mb-2 text-gray-800"></h2>
+            <p id="genericConfirmMessage" class="text-gray-700 mb-6 text-sm whitespace-pre-line"></p>
+            <div class="flex gap-2">
+                <button onclick="closeGenericConfirm()"
+                    class="flex-1 bg-gray-300 text-gray-800 font-bold py-3 rounded-lg text-lg">ยกเลิก</button>
+                <button id="genericConfirmOkBtn" onclick="acceptGenericConfirm()"
+                    class="flex-1 bg-orange-600 text-white font-bold py-3 rounded-lg text-lg shadow">ยืนยัน</button>
+            </div>
+        </div>
+    </div>
+
     <div id="shippingDocumentModal" class="hidden fixed inset-0 bg-gray-100 z-[120] flex-col">
         <header class="no-print bg-gray-900 text-white p-3 shadow-md shrink-0">
             <div class="flex items-center justify-between gap-2">
@@ -2423,6 +2442,13 @@
 
         // ==================== 🎯 ควบคุมการกดคีย์บอร์ดทั้งหมด (เพิ่ม Shortcut 1-6) ====================
         document.addEventListener('keydown', (e) => {
+            // ✅ ระหว่างเปิดกล่องยืนยัน ใช่/ไม่ : Enter=ยืนยัน, Esc=ยกเลิก, ปุ่มอื่นบล็อกไว้
+            if (isConfirmOpen) {
+                if (e.key === 'Escape' || e.key === 'Esc') { e.preventDefault(); closeGenericConfirm(); }
+                else if (e.key === 'Enter') { e.preventDefault(); acceptGenericConfirm(); }
+                else { e.preventDefault(); }
+                return;
+            }
             if (e.key === 'Escape' || e.key === 'Esc') {
                 e.preventDefault();
                 if (isAlertOpen) closeAlert();
@@ -2883,10 +2909,20 @@
                     else if (isScanned) {
                         scannedCount += actualQty;
                         if (lpnPrefix === 'PR') cntPR += actualQty; else if (lpnPrefix === 'PT' || lpnPrefix === 'PN') cntPTPN += actualQty; else if (isDirectQtyPrefix(lpnPrefix)) cntDirectQty += actualQty;
-                        const qtyText = (isDirectQtyPrefix(lpnPrefix) || lpnPrefix === 'PT' || lpnPrefix === 'PN') ? `<span class="text-xs text-green-700 font-black ml-1">(ยอด ${actualQty})</span>` : '';
+                        // ✅ PP ที่ยังนับไม่ครบเป้า (เช่น 20/50) → แสดงเป็นสีเหลือง กันลืมยิงพาเลทถัดไป
+                        const isPPIncomplete = (lpnPrefix.toUpperCase() === 'PP') && (actualQty < expectedQty);
+                        const palletParts = Array.isArray(item.pallet_breakdown) ? item.pallet_breakdown : [];
+                        const qtyText = isPPIncomplete
+                            ? `<span class="text-xs text-amber-700 font-black ml-1">(นับได้ ${actualQty}/${expectedQty})</span>`
+                            : ((isDirectQtyPrefix(lpnPrefix) || lpnPrefix === 'PT' || lpnPrefix === 'PN') ? `<span class="text-xs text-green-700 font-black ml-1">(ยอด ${actualQty})</span>` : '');
+                        const incompleteNote = isPPIncomplete
+                            ? `<div class="text-[11px] text-amber-800 bg-amber-100 border border-amber-300 rounded-lg p-1.5 mt-1.5 font-bold flex items-center gap-1"><svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg><span>ยังไม่ครบ เหลืออีก ${expectedQty - actualQty} กล่อง${palletParts.length ? ` · ยิงแล้ว ${palletParts.length} พาเลท (${palletParts.join('+')})` : ''}</span></div>`
+                            : '';
                         const colorSummaryText = getColorBreakdownText(item);
                         const colorText = colorSummaryText ? `<div class="text-[10px] text-green-700 font-bold">สี: ${colorSummaryText}</div>` : '';
-                        const checkIcon = `<svg class="w-4 h-4 text-green-600 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>`;
+                        const checkIcon = isPPIncomplete
+                            ? `<svg class="w-4 h-4 text-amber-500 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`
+                            : `<svg class="w-4 h-4 text-green-600 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>`;
 
                         let combineDetails = '';
                         if (item.isMaster) {
@@ -2908,7 +2944,7 @@
                             <button onclick="resetSingleBox('${item.lpn}')" class="text-xs text-red-500 hover:underline font-bold mt-1 text-left flex items-center gap-0.5 w-max"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-4v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>ยกเลิก</button>`;
                         }
 
-                        scannedParts.push(`<div class="p-2 border-l-4 border-green-500 bg-white rounded shadow-sm flex flex-col"><div class="flex items-center justify-between gap-2"><div class="font-black text-sm md:text-base text-green-900 tracking-wider flex items-center flex-wrap">${checkIcon} ${item.lpn}</div><div class="text-right shrink-0">${qtyText}${colorText}<div class="text-[10px] text-green-600 font-bold">Zone: ${item.zone}</div></div></div>${combineDetails}</div>`);
+                        scannedParts.push(`<div class="p-2 border-l-4 ${isPPIncomplete ? 'border-amber-500 bg-amber-50' : 'border-green-500 bg-white'} rounded shadow-sm flex flex-col"><div class="flex items-center justify-between gap-2"><div class="font-black text-sm md:text-base ${isPPIncomplete ? 'text-amber-900' : 'text-green-900'} tracking-wider flex items-center flex-wrap">${checkIcon} ${item.lpn}</div><div class="text-right shrink-0">${qtyText}${colorText}<div class="text-[10px] ${isPPIncomplete ? 'text-amber-600' : 'text-green-600'} font-bold">Zone: ${item.zone}</div></div></div>${incompleteNote}${combineDetails}</div>`);
                     }
                     else if (isForceClosed) {
                         unscannedCount += expectedQty; const crossIcon = `<svg class="w-4 h-4 text-gray-500 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>`;
@@ -2970,9 +3006,18 @@
                     const lpn = e.target.value.trim().toUpperCase(); const found = allLpnsInWave.find(item => item.lpn === lpn);
                     if (!found) { showAlert('ข้อผิดพลาด', `ไม่มีข้อมูล LPN รหัส\n[${lpn}]\nในรอบ Wave นี้`); lpnInput.value = ''; return; }
                     if (found.branch !== selectedBranchCode) { showAlert('รหัสสาขาไม่ตรงกัน', `บาร์โค้ด ${lpn} เป็นของสาขา [${found.branch}]\nกรุณาตรวจสอบและเลือกสาขาให้ถูกต้อง`); lpnInput.value = ''; return; }
-                    if (found.status === 'Scanned') { showAlert('ข้อมูลซ้ำซ้อน', `บาร์โค้ด ${lpn}\nได้รับการสแกนไปแล้ว`, 'border-yellow-500'); lpnInput.value = ''; return; }
+                    if (found.status === 'Scanned') {
+                        lpnInput.value = '';
+                        // ✅ PP หลายพาเลทต่อ 1 LPN: ยิงซ้ำได้เพื่อสะสมยอดที่เหลือ (แทนการบล็อก)
+                        if (isMultiPalletLpn(found.lpn) && !found.isMaster && !found.combinedWith) {
+                            promptRescanContinuation(found);
+                        } else {
+                            showAlert('ข้อมูลซ้ำซ้อน', `บาร์โค้ด ${lpn}\nได้รับการสแกนไปแล้ว`, 'border-yellow-500');
+                        }
+                        return;
+                    }
                     resetScanColorButtons();
-                    if (requiresDirectQty(lpn)) { document.getElementById('displayLpnQty').innerText = lpn; document.getElementById('qtyScanTitle').innerText = `สแกนกล่อง ${lpn.substring(0, 2)}`; document.getElementById('guideQty').innerText = found.Total_Qty || found.total_qty || 1; qtyInput.value = ''; qtySection.classList.remove('hidden'); colorSection.classList.add('hidden'); colorQtyArea.classList.add('hidden'); lpnInput.blur(); setTimeout(() => { qtyInput.focus(); }, 10); } else { document.getElementById('displayLpn').innerText = lpn; document.getElementById('selectedScanColor').value = ''; document.getElementById('selectedScanType').value = 'TOTE'; document.getElementById('selectedScanColorLabel').innerText = '-'; colorQtyInput.value = ''; colorQtyArea.classList.add('hidden'); colorSection.classList.remove('hidden'); qtySection.classList.add('hidden'); lpnInput.blur(); } lpnInput.value = '';
+                    if (requiresDirectQty(lpn)) { directQtyContinuationLpn = null; document.getElementById('displayLpnQty').innerText = lpn; document.getElementById('qtyScanTitle').innerText = `สแกนกล่อง ${lpn.substring(0, 2)}`; document.getElementById('guideQty').innerText = found.Total_Qty || found.total_qty || 1; qtyInput.value = ''; qtySection.classList.remove('hidden'); colorSection.classList.add('hidden'); colorQtyArea.classList.add('hidden'); lpnInput.blur(); setTimeout(() => { qtyInput.focus(); }, 10); } else { document.getElementById('displayLpn').innerText = lpn; document.getElementById('selectedScanColor').value = ''; document.getElementById('selectedScanType').value = 'TOTE'; document.getElementById('selectedScanColorLabel').innerText = '-'; colorQtyInput.value = ''; colorQtyArea.classList.add('hidden'); colorSection.classList.remove('hidden'); qtySection.classList.add('hidden'); lpnInput.blur(); } lpnInput.value = '';
                 }
             });
             qtyInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') { e.preventDefault(); executeQtyScanSave(); } });
@@ -2986,9 +3031,106 @@
             function clearDirectQtyInput() {
                 qtyInput.value = '';
             }
-            function executeQtyScanSave() { const qtyVal = parseInt(qtyInput.value); if (isNaN(qtyVal) || qtyVal < 1) return showAlert('ข้อผิดพลาด', 'กรุณาระบุจำนวนกล่องสินค้าให้ถูกต้อง'); executeScanSave('None', 'Carton', qtyVal, document.getElementById('displayLpnQty').innerText); }
+            function executeQtyScanSave() {
+                const qtyVal = parseInt(qtyInput.value);
+                if (isNaN(qtyVal) || qtyVal < 1) return showAlert('ข้อผิดพลาด', 'กรุณาระบุจำนวนกล่องสินค้าให้ถูกต้อง');
+                const lpn = document.getElementById('displayLpnQty').innerText;
+                const target = allLpnsInWave.find(item => item.lpn === lpn);
+                const isContinuation = !!target && directQtyContinuationLpn === lpn;
+                directQtyContinuationLpn = null;
+
+                if (isContinuation) {
+                    // ✅ ยิงซ้ำ PP: บวกสะสมยอดจากพาเลทก่อนหน้า แล้วส่งเป็น "ยอดรวมสะสม"
+                    // (backend ใช้ MAX(Qty) ต่อ LPN → ยอดรวมสะสมจะถูกต้องเมื่อโหลดใหม่/พิมพ์เอกสาร)
+                    const prevQty = parseInt(target.qty) || 0;
+                    const cumulative = prevQty + qtyVal;
+                    const expectedTotal = getExpectedQty(target);
+                    const prevBreakdown = Array.isArray(target.pallet_breakdown) && target.pallet_breakdown.length
+                        ? target.pallet_breakdown
+                        : (prevQty > 0 ? [prevQty] : []);
+                    target.pallet_breakdown = [...prevBreakdown, qtyVal];
+                    executeScanSave('None', 'Carton', cumulative, lpn);
+                    if (cumulative > expectedTotal) {
+                        showToast(`บันทึกแล้ว รวม ${cumulative}/${expectedTotal} — เกินเป้า ${cumulative - expectedTotal} กล่อง`, true);
+                    } else if (cumulative < expectedTotal) {
+                        showToast(`บันทึกแล้ว รวม ${cumulative}/${expectedTotal} — ยังเหลืออีก ${expectedTotal - cumulative} กล่อง`);
+                    } else {
+                        showToast(`นับครบแล้ว ${cumulative}/${expectedTotal} กล่อง`);
+                    }
+                } else {
+                    if (target) target.pallet_breakdown = [qtyVal];
+                    executeScanSave('None', 'Carton', qtyVal, lpn);
+                }
+            }
             function requiresDirectQty(lpn) { return isDirectQtyLpn(lpn); }
             function requiresColorQty(lpn) { return lpn.startsWith('PT') || lpn.startsWith('PN'); }
+
+            // ==================== 📦 PP หลายพาเลทต่อ 1 LPN: ยิงซ้ำสะสมยอด ====================
+            let directQtyContinuationLpn = null;
+            let rescanPromptLpn = null;
+            function isMultiPalletLpn(lpn) { return String(lpn || '').substring(0, 2).toUpperCase() === 'PP'; }
+
+            function promptRescanContinuation(item) {
+                if (!item) return;
+                const already = parseInt(item.qty) || 0;
+                const total = getExpectedQty(item);
+                const remaining = Math.max(0, total - already);
+                rescanPromptLpn = item.lpn;
+                showConfirm(
+                    `LPN ${item.lpn} ยิงไปแล้ว`,
+                    `พาเลทนี้บันทึกไปแล้ว ${already}/${total} กล่อง\nยังเหลืออีก ${remaining} กล่อง\n\nถ้านี่คือ PP พาเลทถัดไปของ LPN เดียวกัน กด "ใช่ ยิงซ้ำต่อ" เพื่อบันทึกยอดที่เหลือเพิ่ม`,
+                    'ใช่ ยิงซ้ำต่อ',
+                    () => {
+                        const target = allLpnsInWave.find(i => i.lpn === rescanPromptLpn);
+                        rescanPromptLpn = null;
+                        if (target) openDirectQtyEntryForContinuation(target);
+                    }
+                );
+            }
+
+            function openDirectQtyEntryForContinuation(item) {
+                const already = parseInt(item.qty) || 0;
+                const total = getExpectedQty(item);
+                const remaining = Math.max(0, total - already);
+                directQtyContinuationLpn = item.lpn;
+                document.getElementById('displayLpnQty').innerText = item.lpn;
+                document.getElementById('qtyScanTitle').innerText = `ยิงซ้ำ ${item.lpn.substring(0, 2)} · พาเลทถัดไป`;
+                document.getElementById('guideQty').innerText = remaining;
+                qtyInput.value = '';
+                qtySection.classList.remove('hidden');
+                colorSection.classList.add('hidden');
+                colorQtyArea.classList.add('hidden');
+                lpnInput.blur();
+                setTimeout(() => { qtyInput.focus(); }, 10);
+            }
+
+            // ==================== ✅ กล่องยืนยันแบบ ใช่/ไม่ (ใช้ซ้ำได้) ====================
+            let isConfirmOpen = false;
+            let genericConfirmCallback = null;
+            function showConfirm(title, message, confirmText = 'ยืนยัน', onConfirm = null) {
+                genericConfirmCallback = (typeof onConfirm === 'function') ? onConfirm : null;
+                document.getElementById('genericConfirmTitle').innerText = title;
+                document.getElementById('genericConfirmMessage').innerText = message;
+                document.getElementById('genericConfirmOkBtn').innerText = confirmText;
+                document.getElementById('genericConfirmModal').classList.remove('hidden');
+                isConfirmOpen = true;
+                if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+            }
+            function closeGenericConfirm() {
+                document.getElementById('genericConfirmModal').classList.add('hidden');
+                isConfirmOpen = false;
+                genericConfirmCallback = null;
+                rescanPromptLpn = null;
+                directQtyContinuationLpn = null;
+                if (selectedBranchCode !== "") document.getElementById('lpnInput').focus();
+            }
+            function acceptGenericConfirm() {
+                const cb = genericConfirmCallback;
+                document.getElementById('genericConfirmModal').classList.add('hidden');
+                isConfirmOpen = false;
+                genericConfirmCallback = null;
+                if (cb) cb();
+            }
             function getColorLabel(color) {
                 const normalizedColor = String(color || '').toUpperCase();
                 const labels = { BLACK: 'ดำ', BLUE: 'น้ำเงิน', YELLOW: 'เหลือง', GREEN: 'เขียว', RED: 'แดง', REUSE: 'กล่องกระดาษ (Reuse)' };
@@ -3265,6 +3407,28 @@
             }
 
             async function finishBranchJob() {
+                // ✅ กันลืม: ถ้ายังมี PP ที่นับไม่ครบเป้า ให้เตือนและยืนยันก่อนปิดจบ
+                const incompletePP = allLpnsInWave.filter(i =>
+                    (i.branch || 'Unknown') === selectedBranchCode
+                    && i.status === 'Scanned'
+                    && String(i.lpn || '').substring(0, 2).toUpperCase() === 'PP'
+                    && (parseInt(i.qty) || 0) < getExpectedQty(i)
+                );
+                if (incompletePP.length > 0) {
+                    const lines = incompletePP.slice(0, 8).map(i => `• ${i.lpn} (${parseInt(i.qty) || 0}/${getExpectedQty(i)})`).join('\n');
+                    const more = incompletePP.length > 8 ? `\n…และอีก ${incompletePP.length - 8} รายการ` : '';
+                    showConfirm(
+                        'ยังนับ PP ไม่ครบเป้า',
+                        `พาเลท PP ต่อไปนี้ยอดยังไม่ครบ:\n${lines}${more}\n\nต้องการปิดจบสาขาทั้งที่ยังนับไม่ครบหรือไม่?`,
+                        'ปิดจบเลย',
+                        () => performFinishBranchJob()
+                    );
+                    return;
+                }
+                performFinishBranchJob();
+            }
+
+            async function performFinishBranchJob() {
                 const branchCodeToClose = selectedBranchCode;
                 const completedAtIso = new Date().toISOString();
                 const completedAtText = formatBangkokDateTime(completedAtIso);
