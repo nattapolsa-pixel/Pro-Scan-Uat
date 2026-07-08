@@ -1924,7 +1924,9 @@
 
                     if (isPaperTote) {
                         paperBoxCount += qty;
-                    } else if (normalizedPrefix === 'PR' || normalizedPrefix === 'PP' || normalizedPrefix === 'SP' || normalizedType === 'CARTON' || normalizedColor === 'REUSE') {
+                    } else if (normalizedPrefix === 'PP' || normalizedPrefix === 'SP' || normalizedType === 'CARTON' || normalizedColor === 'REUSE') {
+                        // ✅ PR ถูกเอาออกจากช่อง M แล้ว → ให้ไปนับตามสี Tote ที่หน้างานเลือก (เหมือน PT/PN)
+                        //    (PR ที่เลือกสีรียูส ยังลง M ตามเงื่อนไข color REUSE ด้านบน เพราะไม่มีช่องรียูสแยก)
                         mCount += qty;
                     } else {
                         if (normalizedColor === 'RED') redCount += qty;
