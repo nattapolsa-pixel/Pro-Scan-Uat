@@ -2722,6 +2722,8 @@
                     if (masterTarget) {
                         masterTarget.isMaster = true;
                         masterTarget.childCount = (masterTarget.childCount || 0) + 1;
+                        // ✅ กล่องแม่ที่รวมกล่องแล้ว = ถือว่าตรวจเสร็จ (กันไปโผล่ฝั่ง "ค้างตรวจสอบ" หลังรีเฟรช)
+                        masterTarget.status = 'Scanned';
                     }
                 }
             });
@@ -2915,7 +2917,7 @@
                         scannedCount += actualQty;
                         if (lpnPrefix === 'PR') cntPR += actualQty; else if (lpnPrefix === 'PT' || lpnPrefix === 'PN') cntPTPN += actualQty; else if (isDirectQtyPrefix(lpnPrefix)) cntDirectQty += actualQty;
                         // ✅ PP ที่ยังนับไม่ครบเป้า (เช่น 20/50) → แสดงเป็นสีเหลือง กันลืมยิงพาเลทถัดไป
-                        const isPPIncomplete = (lpnPrefix.toUpperCase() === 'PP') && (actualQty < expectedQty);
+                        const isPPIncomplete = (lpnPrefix.toUpperCase() === 'PP') && !item.isMaster && !item.combinedWith && (actualQty < expectedQty);
                         const palletParts = Array.isArray(item.pallet_breakdown) ? item.pallet_breakdown : [];
                         const qtyText = isPPIncomplete
                             ? `<span class="text-xs text-amber-700 font-black ml-1">(นับได้ ${actualQty}/${expectedQty})</span>`
@@ -3417,6 +3419,7 @@
                     (i.branch || 'Unknown') === selectedBranchCode
                     && i.status === 'Scanned'
                     && String(i.lpn || '').substring(0, 2).toUpperCase() === 'PP'
+                    && !i.isMaster && !i.combinedWith
                     && (parseInt(i.qty) || 0) < getExpectedQty(i)
                 );
                 if (incompletePP.length > 0) {
