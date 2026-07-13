@@ -717,8 +717,6 @@
                 <button onclick="checkAndLoadWave()"
                     class="w-full bg-blue-600 text-white font-bold py-3 rounded-lg text-lg shadow">ตกลง
                     เข้าทำงาน</button>
-                <button onclick="loadTestWave56245()"
-                    class="w-full mt-2 bg-emerald-600 text-white font-bold py-3 rounded-lg text-base shadow">🧪 โหลด Wave 56245 (ข้อมูลจริง · ทดสอบออฟไลน์)</button>
                 <button onclick="logout()"
                     class="w-full mt-1 text-slate-500 hover:text-slate-700 font-bold py-2 text-sm">↩ ออกจากระบบ (เปลี่ยนพนักงาน)</button>
             </div>
@@ -3571,7 +3569,7 @@
             const PALLET_CLR_HEX = { Green: '#16a34a', Blue: '#0ea5e9', Red: '#dc2626' };
             let activePalletNo = 0, activePalletColor = null, activePalletType = 'TOTE', palletColorMode = false;
             let palletAllDone = false;
-            let noSaveMode = true; // ✅ โหมดทดสอบ: true = ไม่เขียนลงเซิร์ฟเวอร์จริง
+            let noSaveMode = false; // 🟢 โหมดใช้งานจริง: บันทึกขึ้นเซิร์ฟเวอร์
             let lastScannedLpn = null; // สำหรับปุ่มยกเลิกล่าสุด
             let lpnSearchTerm = '';    // สำหรับค้นหา LPN ในรายการ
 
@@ -3941,10 +3939,8 @@
                 const cBtn = document.getElementById('childScanBtn'); cBtn.disabled = true; cBtn.classList.replace('bg-purple-800', 'bg-gray-400'); cBtn.classList.remove('hover:bg-purple-900'); masterInput.focus();
             }
     </script>
-    <div style="position:fixed;top:6px;left:6px;z-index:2000" class="bg-black/80 text-white text-[11px] font-black rounded-lg px-2.5 py-1.5 flex items-center gap-1.5 shadow-lg">
-        <input type="checkbox" id="noSaveToggle" checked class="w-4 h-4" onchange="noSaveMode=this.checked; showToast(noSaveMode ? 'โหมดทดสอบ: ไม่บันทึกจริง' : '⚠ เปิดบันทึกจริงแล้ว', !noSaveMode);">
-        <label for="noSaveToggle">🧪 ทดสอบ (ไม่บันทึก)</label>
-    </div>
+    <!-- โหมดทดสอบถูกปิดสำหรับใช้งานจริง -->
+
     <div id="helpModal" class="hidden fixed inset-0 bg-gray-900/70 flex items-center justify-center p-4 z-[2500]" onclick="if(event.target===this)closeHelp()">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[85vh] overflow-y-auto p-5">
             <div class="flex items-center justify-between mb-3">
