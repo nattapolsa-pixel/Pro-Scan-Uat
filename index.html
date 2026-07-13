@@ -317,7 +317,7 @@
 
             .print-header {
                 display: grid;
-                grid-template-columns: 1fr 1fr 1fr;
+                grid-template-columns: 1fr 2.2fr 1fr;
                 align-items: flex-start;
                 gap: 8px;
                 width: 100%;
@@ -333,15 +333,15 @@
 
             .print-logo {
                 display: block;
-                height: 50px;
+                height: 88px;
                 width: auto;
                 object-fit: contain;
-                margin-bottom: 7px;
+                margin-bottom: 8px;
             }
 
             .print-meta-lines {
-                font-size: 11px;
-                line-height: 1.45;
+                font-size: 14px;
+                line-height: 1.5;
                 color: #000000;
             }
 
@@ -359,16 +359,17 @@
 
             .print-title h1 {
                 margin: 0;
-                font-size: 18px;
+                font-size: 24px;
                 line-height: 1.2;
                 font-weight: 800;
                 color: #000000;
+                white-space: nowrap;
             }
 
             .print-date {
                 width: 100%;
                 text-align: right;
-                font-size: 11px;
+                font-size: 14px;
                 line-height: 1.45;
                 font-weight: 700;
                 padding-top: 16px;
@@ -378,21 +379,21 @@
             .print-job-table {
                 width: 100% !important;
                 border-collapse: collapse !important;
-                table-layout: fixed !important;
+                table-layout: auto !important;
                 color: #000000 !important;
-                font-size: 8px !important;
-                line-height: 1.15 !important;
+                font-size: 13px !important;
+                line-height: 1.25 !important;
             }
 
             .print-job-table th,
             .print-job-table td {
                 border: 1px solid #000000 !important;
-                padding: 2px 3px !important;
-                height: 22px !important;
-                line-height: 1.15 !important;
+                padding: 4px 8px !important;
+                height: 24px !important;
+                line-height: 1.25 !important;
                 vertical-align: middle !important;
                 color: #000000 !important;
-                overflow-wrap: anywhere;
+                white-space: nowrap !important;
             }
 
             .print-job-table th {
@@ -448,8 +449,8 @@
                 justify-content: space-between;
                 align-items: flex-start;
                 margin-top: auto;
-                padding: 10mm 4px 0;
-                font-size: 9px;
+                padding: 6mm 4px 0;
+                font-size: 13px;
                 color: #000000;
             }
 
@@ -476,6 +477,64 @@
                 color: #000000;
             }
         }
+
+        /* ✅ โหมดตัวอักษรใหญ่ (สำหรับรายการยาวๆ บนมือถือ) */
+        .big-text #mainScrollingArea { zoom: 1.2; }
+        .big-text #modeCombine { zoom: 1.15; }
+
+        /* ==================== ✨ DESIGN POLISH (ตกแต่งหน้าตาใหม่) ==================== */
+        /* พื้นหลังนุ่มขึ้น ไล่เฉดเทา-ฟ้าอ่อน */
+        #branchSelectorModal { background: linear-gradient(160deg, #d7e0fb 0%, #e9eefb 55%, #f6f9fd 100%) !important; }
+        #mainApp > main { background: linear-gradient(160deg, #dbe4fb 0%, #e9eefb 55%, #f5f8fd 100%) !important; }
+        /* สกรอลบาร์บาง โค้ง จาง */
+        #mainScrollingArea::-webkit-scrollbar, #modeScan::-webkit-scrollbar, #modeCombine::-webkit-scrollbar, #childList::-webkit-scrollbar { width: 8px; height: 8px; }
+        #mainScrollingArea::-webkit-scrollbar-thumb, #modeScan::-webkit-scrollbar-thumb, #modeCombine::-webkit-scrollbar-thumb, #childList::-webkit-scrollbar-thumb { background: rgba(100, 116, 139, .35); border-radius: 9999px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(100, 116, 139, .6); }
+        ::-webkit-scrollbar-track { background: transparent; }
+        /* การ์ดขาว: โค้งขึ้น เงานุ่มสม่ำเสมอ + ทรานสิชัน */
+        #mainApp .bg-white.rounded-xl, #branchSelectorModal .bg-white.rounded-xl { border-radius: 1rem; box-shadow: 0 2px 5px rgba(15, 23, 42, .07), 0 16px 36px -14px rgba(30, 41, 59, .38) !important; transition: box-shadow .2s ease, transform .2s ease; }
+        /* ช่องสแกน LPN หลัก: เด่น เชื้อเชิญ */
+        #lpnInput { border-radius: 16px !important; border-width: 3px !important; box-shadow: inset 0 2px 4px rgba(15, 23, 42, .06), 0 6px 16px -8px rgba(37, 99, 235, .4) !important; transition: box-shadow .2s, border-color .2s; }
+        #lpnInput:focus { box-shadow: 0 0 0 5px rgba(37, 99, 235, .22) !important; outline: none; }
+        /* ปุ่มทั่วไป: ทรานสิชันนุ่ม */
+        button { transition: transform .1s ease, box-shadow .2s ease, background-color .2s ease, filter .15s ease; }
+        /* ปุ่มเลือกสาขา: ยกตัวเวลาชี้ */
+        #branchButtonGrid > * { transition: transform .15s ease, box-shadow .2s ease; }
+        #branchButtonGrid > *:hover { transform: translateY(-2px); }
+        /* แท็บ: เปลี่ยนสถานะเนียน */
+        #tabScan, #tabCombine { transition: color .2s, border-color .2s, background-color .2s; }
+        /* แอนิเมชันโผล่นุ่มสำหรับการ์ดพาเลท/แบนเนอร์ */
+        @keyframes popIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+        #palletGroupsContainer > div, #reopenBanner:not(.hidden) { animation: popIn .28s ease both; }
+        /* ปุ่มลอย: เงาลอยเด่น */
+        #quickTools button { box-shadow: 0 10px 24px -6px rgba(15, 23, 42, .4); }
+        /* หัวเว็บ: ไฮไลต์บนสุดบางๆ + เงาใต้ ให้ดูมีมิติ */
+        #mainApp > header, #branchSelectorModal > header { background: linear-gradient(120deg, #4338ca 0%, #2563eb 55%, #0e7490 100%) !important; box-shadow: 0 8px 22px -8px rgba(30, 27, 75, .6); }
+        /* โมดัล/การ์ดลอย: เงาหรูขึ้น */
+        #alertModalContent, #palletColorModal > div, #genericConfirmModal > div, #confirmModal > div, #loginModal > div, #waveSelectorModal > div, #scannerModal > div { box-shadow: 0 24px 60px -12px rgba(15, 23, 42, .45) !important; }
+
+        /* ==================== ✨ REFRESH: หน้าตรวจสอบกล่อง ==================== */
+        /* แถบความคืบหน้า: ไล่เฉด + หนาขึ้น */
+        #branchProgress .bg-slate-200 { height: 14px !important; }
+        #branchProgressFill { background: linear-gradient(90deg, #3b82f6, #6366f1, #8b5cf6) !important; height: 14px !important; }
+        /* ช่องค้นหา LPN: มน + เรืองแสงตอนโฟกัส */
+        #lpnSearchInput { border-radius: 12px; transition: box-shadow .2s, border-color .2s; }
+        #lpnSearchInput:focus { box-shadow: 0 0 0 4px rgba(59, 130, 246, .15); border-color: #3b82f6; }
+        /* การ์ดรายการ LPN: มนนุ่ม + ยกตัวตอนชี้ (เมาส์บน PC) */
+        #unscannedListContainer > div, #scannedListContainer > div { border-radius: 12px !important; transition: transform .12s ease, box-shadow .2s ease; }
+        #unscannedListContainer > div:hover, #scannedListContainer > div:hover { transform: translateY(-1px); box-shadow: 0 8px 18px -10px rgba(15, 23, 42, .35); }
+        /* หัวข้อสถิติเป็นชิป: ห่อบรรทัดได้บนจอแคบ (มือถือ/handheld) */
+        #typeStatsDisplay { flex-wrap: wrap; }
+
+        /* ---- ✨ REFRESH: หน้า Combine (รวมกล่อง/พาเลท) ---- */
+        #masterInput, #childInput { border-radius: 14px !important; transition: box-shadow .2s, border-color .2s; }
+        #masterInput:focus { box-shadow: 0 0 0 4px rgba(147, 51, 234, .18); }
+        #childInput:focus { box-shadow: 0 0 0 4px rgba(59, 130, 246, .15); }
+        #childList { border-style: dashed !important; border-color: #cbd5e1 !important; border-radius: 14px !important; min-height: 140px; max-height: 48vh; }
+        #childList:empty::before { content: "ยังไม่มี LPN รอง — สแกน LPN รองด้านบนเพื่อเพิ่มเข้ากล่องหลัก"; display: flex; align-items: center; justify-content: center; width: 100%; min-height: 120px; color: #94a3b8; font-weight: 700; font-size: .8125rem; text-align: center; padding: 1rem; line-height: 1.5; }
+        #combineColorGrid > button { border-radius: 12px !important; transition: transform .12s ease, filter .15s ease, box-shadow .2s ease; }
+        #combineColorGrid > button:hover { filter: brightness(1.06); }
+        #modeCombine button.bg-purple-600 { background: linear-gradient(135deg, #7c3aed, #a21caf) !important; border-radius: 14px !important; }
     </style>
 </head>
 
@@ -658,6 +717,10 @@
                 <button onclick="checkAndLoadWave()"
                     class="w-full bg-blue-600 text-white font-bold py-3 rounded-lg text-lg shadow">ตกลง
                     เข้าทำงาน</button>
+                <button onclick="loadTestWave56245()"
+                    class="w-full mt-2 bg-emerald-600 text-white font-bold py-3 rounded-lg text-base shadow">🧪 โหลด Wave 56245 (ข้อมูลจริง · ทดสอบออฟไลน์)</button>
+                <button onclick="logout()"
+                    class="w-full mt-1 text-slate-500 hover:text-slate-700 font-bold py-2 text-sm">↩ ออกจากระบบ (เปลี่ยนพนักงาน)</button>
             </div>
             <div class="mt-5 flex-1 min-h-0 flex flex-col border-t pt-4">
                 <div class="flex justify-between items-center mb-2 shrink-0">
@@ -701,7 +764,7 @@
     </div>
 
     <div id="branchSelectorModal" class="hidden flex-col bg-gray-100" style="position:fixed;top:0;left:0;right:0;bottom:0;height:100dvh;overflow:hidden;">
-        <header class="bg-blue-900 text-white p-3 flex justify-between items-center shadow-md shrink-0">
+        <header class="bg-gradient-to-r from-blue-900 to-indigo-800 text-white p-3 flex justify-between items-center shadow-md shrink-0">
             <div><span class="text-xs text-blue-300 block">WAVE / BOOKING NO.</span>
                 <h1 id="branchWaveDisplay" class="text-xl font-bold text-yellow-300"></h1>
             </div>
@@ -714,6 +777,10 @@
                         </path>
                     </svg>
                     📄 ดูเอกสาร
+                </button>
+                <button onclick="logout()" title="ออกจากระบบ"
+                    class="bg-slate-700 hover:bg-slate-800 text-sm px-3 py-2 rounded font-bold shadow flex items-center gap-1">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg> ออกระบบ
                 </button>
                 <button onclick="exitWave()"
                     class="bg-red-600 text-sm px-4 py-2 rounded font-bold shadow flex items-center gap-1">
@@ -745,12 +812,12 @@
                 </svg>
             </div>
 
-            <div id="branchButtonGrid" class="grid grid-cols-1 gap-3 pb-6"></div>
+            <div id="branchButtonGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 pb-6"></div>
         </div>
     </div>
 
     <div id="mainApp" class="hidden flex-col" style="position:fixed;top:0;left:0;right:0;bottom:0;height:100dvh;overflow:hidden;">
-        <header class="bg-blue-900 text-white shadow-md shrink-0">
+        <header class="bg-gradient-to-r from-blue-900 to-indigo-800 text-white shadow-md shrink-0">
             <div class="p-2 md:p-3 flex justify-between items-center border-b border-blue-700">
                 <div class="flex-1 min-w-0 pr-2">
                     <span class="text-[10px] md:text-xs text-blue-300 block">กำลังทำสาขา:</span>
@@ -773,7 +840,7 @@
                         </svg>
                         📄 ดูเอกสาร
                     </button>
-                    <button onclick="backToBranchSelect()"
+                    <button onclick="confirmBackToBranchSelect()"
                         class="bg-blue-600 border border-blue-400 text-xs md:text-sm px-3 py-2 rounded font-bold shadow whitespace-nowrap flex items-center gap-1">
                         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -811,7 +878,7 @@
         <main class="flex-1 flex flex-col relative bg-gray-100" style="min-height:0;overflow:hidden;">
 
             <section id="modeScan" class="flex flex-col min-h-0" style="height:100%;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain;">
-                <div class="bg-white p-3 md:p-4 shrink-0 shadow-sm z-20">
+                <div class="bg-white p-3 md:p-4 shrink-0 shadow-sm z-20" onclick="if(!event.target.closest('button')){var _i=document.getElementById('lpnInput'); if(_i) _i.focus();}">
                     <label class="block text-gray-800 font-black mb-1.5 text-sm md:text-base">สแกนบาร์โค้ด LPN
                         กล่อง</label>
                     <div class="flex gap-2">
@@ -835,15 +902,21 @@
                     </div>
                 </div>
 
+                <div id="palletBanner" class="mx-3 mt-2"></div>
+                <div class="mx-3 mt-2">
+                    <button onclick="endBranchJob()" class="w-full bg-white text-rose-600 border-2 border-rose-300 hover:bg-rose-50 font-black py-2.5 rounded-xl shadow-sm text-sm flex items-center justify-center gap-2 transition">
+                        🏁 สิ้นสุด/ปิดงานสาขานี้ <span class="text-[11px] font-bold opacity-90">(LPN ที่ยังไม่ยิง = 0)</span>
+                    </button>
+                </div>
                 <div id="dynamicFuntionArea" class="px-3 shrink-0 relative z-10">
                     <div id="colorSelectionArea"
                         class="hidden bg-white p-4 rounded-b-xl shadow-lg border-x-2 border-b-2 border-blue-300 mb-2">
                         <div class="flex items-center justify-between border-b pb-2 mb-3">
                             <div>
-                                <span class="text-sm text-gray-500 font-bold">LPN ล่าสุด</span>
+                                <span id="colorAreaSubLabel" class="text-sm text-gray-500 font-bold">LPN ล่าสุด</span>
                                 <h2 id="displayLpn" class="text-2xl font-black text-gray-800 tracking-wider"></h2>
                             </div>
-                            <button onclick="cancelColorSelection()"
+                            <button id="cancelColorBtn" onclick="cancelColorSelection()"
                                 class="flex items-center gap-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold px-3 py-2 rounded-lg border border-gray-300 text-sm shadow-sm transition">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -852,27 +925,16 @@
                             </button>
                         </div>
                         <div id="scanColorGrid" class="grid grid-cols-2 gap-2">
-                            <button data-scan-color="Black" onclick="selectScanColor('Black')"
-                                class="scan-color-btn bg-gray-800 text-white py-3 rounded font-bold shadow text-lg transition duration-150">[1] ดำ</button>
-                            <button data-scan-color="Blue" onclick="selectScanColor('Blue')"
-                                class="scan-color-btn bg-blue-600 text-white py-3 rounded font-bold shadow text-lg transition duration-150">[2]
-                                น้ำเงิน</button>
-                            <button data-scan-color="Yellow" onclick="selectScanColor('Yellow')"
-                                class="scan-color-btn bg-yellow-400 text-gray-900 py-3 rounded font-bold shadow text-lg transition duration-150">[3]
-                                เหลือง</button>
-                            <button data-scan-color="Green" onclick="selectScanColor('Green')"
-                                class="scan-color-btn bg-green-600 text-white py-3 rounded font-bold shadow text-lg transition duration-150">[4] เขียว</button>
                             <button data-scan-color="Red" onclick="selectScanColor('Red')"
-                                class="scan-color-btn bg-red-600 text-white py-3 rounded font-bold col-span-2 shadow text-lg transition duration-150">[5]
-                                แดง</button>
+                                class="scan-color-btn bg-red-600 text-white py-4 rounded font-black shadow text-lg transition duration-150">[1] แดง</button>
+                            <button data-scan-color="Blue" onclick="selectScanColor('Blue')"
+                                class="scan-color-btn bg-blue-600 text-white py-4 rounded font-black shadow text-lg transition duration-150">[2] น้ำเงิน</button>
+                            <button data-scan-color="Green" onclick="selectScanColor('Green')"
+                                class="scan-color-btn bg-green-600 text-white py-4 rounded font-black shadow text-lg transition duration-150">[3] เขียว</button>
+                            <button data-scan-color="Black" onclick="selectScanColor('Black')"
+                                class="scan-color-btn bg-gray-800 text-white py-4 rounded font-black shadow text-lg transition duration-150">[4] ดำ</button>
                             <button data-scan-color="Reuse" onclick="selectScanColor('Reuse', 'Carton')"
-                                class="scan-color-btn bg-orange-100 hover:bg-orange-200 text-orange-900 py-3 rounded font-bold col-span-2 border border-orange-300 shadow text-lg flex items-center justify-center gap-2 transition duration-150">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
-                                </svg>
-                                [6] กล่องกระดาษ (Reuse)
-                            </button>
+                                class="scan-color-btn bg-orange-100 hover:bg-orange-200 text-orange-900 py-4 rounded font-black col-span-2 border border-orange-300 shadow text-lg transition duration-150">[5] กระดาษ</button>
                         </div>
                         <div id="colorQtyArea"
                             class="hidden mt-3 bg-blue-50 border border-blue-200 rounded-lg p-3 text-center shadow-inner">
@@ -973,7 +1035,7 @@
                     </div>
                 </div>
 
-                <div id="mainScrollingArea" class="px-3 pt-2 space-y-3">
+                <div id="mainScrollingArea" class="px-3 md:px-5 pt-2 space-y-3">
                     <div class="bg-white rounded-xl shadow-sm border border-gray-300 p-3">
                         <div class="flex items-center justify-between border-b pb-2 mb-2">
                             <h3 class="font-black text-blue-900 text-base flex items-center gap-1">
@@ -988,7 +1050,7 @@
                                     class="text-sm text-gray-500 font-bold">รายการ</span></div>
                         </div>
                         <div id="typeStatsDisplay"
-                            class="text-xs font-bold text-gray-600 flex justify-between bg-gray-50 p-2 rounded">
+                            class="text-xs font-bold text-gray-600 flex flex-wrap gap-2 justify-center bg-gray-50 p-2 rounded">
                             <span class="flex items-center gap-1"><span
                                     class="inline-block w-2.5 h-2.5 rounded-full bg-red-600"></span> PR: 0</span>
                             <span class="flex items-center gap-1"><span
@@ -998,8 +1060,27 @@
                         </div>
                     </div>
 
+                    <div id="reopenBanner" class="hidden"></div>
+
+                    <div id="branchProgress" class="bg-white rounded-xl shadow-sm border border-slate-200 p-3">
+                        <div class="flex items-center justify-between mb-1.5">
+                            <span class="text-sm font-black text-slate-700">ความคืบหน้าสาขานี้</span>
+                            <span class="text-sm font-black text-blue-700" id="branchProgressText">0/0 (0%)</span>
+                        </div>
+                        <div class="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
+                            <div id="branchProgressFill" class="bg-blue-600 h-3 rounded-full transition-all duration-500" style="width:0%"></div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-2">
+                        <input id="lpnSearchInput" oninput="filterLpnList()" placeholder="🔍 ค้นหา LPN ในรายการ..." class="w-full text-sm p-2.5 border-2 border-slate-300 rounded-lg uppercase focus:border-blue-500 outline-none font-bold">
+                    </div>
+
+                    <div id="palletGroupsContainer"></div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 items-start">
                     <div class="bg-white rounded-xl shadow-sm border-2 border-red-200 overflow-hidden flex flex-col">
-                        <div class="bg-red-100 p-3 flex justify-between items-center">
+                        <div class="bg-gradient-to-r from-red-100 to-rose-50 p-3 flex justify-between items-center">
                             <h3 class="font-black text-red-800 text-base flex items-center gap-1">
                                 <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -1017,11 +1098,11 @@
                                 บังคับปิดงาน (มีค้างสแกน)
                             </button>
                         </div>
-                        <div id="unscannedListContainer" class="p-2 space-y-2 bg-red-50/30"></div>
+                        <div id="unscannedListContainer" class="p-2 grid grid-cols-1 2xl:grid-cols-2 gap-2 bg-red-50/30"></div>
                     </div>
 
                     <div class="bg-white rounded-xl shadow-sm border-2 border-green-200 overflow-hidden flex flex-col">
-                        <div class="bg-green-100 p-3 flex justify-between items-center">
+                        <div class="bg-gradient-to-r from-green-100 to-emerald-50 p-3 flex justify-between items-center">
                             <h3 class="font-black text-green-800 text-base flex items-center gap-1">
                                 <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor"
                                     viewBox="0 0 24 24">
@@ -1031,7 +1112,8 @@
                                 ตรวจสอบแล้ว (<span id="scannedCountHeader">0</span>)
                             </h3>
                         </div>
-                        <div id="scannedListContainer" class="p-2 space-y-2 bg-green-50/30"></div>
+                        <div id="scannedListContainer" class="p-2 grid grid-cols-1 2xl:grid-cols-2 gap-2 bg-green-50/30"></div>
+                    </div>
                     </div>
                 </div>
 
@@ -1069,7 +1151,8 @@
             </section>
 
             <section id="modeCombine" class="hidden flex flex-col h-full min-h-0 overflow-y-auto p-3 gap-2">
-                <div class="bg-white p-4 rounded-xl shadow-sm border border-purple-200 shrink-0">
+                <!-- ✅ ซ่อนช่องกรอกจำนวนพาเลทเอง (นับพาเลทอัตโนมัติจากโฟลว์ pallet-first แล้ว) — คงองค์ประกอบไว้ใน DOM เพื่อไม่ให้ JS พัง -->
+                <div class="hidden bg-white p-4 rounded-xl shadow-sm border border-purple-200 shrink-0">
                     <label for="branchPalletCountInput" class="block text-purple-900 font-bold mb-2 text-sm">
                         จำนวนพาเลททั้งหมดของสาขานี้
                     </label>
@@ -1087,8 +1170,11 @@
                         </button>
                     </div>
                 </div>
+                <div class="bg-purple-50 border border-purple-200 rounded-xl p-3 shrink-0 text-center text-sm font-bold text-purple-800">
+                    🔗 Combine: สแกน LPN หลัก → LPN รอง ที่จะรวม → กดยืนยัน (รวมเข้าพาเลทสีที่กำลังทำ)
+                </div>
                 <div class="bg-white p-4 rounded-xl shadow-sm border-2 border-purple-300 shrink-0">
-                    <label class="block text-purple-900 font-bold mb-2 text-sm">1. สแกนพาเลทหลัก (Pallet/Tote)</label>
+                    <label class="block text-purple-900 font-bold mb-2 text-sm">1. สแกน LPN หลัก (Pallet/Tote)</label>
                     <div class="flex gap-2">
                         <input type="text" id="masterInput" autocomplete="off"
                             class="w-full text-2xl p-3 border-2 border-purple-300 rounded-lg uppercase bg-purple-50 focus:bg-white focus:border-purple-500 font-bold"
@@ -1110,11 +1196,11 @@
                     </div>
                 </div>
                 <div class="flex-1 bg-white rounded-xl shadow-sm border border-gray-200 p-4 flex flex-col">
-                    <label class="block text-gray-700 font-bold mb-2 text-sm shrink-0">2. สแกนกล่องสินค้า (Box)</label>
+                    <label class="block text-gray-700 font-bold mb-2 text-sm shrink-0">2. สแกน LPN รอง (Box) ที่จะรวมเข้า LPN หลัก</label>
                     <div class="flex gap-2 mb-2 shrink-0">
                         <input type="text" id="childInput" autocomplete="off" disabled
                             class="w-full text-xl p-3 border-2 border-gray-300 rounded-lg uppercase bg-gray-100 font-bold"
-                            placeholder="สแกนกล่องสินค้า...">
+                            placeholder="สแกน LPN รอง...">
                         <button id="childScanBtn" disabled onclick="openScanner('childInput')"
                             class="bg-gray-400 text-white w-14 rounded-lg shadow transition flex items-center justify-center flex-shrink-0">
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
@@ -1132,35 +1218,21 @@
                     </div>
 
                     <ul id="childList"
-                        class="border-2 rounded-lg flex-1 overflow-y-auto p-2 bg-gray-50 flex flex-col gap-2 mb-3 shadow-inner">
-                    </ul>
+                        class="border-2 rounded-lg flex-1 overflow-y-auto p-2 bg-gray-50 flex flex-col gap-2 mb-3 shadow-inner"></ul>
 
-                    <label class="block text-gray-700 font-bold text-sm mb-2 shrink-0">3. ระบุสีพาเลท
+                    <label class="block text-gray-700 font-bold text-sm mb-2 shrink-0">3. ระบุสี Tote (ตะกร้า)
                         (บังคับเลือก)</label>
-                    <div class="grid grid-cols-3 gap-2 shrink-0" id="combineColorGrid">
-                        <button id="cmb-btn-1" onclick="selectCombineColor('Black', this)"
-                            class="color-btn bg-gray-800 text-white py-2.5 rounded font-bold shadow text-sm">[1]
-                            ดำ</button>
+                    <div class="grid grid-cols-2 gap-2 shrink-0" id="combineColorGrid">
+                        <button id="cmb-btn-1" onclick="selectCombineColor('Red', this)"
+                            class="color-btn bg-red-600 text-white py-3 rounded font-black shadow text-sm">[1] แดง</button>
                         <button id="cmb-btn-2" onclick="selectCombineColor('Blue', this)"
-                            class="color-btn bg-blue-600 text-white py-2.5 rounded font-bold shadow text-sm">[2]
-                            น้ำเงิน</button>
-                        <button id="cmb-btn-3" onclick="selectCombineColor('Yellow', this)"
-                            class="color-btn bg-yellow-400 text-gray-900 py-2.5 rounded font-bold shadow text-sm">[3]
-                            เหลือง</button>
-                        <button id="cmb-btn-4" onclick="selectCombineColor('Green', this)"
-                            class="color-btn bg-green-600 text-white py-2.5 rounded font-bold shadow text-sm">[4]
-                            เขียว</button>
-                        <button id="cmb-btn-5" onclick="selectCombineColor('Red', this)"
-                            class="color-btn bg-red-600 text-white py-2.5 rounded font-bold shadow text-sm">[5]
-                            แดง</button>
-                        <button id="cmb-btn-6" onclick="selectCombineColor('Reuse', this)"
-                            class="color-btn bg-orange-100 text-orange-900 py-2.5 rounded border border-orange-300 font-bold shadow text-sm flex items-center justify-center gap-1">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
-                            </svg>
-                            [6] กล่อง
-                        </button>
+                            class="color-btn bg-blue-600 text-white py-3 rounded font-black shadow text-sm">[2] น้ำเงิน</button>
+                        <button id="cmb-btn-3" onclick="selectCombineColor('Green', this)"
+                            class="color-btn bg-green-600 text-white py-3 rounded font-black shadow text-sm">[3] เขียว</button>
+                        <button id="cmb-btn-4" onclick="selectCombineColor('Black', this)"
+                            class="color-btn bg-gray-800 text-white py-3 rounded font-black shadow text-sm">[4] ดำ</button>
+                        <button id="cmb-btn-5" onclick="selectCombineColor('Reuse', this)"
+                            class="color-btn bg-orange-100 text-orange-900 py-3 rounded border border-orange-300 font-black shadow text-sm col-span-2">[5] กระดาษ</button>
                     </div>
                     <input type="hidden" id="selectedCombineColor" value="">
 
@@ -1534,7 +1606,7 @@
         // ==================== 🚀 ระบบคิวส่งออกแบบ FAST SEQUENTIAL (มีระบบควบคุมไฟจราจร) ====================
         let syncQueue = JSON.parse(localStorage.getItem('proScannerQueue')) || [];
         let isSyncing = false;
-        function pushToQueue(payload) { syncQueue.push(payload); localStorage.setItem('proScannerQueue', JSON.stringify(syncQueue)); updateSyncStatusUI(); processQueue(); }
+        function pushToQueue(payload) { if (typeof noSaveMode !== 'undefined' && noSaveMode) { return; } syncQueue.push(payload); localStorage.setItem('proScannerQueue', JSON.stringify(syncQueue)); updateSyncStatusUI(); processQueue(); }
 
         async function processQueue() {
             if (isSyncing || syncQueue.length === 0) return;
@@ -1575,6 +1647,7 @@
 
         function updateSyncStatusUI() {
             const statusEl = document.getElementById('syncStatus');
+            if (!navigator.onLine) { statusEl.innerHTML = `<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636L5.636 18.364M5.636 5.636l12.728 12.728"></path></svg> ⚠ ออฟไลน์ (เน็ตหลุด)`; statusEl.className = "text-[10px] text-red-300 font-black flex items-center gap-1 animate-pulse"; return; }
             if (syncQueue.length > 0) {
                 statusEl.innerHTML = `<svg class="w-3 h-3 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg> กำลังส่ง (${syncQueue.length})...`;
                 statusEl.className = "text-[10px] text-yellow-300 font-bold animate-pulse flex items-center gap-1";
@@ -1583,6 +1656,8 @@
                 statusEl.className = "text-[10px] text-green-300 font-bold flex items-center gap-1";
             }
         }
+        window.addEventListener('online', updateSyncStatusUI);
+        window.addEventListener('offline', updateSyncStatusUI);
 
         // ==================== SHIPPING CONTROL DOCUMENT ====================
         function escapeDocumentText(value) {
@@ -1923,7 +1998,7 @@
                         && (normalizedType === 'CARTON' || normalizedColor === 'REUSE');
 
                     if (isPaperTote) {
-                        paperBoxCount += qty;
+                        mCount += qty; // ✅ รวมกล่องกระดาษเข้ากล่อง M (ตามที่ขอ ไม่มีคอลัมน์กระดาษแยกแล้ว)
                     } else if (normalizedPrefix === 'PP' || normalizedPrefix === 'SP' || normalizedType === 'CARTON' || normalizedColor === 'REUSE') {
                         // ✅ PR ถูกเอาออกจากช่อง M แล้ว → ให้ไปนับตามสี Tote ที่หน้างานเลือก (เหมือน PT/PN)
                         //    (PR ที่เลือกสีรียูส ยังลง M ตามเงื่อนไข color REUSE ด้านบน เพราะไม่มีช่องรียูสแยก)
@@ -1996,7 +2071,6 @@
                         <td class="print-cell print-number">${blueCount || ''}</td>
                         <td class="print-cell print-number">${greenCount || ''}</td>
                         <td class="print-cell print-number">${blackCount || ''}</td>
-                        <td class="print-cell print-number">${paperBoxCount || ''}</td>
                         <td class="print-cell print-number">${branchTotalBoxes || ''}</td>
                         <td class="print-cell print-number">${escapeDocumentText(branchPalletDisplay)}</td>
                     </tr>
@@ -2014,7 +2088,6 @@
                         <td class="p-3 border-r border-slate-200 text-blue-600 font-bold font-sans">${blueCount || ''}</td>
                         <td class="p-3 border-r border-slate-200 text-green-600 font-bold font-sans">${greenCount || ''}</td>
                         <td class="p-3 border-r border-slate-200 text-slate-800 font-bold font-sans">${blackCount || ''}</td>
-                        <td class="p-3 border-r border-slate-200 text-orange-700 font-bold font-sans">${paperBoxCount || ''}</td>
                         <td class="p-3 border-r border-slate-200 bg-slate-50/50 font-black text-slate-900 font-sans">${branchTotalBoxes}</td>
                         <td class="p-3 font-black bg-slate-50/50 text-indigo-900 font-sans">
                             <input type="number"
@@ -2051,7 +2124,6 @@
                             <td class="p-3 border-r border-slate-200 text-blue-600 font-bold font-sans"></td>
                             <td class="p-3 border-r border-slate-200 text-green-600 font-bold font-sans"></td>
                             <td class="p-3 border-r border-slate-200 text-slate-800 font-bold font-sans"></td>
-                            <td class="p-3 border-r border-slate-200 text-orange-700 font-bold font-sans"></td>
                             <td class="p-3 border-r border-slate-200 bg-slate-50/50 font-black text-slate-900 font-sans"></td>
                             <td class="p-3 font-black bg-slate-50/50 text-indigo-900 font-sans"></td>
                         </tr>
@@ -2069,7 +2141,6 @@
                     <td class="p-3 border-r border-slate-200 text-blue-700 font-sans">${totalBlue}</td>
                     <td class="p-3 border-r border-slate-200 text-green-700 font-sans">${totalGreen}</td>
                     <td class="p-3 border-r border-slate-200 text-slate-900 font-sans">${totalBlack}</td>
-                    <td class="p-3 border-r border-slate-200 text-orange-800 font-sans">${totalPaperBoxes}</td>
                     <td class="p-3 border-r border-slate-200 bg-slate-200 text-slate-950 font-sans">${totalAllBoxes}</td>
                     <td class="p-3 bg-slate-200 text-indigo-950 font-sans">${escapeDocumentText(totalPalletDisplay)}</td>
                 </tr>
@@ -2083,7 +2154,6 @@
                     <td class="print-cell print-number">${totalBlue}</td>
                     <td class="print-cell print-number">${totalGreen}</td>
                     <td class="print-cell print-number">${totalBlack}</td>
-                    <td class="print-cell print-number">${totalPaperBoxes}</td>
                     <td class="print-cell print-number">${totalAllBoxes}</td>
                     <td class="print-cell print-number">${escapeDocumentText(totalPalletDisplay)}</td>
                 </tr>
@@ -2153,7 +2223,6 @@
                                     <th>TOTE น้ำเงิน</th>
                                     <th>TOTE เขียว</th>
                                     <th>TOTE ดำ</th>
-                                    <th>กล่องกระดาษ</th>
                                     <th>รวม</th>
                                     <th>pallet</th>
                                 </tr>
@@ -2303,7 +2372,6 @@
                                     <th class="p-3 border-r border-slate-700 w-24 text-center font-sans text-blue-300">TOTE น้ำเงิน</th>
                                     <th class="p-3 border-r border-slate-700 w-24 text-center font-sans text-green-300">TOTE เขียว</th>
                                     <th class="p-3 border-r border-slate-700 w-24 text-center font-sans text-slate-300">TOTE ดำ</th>
-                                    <th class="p-3 border-r border-slate-700 w-28 text-center font-sans text-orange-300">กล่องกระดาษ</th>
                                     <th class="p-3 border-r border-slate-700 w-24 text-center bg-slate-700 font-sans">รวมกล่อง</th>
                                     <th class="p-3 w-20 text-center bg-slate-700 text-indigo-200 font-sans">พาเลท</th>
                                 </tr>
@@ -2454,6 +2522,16 @@
                 else { e.preventDefault(); }
                 return;
             }
+            // ✅ ระหว่างเลือกสีพาเลท: กด 1/2/3 เลือกสี, ปุ่มอื่น (รวม Esc) บล็อก — บังคับเลือก
+            const _pcm = document.getElementById('palletColorModal');
+            if (_pcm && !_pcm.classList.contains('hidden')) {
+                if (e.key === '1') pickPalletColor('Green');
+                else if (e.key === '2') pickPalletColor('Blue');
+                else if (e.key === '3') pickPalletColor('Red');
+                else if (e.key === 'Escape' || e.key === 'Esc') palletModalBack();
+                else if (e.key === 'Enter') { if (palletAllDone) palletModalFinish(); }
+                e.preventDefault(); return;
+            }
             if (e.key === 'Escape' || e.key === 'Esc') {
                 e.preventDefault();
                 if (isAlertOpen) closeAlert();
@@ -2492,12 +2570,11 @@
                 // โหมด 1: ตรวจสอบกล่อง (Single Scan) + แถบเลือกสีกำลังแสดง
                 if (!document.getElementById('colorSelectionArea').classList.contains('hidden')) {
                     e.preventDefault();
-                    if (e.key === '1') selectScanColor('Black');
+                    if (e.key === '1') selectScanColor('Red');
                     else if (e.key === '2') selectScanColor('Blue');
-                    else if (e.key === '3') selectScanColor('Yellow');
-                    else if (e.key === '4') selectScanColor('Green');
-                    else if (e.key === '5') selectScanColor('Red');
-                    else if (e.key === '6') selectScanColor('Reuse', 'Carton');
+                    else if (e.key === '3') selectScanColor('Green');
+                    else if (e.key === '4') selectScanColor('Black');
+                    else if (e.key === '5') selectScanColor('Reuse', 'Carton');
                 }
                 // โหมด 2: รวมพาเลท (Combine Scan)
                 else if (!document.getElementById('modeCombine').classList.contains('hidden')) {
@@ -2694,6 +2771,10 @@
 
         function selectWaveFromTable(waveNo) { document.getElementById('waveInput').value = waveNo; checkAndLoadWave(); }
 
+        // 🧪 ข้อมูลจริง Wave 56245 (ฝังไว้ทดสอบออฟไลน์ ไม่ต้องต่อเซิร์ฟเวอร์)
+        const TEST_WAVE_56245 = JSON.parse('{"wave_no":"0000056245","booking_no":"B001-260755609","license_plate":"","lpn_list":[{"lpn":"PN0004134696","zone":"MART08","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Pending","total_qty":1,"qty":0,"scan_type":null,"owner":"DM02","color":"None","color_breakdown":"","wave_no":"0000056245"},{"lpn":"PN0004134697","zone":"MART08","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":1,"qty":1,"scan_type":"COMBINE: PN0004134696","owner":"DM02","color":"Blue","color_breakdown":"Blue~1~COMBINE: PN0004134696","wave_no":"0000056245"},{"lpn":"PN0004134706","zone":"EA","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":1,"qty":1,"scan_type":"TOTE","owner":"DM02","color":"Black","color_breakdown":"Black~1~TOTE","wave_no":"0000056245"},{"lpn":"PN0004134712","zone":"FA","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":1,"qty":1,"scan_type":"TOTE","owner":"DM02","color":"Blue","color_breakdown":"Blue~1~TOTE","wave_no":"0000056245"},{"lpn":"PN0004134713","zone":"FA","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":1,"qty":1,"scan_type":"Carton","owner":"DM02","color":"Reuse","color_breakdown":"Reuse~1~Carton","wave_no":"0000056245"},{"lpn":"PP0004134685","zone":"BL","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":11,"qty":13,"scan_type":"Carton","owner":"DM02","color":"None","color_breakdown":"None~13~Carton","wave_no":"0000056245"},{"lpn":"PP0004134708","zone":"FA","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":1,"qty":1,"scan_type":"Carton","owner":"DM02","color":"None","color_breakdown":"None~1~Carton","wave_no":"0000056245"},{"lpn":"PP0004134715","zone":"DF","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":2,"qty":2,"scan_type":"Carton","owner":"DM02","color":"None","color_breakdown":"None~2~Carton","wave_no":"0000056245"},{"lpn":"PR0004134714","zone":"YA","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":1,"qty":1,"scan_type":"TOTE","owner":"DM02","color":"Red","color_breakdown":"Red~1~TOTE","wave_no":"0000056245"},{"lpn":"PT0004134680","zone":"BB","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":1,"qty":1,"scan_type":"COMBINE: PT0004134679","owner":"DM02","color":"Reuse","color_breakdown":"Reuse~1~COMBINE: PT0004134679","wave_no":"0000056245"},{"lpn":"PT0004134683","zone":"CA","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":1,"qty":1,"scan_type":"COMBINE: PT0004134684","owner":"DM02","color":"Reuse","color_breakdown":"Reuse~1~COMBINE: PT0004134684","wave_no":"0000056245"},{"lpn":"PT0004134687","zone":"DA","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":1,"qty":1,"scan_type":"TOTE","owner":"DM02","color":"Blue","color_breakdown":"Blue~1~TOTE","wave_no":"0000056245"},{"lpn":"PT0004134688","zone":"DB","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":1,"qty":1,"scan_type":"TOTE","owner":"DM02","color":"Blue","color_breakdown":"Blue~1~TOTE","wave_no":"0000056245"},{"lpn":"PT0004134689","zone":"DB","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":1,"qty":1,"scan_type":"Carton","owner":"DM02","color":"Reuse","color_breakdown":"Reuse~1~Carton","wave_no":"0000056245"},{"lpn":"PT0004134690","zone":"DB","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":1,"qty":1,"scan_type":"Carton","owner":"DM02","color":"Reuse","color_breakdown":"Reuse~1~Carton","wave_no":"0000056245"},{"lpn":"PT0004134691","zone":"DB","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":1,"qty":1,"scan_type":"Carton","owner":"DM02","color":"Reuse","color_breakdown":"Reuse~1~Carton","wave_no":"0000056245"},{"lpn":"PT0004134692","zone":"DC","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":1,"qty":1,"scan_type":"Carton","owner":"DM02","color":"Reuse","color_breakdown":"Reuse~1~Carton","wave_no":"0000056245"},{"lpn":"PT0004134693","zone":"DC","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":1,"qty":1,"scan_type":"Carton","owner":"DM02","color":"Reuse","color_breakdown":"Reuse~1~Carton","wave_no":"0000056245"},{"lpn":"PT0004134694","zone":"DC","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Pending","total_qty":1,"qty":0,"scan_type":null,"owner":"DM02","color":"None","color_breakdown":"","wave_no":"0000056245"},{"lpn":"PT0004134695","zone":"CC","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":1,"qty":1,"scan_type":"COMBINE: PT0004134694","owner":"DM02","color":"Blue","color_breakdown":"Blue~1~COMBINE: PT0004134694","wave_no":"0000056245"},{"lpn":"PT0004134698","zone":"MART09","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Pending","total_qty":1,"qty":0,"scan_type":null,"owner":"DM02","color":"None","color_breakdown":"","wave_no":"0000056245"},{"lpn":"PT0004134702","zone":"EA","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":1,"qty":1,"scan_type":"TOTE","owner":"DM02","color":"Blue","color_breakdown":"Blue~1~TOTE","wave_no":"0000056245"},{"lpn":"PT0004134704","zone":"EA","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":1,"qty":1,"scan_type":"Carton","owner":"DM02","color":"Reuse","color_breakdown":"Reuse~1~Carton","wave_no":"0000056245"},{"lpn":"PT0004134705","zone":"EA","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":1,"qty":1,"scan_type":"Carton","owner":"DM02","color":"Reuse","color_breakdown":"Reuse~1~Carton","wave_no":"0000056245"},{"lpn":"PT0004134711","zone":"FA","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":1,"qty":1,"scan_type":"COMBINE: PT0004134709","owner":"DM02","color":"Reuse","color_breakdown":"Reuse~1~COMBINE: PT0004134709","wave_no":"0000056245"},{"lpn":"PN0004134678","zone":"AC","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":1,"qty":1,"scan_type":"Carton","owner":"DM02","color":"Reuse","color_breakdown":"Reuse~1~Carton","wave_no":"0000056245"},{"lpn":"PN0004134707","zone":"EA","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":1,"qty":1,"scan_type":"Carton","owner":"DM02","color":"Reuse","color_breakdown":"Reuse~1~Carton","wave_no":"0000056245"},{"lpn":"PP0004134681","zone":"AM","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Pending","total_qty":38,"qty":0,"scan_type":null,"owner":"DM02","color":"None","color_breakdown":"","wave_no":"0000056245"},{"lpn":"PP0004134682","zone":"AN","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":11,"qty":11,"scan_type":"Carton","owner":"DM02","color":"None","color_breakdown":"None~11~Carton","wave_no":"0000056245"},{"lpn":"PP0004134686","zone":"BN","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":5,"qty":5,"scan_type":"Carton","owner":"DM02","color":"None","color_breakdown":"None~5~Carton","wave_no":"0000056245"},{"lpn":"PT0004134679","zone":"BB","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Pending","total_qty":1,"qty":0,"scan_type":null,"owner":"DM02","color":"None","color_breakdown":"","wave_no":"0000056245"},{"lpn":"PT0004134684","zone":"CA","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Pending","total_qty":1,"qty":0,"scan_type":null,"owner":"DM02","color":"None","color_breakdown":"","wave_no":"0000056245"},{"lpn":"PT0004134699","zone":"MART09","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":1,"qty":1,"scan_type":"Carton","owner":"DM02","color":"Reuse","color_breakdown":"Reuse~1~Carton","wave_no":"0000056245"},{"lpn":"PT0004134700","zone":"MART09","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Pending","total_qty":1,"qty":0,"scan_type":null,"owner":"DM02","color":"None","color_breakdown":"","wave_no":"0000056245"},{"lpn":"PT0004134701","zone":"MART09","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":1,"qty":1,"scan_type":"COMBINE: PT0004134700","owner":"DM02","color":"Reuse","color_breakdown":"Reuse~1~COMBINE: PT0004134700","wave_no":"0000056245"},{"lpn":"PT0004134703","zone":"EA","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":1,"qty":1,"scan_type":"Carton","owner":"DM02","color":"Reuse","color_breakdown":"Reuse~1~Carton","wave_no":"0000056245"},{"lpn":"PT0004134709","zone":"FA","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Pending","total_qty":1,"qty":0,"scan_type":null,"owner":"DM02","color":"None","color_breakdown":"","wave_no":"0000056245"},{"lpn":"PT0004134710","zone":"FA","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":1,"qty":1,"scan_type":"COMBINE: PT0004134709","owner":"DM02","color":"Reuse","color_breakdown":"Reuse~1~COMBINE: PT0004134709","wave_no":"0000056245"},{"lpn":"PT0004134716","zone":"DF","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":1,"qty":3,"scan_type":"Carton","owner":"DM02","color":"Reuse","color_breakdown":"Reuse~3~Carton","wave_no":"0000056245"}],"zone_summary":[]}');
+        function loadTestWave56245() { try { applyWaveDataToScreen(TEST_WAVE_56245, true); showToast('โหลด Wave 56245 (ข้อมูลจริง) แล้ว'); } catch (e) { showAlert('ผิดพลาด', String(e)); } }
+
         function applyWaveDataToScreen(data, isWaveOnly) {
             currentBookingNo = data.booking_no ? String(data.booking_no).trim() : '';
             currentLicensePlate = data.license_plate ? String(data.license_plate).trim() : '';
@@ -2707,6 +2788,28 @@
             }
 
             allLpnsInWave = data.lpn_list || [];
+            // ✅ 1 LPN มีหลายสินค้า (หลายแถว) → รวมเป็น 1 รายการต่อ LPN: สแกนครั้งเดียวจบทั้ง LPN, ความคืบหน้าถึง 100% ได้, ไม่นับซ้ำ
+            (function mergeDuplicateLpns() {
+                const map = {}, order = [];
+                (allLpnsInWave || []).forEach(it => {
+                    const lpn = String(it.lpn || '').toUpperCase();
+                    const key = lpn + '|' + String(it.branch || '').toUpperCase();
+                    const prefix = lpn.substring(0, 2);
+                    const rowQty = parseInt(it.total_qty) || 1;
+                    if (!map[key]) {
+                        map[key] = Object.assign({}, it, { total_qty: rowQty, _rowCount: 1 });
+                        order.push(key);
+                    } else {
+                        const m = map[key];
+                        m._rowCount++;
+                        if (prefix === 'PP' || prefix === 'SP') m.total_qty = (parseInt(m.total_qty) || 0) + rowQty;
+                        if (it.status === 'Scanned' && m.status !== 'Scanned') {
+                            m.status = 'Scanned'; m.qty = it.qty; m.color = it.color; m.scan_type = it.scan_type; m.color_breakdown = it.color_breakdown;
+                        }
+                    }
+                });
+                allLpnsInWave = order.map(k => map[k]);
+            })();
             const savedDocumentMeta = getSavedShippingDocumentMeta(isWaveOnly ? currentWave : currentBookingNo);
             if (savedDocumentMeta.booking_no) currentBookingNo = savedDocumentMeta.booking_no;
             if (savedDocumentMeta.license_plate) currentLicensePlate = savedDocumentMeta.license_plate;
@@ -2872,8 +2975,8 @@
                 setTimeout(() => document.getElementById('waveInput').focus(), 100);
             }
 
-            function selectBranch(code, name) { selectedBranchCode = code; selectedBranchName = name; document.getElementById('branchSelectorModal').classList.add('hidden'); document.getElementById('mainApp').classList.remove('hidden'); document.getElementById('mainApp').classList.add('flex'); document.getElementById('currentBranchDisplay').innerText = code; document.getElementById('currentBranchNameDisplay').innerText = name; syncBranchPalletCountInput(); updateDashboardUI(); switchTab('scan'); }
-            function backToBranchSelect() { selectedBranchCode = ""; syncBranchPalletCountInput(); document.getElementById('mainApp').classList.add('hidden'); renderBranchGrid(); document.getElementById('branchSelectorModal').classList.remove('hidden'); document.getElementById('branchSelectorModal').classList.add('flex'); }
+            function selectBranch(code, name) { selectedBranchCode = code; selectedBranchName = name; document.getElementById('branchSelectorModal').classList.add('hidden'); document.getElementById('mainApp').classList.remove('hidden'); document.getElementById('mainApp').classList.add('flex'); document.getElementById('currentBranchDisplay').innerText = code; document.getElementById('currentBranchNameDisplay').innerText = name; syncBranchPalletCountInput(); updateDashboardUI(); switchTab('scan'); resumeOrStartPallet(); requestWakeLock(); }
+            function backToBranchSelect() { selectedBranchCode = ""; syncBranchPalletCountInput(); document.getElementById('mainApp').classList.add('hidden'); renderBranchGrid(); document.getElementById('branchSelectorModal').classList.remove('hidden'); document.getElementById('branchSelectorModal').classList.add('flex'); activePalletNo = 0; activePalletColor = null; palletColorMode = false; }
 
             // ==================== REFACTOR UI ====================
             // Cache DOM elements ที่ใช้บ่อยใน updateDashboardUI
@@ -2964,7 +3067,7 @@
                 _elUnscannedCount.textContent = unscannedCount;
                 _elScannedCount.textContent = scannedCount;
                 _elTotalCount.textContent = branchItems.length;
-                _elTypeStats.innerHTML = `<span class="flex items-center gap-1"><span class="inline-block w-2.5 h-2.5 rounded-full bg-red-600"></span> PR: ${cntPR}</span><span class="flex items-center gap-1"><span class="inline-block w-2.5 h-2.5 rounded-full bg-blue-600"></span> PT/PN: ${cntPTPN}</span><span class="flex items-center gap-1"><span class="inline-block w-2.5 h-2.5 rounded-sm bg-orange-500"></span> PP/SP: ${cntDirectQty}</span>`;
+                _elTypeStats.innerHTML = `<span class="inline-flex items-center gap-1.5 bg-red-50 text-red-700 border border-red-200 px-2.5 py-1 rounded-full"><span class="w-2 h-2 rounded-full bg-red-500"></span> PR ${cntPR}</span><span class="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-1 rounded-full"><span class="w-2 h-2 rounded-full bg-blue-500"></span> PT/PN ${cntPTPN}</span><span class="inline-flex items-center gap-1.5 bg-orange-50 text-orange-700 border border-orange-200 px-2.5 py-1 rounded-full"><span class="w-2 h-2 rounded-sm bg-orange-500"></span> PP/SP ${cntDirectQty}</span>`;
                 const isFullyScanned = branchItems.every(i => i.status === 'Scanned' || i.status === 'ForceClosed');
                 if (unscannedCount > 0) _elForceBtn.classList.remove('hidden'); else _elForceBtn.classList.add('hidden');
                 if (isFullyScanned && branchItems.length > 0) _elFinishArea.classList.remove('hidden'); else _elFinishArea.classList.add('hidden');
@@ -2979,6 +3082,11 @@
                         _elBranchCompletionTime.classList.add('hidden');
                     }
                 }
+                renderPalletGroups();
+                updatePalletBanner();
+                filterLpnList();
+                renderReopenBanner();
+                renderBranchProgress();
             }
 
             // ==================== 🔄 ฟังก์ชันการแก้ไขงานและการยกเลิก (UNDO) ====================
@@ -3001,7 +3109,7 @@
 
             async function resetSingleBox(lpn) {
                 if (!confirm(`คุณต้องการยกเลิกการตรวจสอบกล่อง ${lpn} และคืนค่ากลับเป็นค้างตรวจสอบใช่หรือไม่?`)) return;
-                const item = allLpnsInWave.find(i => i.lpn === lpn); if (item) { item.status = 'Pending'; item.qty = 0; item.color = 'None'; item.scan_type = ''; item.color_breakdown = []; pushToQueue({ wave_no: item.wave_no || currentWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: lpn, type: 'RESET_BOX', color: 'None', qty: 0, emp_id: loggedInEmpId }); updateDashboardUI(); saveCurrentWaveDataCache(); showToast(`🔄 คืนค่ากล่อง ${lpn} เรียบร้อยแล้ว`); }
+                const item = allLpnsInWave.find(i => i.lpn === lpn); if (item) { item.status = 'Pending'; item.qty = 0; item.color = 'None'; item.scan_type = ''; item.color_breakdown = []; item.palletNo = null; item.palletColor = null; item.pallet_breakdown = []; pushToQueue({ wave_no: item.wave_no || currentWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: lpn, type: 'RESET_BOX', color: 'None', qty: 0, emp_id: loggedInEmpId }); updateDashboardUI(); saveCurrentWaveDataCache(); showToast(`🔄 คืนค่ากล่อง ${lpn} เรียบร้อยแล้ว`); }
             }
 
             function switchTab(mode) { const isScan = mode === 'scan'; document.getElementById('modeScan').classList.toggle('hidden', !isScan); document.getElementById('modeCombine').classList.toggle('hidden', isScan); document.getElementById('tabScan').className = `flex-1 py-3 font-bold flex items-center justify-center gap-2 ${isScan ? 'text-blue-700 border-b-4 border-blue-700' : 'border-b-4 border-transparent text-gray-500'}`; document.getElementById('tabCombine').className = `flex-1 py-3 font-bold flex items-center justify-center gap-2 ${!isScan ? 'text-purple-700 border-b-4 border-purple-700' : 'border-b-4 border-transparent text-gray-500'}`; syncBranchPalletCountInput(); if (selectedBranchCode !== "") { if (isScan) document.getElementById('lpnInput').focus(); else document.getElementById('masterInput').focus(); } }
@@ -3011,7 +3119,7 @@
             lpnInput.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter' && e.target.value.trim() !== "" && !isAlertOpen) {
                     const lpn = e.target.value.trim().toUpperCase(); const found = allLpnsInWave.find(item => item.lpn === lpn);
-                    if (!found) { showAlert('ข้อผิดพลาด', `ไม่มีข้อมูล LPN รหัส\n[${lpn}]\nในรอบ Wave นี้`); lpnInput.value = ''; return; }
+                    if (!found) { flashScreen(false); showAlert('ข้อผิดพลาด', `ไม่มีข้อมูล LPN รหัส\n[${lpn}]\nในรอบ Wave นี้`); lpnInput.value = ''; return; }
                     if (found.branch !== selectedBranchCode) { showAlert('รหัสสาขาไม่ตรงกัน', `บาร์โค้ด ${lpn} เป็นของสาขา [${found.branch}]\nกรุณาตรวจสอบและเลือกสาขาให้ถูกต้อง`); lpnInput.value = ''; return; }
                     if (found.status === 'Scanned') {
                         lpnInput.value = '';
@@ -3019,12 +3127,13 @@
                         if (isMultiPalletLpn(found.lpn) && !found.isMaster && !found.combinedWith) {
                             promptRescanContinuation(found);
                         } else {
+                            flashScreen(false);
                             showAlert('ข้อมูลซ้ำซ้อน', `บาร์โค้ด ${lpn}\nได้รับการสแกนไปแล้ว`, 'border-yellow-500');
                         }
                         return;
                     }
                     resetScanColorButtons();
-                    if (requiresDirectQty(lpn)) { directQtyContinuationLpn = null; document.getElementById('displayLpnQty').innerText = lpn; document.getElementById('qtyScanTitle').innerText = `สแกนกล่อง ${lpn.substring(0, 2)}`; document.getElementById('guideQty').innerText = found.Total_Qty || found.total_qty || 1; qtyInput.value = ''; qtySection.classList.remove('hidden'); colorSection.classList.add('hidden'); colorQtyArea.classList.add('hidden'); lpnInput.blur(); setTimeout(() => { qtyInput.focus(); }, 10); } else { document.getElementById('displayLpn').innerText = lpn; document.getElementById('selectedScanColor').value = ''; document.getElementById('selectedScanType').value = 'TOTE'; document.getElementById('selectedScanColorLabel').innerText = '-'; colorQtyInput.value = ''; colorQtyArea.classList.add('hidden'); colorSection.classList.remove('hidden'); qtySection.classList.add('hidden'); lpnInput.blur(); } lpnInput.value = '';
+                    if (requiresDirectQty(lpn)) { directQtyContinuationLpn = null; document.getElementById('displayLpnQty').innerText = lpn; document.getElementById('qtyScanTitle').innerText = `สแกนกล่อง ${lpn.substring(0, 2)}`; document.getElementById('guideQty').innerText = found.Total_Qty || found.total_qty || 1; qtyInput.value = ''; qtySection.classList.remove('hidden'); colorSection.classList.add('hidden'); colorQtyArea.classList.add('hidden'); lpnInput.blur(); setTimeout(() => { qtyInput.focus(); }, 10); } else { if (!activePalletColor) { showToast('เลือกสีพาเลทก่อน', true); startPalletColorPrompt(); lpnInput.value = ''; return; } const _cb2 = document.getElementById('cancelColorBtn'); if (_cb2) _cb2.classList.remove('hidden'); var _sl = document.getElementById('colorAreaSubLabel'); if (_sl) _sl.innerText = 'เลือกสี Tote ของกล่องนี้'; document.getElementById('displayLpn').innerText = lpn; document.getElementById('selectedScanColor').value = ''; document.getElementById('selectedScanType').value = 'TOTE'; document.getElementById('selectedScanColorLabel').innerText = '-'; colorQtyInput.value = ''; colorQtyArea.classList.add('hidden'); colorSection.classList.remove('hidden'); qtySection.classList.add('hidden'); lpnInput.blur(); } lpnInput.value = '';
                 }
             });
             qtyInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') { e.preventDefault(); executeQtyScanSave(); } });
@@ -3076,6 +3185,90 @@
             let directQtyContinuationLpn = null;
             let rescanPromptLpn = null;
             function isMultiPalletLpn(lpn) { return String(lpn || '').substring(0, 2).toUpperCase() === 'PP'; }
+            // ✅ ช่วยเหลือ + ออกจากระบบ
+            function openHelp() { const m = document.getElementById('helpModal'); if (m) m.classList.remove('hidden'); }
+            function closeHelp() { const m = document.getElementById('helpModal'); if (m) m.classList.add('hidden'); }
+            function logout() {
+                const pending = (typeof syncQueue !== 'undefined' && syncQueue.length > 0) || (typeof backgroundTasks !== 'undefined' && backgroundTasks > 0);
+                const msg = pending ? 'ยังมีข้อมูลที่กำลังบันทึกขึ้นเซิร์ฟเวอร์ ออกจากระบบตอนนี้อาจทำให้ข้อมูลไม่ครบ\n\nต้องการออกจากระบบจริงไหม?' : 'ต้องการออกจากระบบใช่หรือไม่?';
+                if (!confirm(msg)) return;
+                loggedInEmpId = ""; loggedInEmpName = ""; currentWave = ""; allLpnsInWave = [];
+                selectedBranchCode = ""; selectedBranchName = ""; currentBookingNo = ""; activeWavesList = [];
+                activePalletNo = 0; activePalletColor = null; palletColorMode = false;
+                ['mainApp', 'branchSelectorModal', 'waveSelectorModal', 'helpModal'].forEach(id => { const el = document.getElementById(id); if (el) el.classList.add('hidden'); });
+                const login = document.getElementById('loginModal'); if (login) login.classList.remove('hidden');
+                const emp = document.getElementById('empInput'); if (emp) { emp.value = ''; setTimeout(() => emp.focus(), 100); }
+            }
+            // ✅ ลูกเล่น UX: ไฟวาบ, แถบความคืบหน้า+ฉลอง, กันจอดับ
+            let flashT = null;
+            function flashScreen(ok) {
+                const el = document.getElementById('flashOverlay'); if (!el) return;
+                el.style.background = ok ? 'rgba(22,163,74,0.5)' : 'rgba(220,38,38,0.55)';
+                el.innerHTML = `<div style="font-size:130px;line-height:1;color:#fff;text-shadow:0 2px 12px rgba(0,0,0,.3)">${ok ? '✓' : '✕'}</div>`;
+                el.classList.remove('hidden'); el.style.opacity = '1';
+                clearTimeout(flashT);
+                flashT = setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.classList.add('hidden'), 250); }, ok ? 260 : 400);
+            }
+            let branchCelebrated = {};
+            function renderBranchProgress() {
+                const el = document.getElementById('branchProgress'); if (!el) return;
+                const bi = allLpnsInWave.filter(i => (i.branch || 'Unknown') === selectedBranchCode);
+                const total = bi.length;
+                const done = bi.filter(i => i.status === 'Scanned' || i.status === 'ForceClosed').length;
+                const pct = total ? Math.round(done / total * 100) : 0;
+                const txt = document.getElementById('branchProgressText'); const fill = document.getElementById('branchProgressFill');
+                if (txt) txt.textContent = `${done}/${total} (${pct}%)`;
+                if (fill) { fill.style.width = pct + '%'; fill.className = `h-3 rounded-full transition-all duration-500 ${pct >= 100 ? 'bg-emerald-500' : 'bg-blue-600'}`; }
+                if (total > 0 && done >= total && !branchCelebrated[selectedBranchCode]) {
+                    branchCelebrated[selectedBranchCode] = true;
+                    flashScreen(true);
+                    showToast('🎉 ครบทุกกล่องในสาขานี้แล้ว!');
+                }
+            }
+            let wakeLock = null;
+            async function requestWakeLock() {
+                try { if ('wakeLock' in navigator) { wakeLock = await navigator.wakeLock.request('screen'); } } catch (e) { }
+            }
+            document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') requestWakeLock(); });
+            // ✅ เตือนก่อนออกจากสาขา ถ้ายังมีพาเลทค้าง
+            function confirmBackToBranchSelect() {
+                const scannedHere = allLpnsInWave.some(i => (i.branch || 'Unknown') === selectedBranchCode && i.status === 'Scanned' && (parseInt(i.palletNo) || 0) > 0);
+                if (activePalletColor || scannedHere) {
+                    showConfirm('ออกจากสาขานี้?', `กำลังทำสาขา ${selectedBranchCode} อยู่ (มีพาเลทที่ทำค้าง)\nงานจะถูกเก็บไว้ให้ทำต่อเมื่อกลับเข้ามา\n\nต้องการออกไปเลือกสาขาใหม่ไหม?`, 'ออกไปเลือกสาขา', () => backToBranchSelect());
+                } else { backToBranchSelect(); }
+            }
+            // ✅ เลื่อนขึ้นบนสุด / ปรับตัวอักษรใหญ่
+            function scrollListTop() {
+                ['modeScan', 'modeCombine'].forEach(id => { const el = document.getElementById(id); if (el && !el.classList.contains('hidden')) { try { el.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) { el.scrollTop = 0; } } });
+            }
+            function toggleBigText() {
+                const on = document.body.classList.toggle('big-text');
+                const btn = document.getElementById('bigTextBtn'); if (btn) btn.textContent = on ? 'ก' : 'ก+';
+                try { localStorage.setItem('proScannerBigText', on ? '1' : '0'); } catch (e) { }
+            }
+            // ✅ ยกเลิกปิดงานสาขา (เปิดกลับมาแก้ไข) + คืนกล่องที่ถูกบังคับปิดให้แก้ได้
+            function reopenBranch() {
+                showConfirm('ยกเลิกปิดงาน?', `เปิดสาขา ${selectedBranchCode} กลับมาแก้ไขใหม่\n(ยกเลิกสถานะ "ปิดงานแล้ว" — LPN/พาเลทที่ทำไว้ยังอยู่ครบ แก้ไขได้)`, 'ยกเลิกปิดงาน', () => {
+                    const key = getBranchCompletionKey(selectedBranchCode);
+                    if (key) { try { localStorage.removeItem(key); } catch (e) { } }
+                    delete branchCelebrated[selectedBranchCode];
+                    allLpnsInWave.forEach(i => { if ((i.branch || 'Unknown') === selectedBranchCode && i.status === 'ForceClosed') { i.status = 'Pending'; i.qty = 0; } });
+                    saveCurrentWaveDataCache();
+                    showToast(`เปิดสาขา ${selectedBranchCode} กลับมาแก้ไขได้แล้ว`);
+                    updateDashboardUI();
+                });
+            }
+            function renderReopenBanner() {
+                const el = document.getElementById('reopenBanner'); if (!el) return;
+                const rec = getBranchCompletionRecord(selectedBranchCode);
+                if (rec) {
+                    el.classList.remove('hidden');
+                    el.innerHTML = `<div class="bg-amber-50 border-2 border-amber-300 rounded-xl p-3 flex items-center justify-between gap-2">
+                        <div class="text-xs font-bold text-amber-800 min-w-0"><div>✅ สาขานี้ปิดงานแล้ว</div><div class="text-[11px] opacity-80 truncate">บันทึกจบ: ${escapeDocumentText(formatBangkokDateTime(rec.completed_at))}</div></div>
+                        <button onclick="reopenBranch()" class="bg-amber-600 hover:bg-amber-700 text-white text-xs font-black px-3 py-2 rounded-lg whitespace-nowrap" style="flex:none">↩ ยกเลิกปิดงาน / แก้ไข</button>
+                    </div>`;
+                } else { el.classList.add('hidden'); el.innerHTML = ''; }
+            }
 
             function promptRescanContinuation(item) {
                 if (!item) return;
@@ -3356,6 +3549,7 @@
                     target.color = entries.length === 1 ? entries[0].color : 'Multiple';
                     target.scan_type = entries.length === 1 ? entries[0].type : 'TOTE_MULTI';
                     target.color_breakdown = entries.map(entry => ({ color: entry.color, type: entry.type, qty: entry.qty }));
+                    target.palletNo = activePalletNo; target.palletColor = activePalletColor;
                 }
                 resetScanColorButtons();
                 updateDashboardUI();
@@ -3364,10 +3558,180 @@
                 lpnInput.focus();
                 const lpnWave = target ? (target.wave_no || currentWave) : currentWave;
                 entries.forEach(entry => {
-                    pushToQueue({ wave_no: lpnWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: lpn, type: entry.type, color: entry.color, qty: entry.qty, emp_id: loggedInEmpId });
+                    pushToQueue({ wave_no: lpnWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: lpn, type: entry.type, color: entry.color, qty: entry.qty, emp_id: loggedInEmpId, pallet_no: activePalletNo });
                 });
             }
-            async function executeScanSave(color, type = 'TOTE', qty = 1, forceLpn = null) { const lpn = forceLpn || document.getElementById('displayLpn').innerText; colorSection.classList.add('hidden'); qtySection.classList.add('hidden'); colorQtyArea.classList.add('hidden'); resetScanColorButtons(); const target = allLpnsInWave.find(item => item.lpn === lpn); if (target) { target.status = 'Scanned'; target.qty = qty; target.color = color; target.scan_type = type; target.color_breakdown = []; } updateDashboardUI(); saveCurrentWaveDataCache(); showToast(`บันทึกข้อมูล ${lpn} สำเร็จ`); lpnInput.focus(); const lpnWave = target ? (target.wave_no || currentWave) : currentWave; pushToQueue({ wave_no: lpnWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: lpn, type: type, color: color, qty: qty, emp_id: loggedInEmpId }); }
+            async function executeScanSave(color, type = 'TOTE', qty = 1, forceLpn = null) { const lpn = forceLpn || document.getElementById('displayLpn').innerText; colorSection.classList.add('hidden'); qtySection.classList.add('hidden'); colorQtyArea.classList.add('hidden'); resetScanColorButtons(); lastScannedLpn = lpn; const target = allLpnsInWave.find(item => item.lpn === lpn); if (target) { target.status = 'Scanned'; target.qty = qty; target.color = color; target.scan_type = type; target.color_breakdown = []; target.palletNo = activePalletNo; target.palletColor = activePalletColor; } updateDashboardUI(); saveCurrentWaveDataCache(); showToast(`บันทึกข้อมูล ${lpn} สำเร็จ`); flashScreen(true); lpnInput.focus(); const lpnWave = target ? (target.wave_no || currentWave) : currentWave; pushToQueue({ wave_no: lpnWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: lpn, type: type, color: color, qty: qty, emp_id: loggedInEmpId, pallet_no: activePalletNo }); }
+
+            // ==================== 🎨 PALLET-FIRST FLOW (เพิ่มใหม่) ====================
+            const PALLET_TH = { Black: 'ดำ', Blue: 'น้ำเงิน', Yellow: 'เหลือง', Green: 'เขียว', Red: 'แดง', Reuse: 'กระดาษ', None: '-' };
+            const PALLET_HEX = { Black: '#1f2937', Blue: '#2563eb', Yellow: '#eab308', Green: '#16a34a', Red: '#dc2626', Reuse: '#f97316' };
+            // สีพาเลท (3 สี) — คนละชุดกับสี Tote
+            const PALLET_CLR_TH = { Green: 'เขียว', Blue: 'ฟ้า', Red: 'แดง' };
+            const PALLET_CLR_HEX = { Green: '#16a34a', Blue: '#0ea5e9', Red: '#dc2626' };
+            let activePalletNo = 0, activePalletColor = null, activePalletType = 'TOTE', palletColorMode = false;
+            let palletAllDone = false;
+            let noSaveMode = true; // ✅ โหมดทดสอบ: true = ไม่เขียนลงเซิร์ฟเวอร์จริง
+            let lastScannedLpn = null; // สำหรับปุ่มยกเลิกล่าสุด
+            let lpnSearchTerm = '';    // สำหรับค้นหา LPN ในรายการ
+
+            function undoLastScan() {
+                if (!lastScannedLpn) return;
+                const item = allLpnsInWave.find(i => i.lpn === lastScannedLpn);
+                if (!item || item.status !== 'Scanned') { lastScannedLpn = null; renderUndoBar(); return; }
+                const lpn = lastScannedLpn;
+                item.status = 'Pending'; item.qty = 0; item.color = 'None'; item.scan_type = ''; item.color_breakdown = [];
+                item.combinedWith = null; item.isMaster = false; item.palletNo = null; item.palletColor = null;
+                pushToQueue({ wave_no: item.wave_no || currentWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: lpn, type: 'RESET_BOX', color: 'None', qty: 0, emp_id: loggedInEmpId, pallet_no: 0 });
+                lastScannedLpn = null;
+                updateDashboardUI(); saveCurrentWaveDataCache();
+                showToast(`↩ ยกเลิก ${lpn} แล้ว (คืนเป็นค้างตรวจสอบ)`);
+                document.getElementById('lpnInput').focus();
+            }
+            function renderUndoBar() {
+                const el = document.getElementById('undoBar'); if (!el) return;
+                const item = lastScannedLpn ? allLpnsInWave.find(i => i.lpn === lastScannedLpn) : null;
+                if (item && item.status === 'Scanned') {
+                    el.classList.remove('hidden');
+                    el.innerHTML = `<button onclick="undoLastScan()" class="w-full bg-amber-100 hover:bg-amber-200 border border-amber-300 text-amber-800 font-bold py-2 rounded-xl text-sm flex items-center justify-center gap-1">↩ ยกเลิกล่าสุด: ${lastScannedLpn}</button>`;
+                } else { el.classList.add('hidden'); el.innerHTML = ''; }
+            }
+            function filterLpnList() {
+                const inp = document.getElementById('lpnSearchInput');
+                lpnSearchTerm = inp ? (inp.value || '').trim().toUpperCase() : '';
+                document.querySelectorAll('#scannedListContainer > div, #unscannedListContainer > div').forEach(el => {
+                    el.style.display = (!lpnSearchTerm || el.textContent.toUpperCase().includes(lpnSearchTerm)) ? '' : 'none';
+                });
+            }
+
+            function startPalletColorPrompt() {
+                palletColorMode = true; activePalletColor = null;
+                colorSection.classList.add('hidden'); colorQtyArea.classList.add('hidden'); qtySection.classList.add('hidden');
+                const t = document.getElementById('palletColorModalTitle'); if (t) t.innerText = `เลือกสีพาเลท ลำดับที่ ${activePalletNo + 1}`;
+                const _bi = allLpnsInWave.filter(i => (i.branch || 'Unknown') === selectedBranchCode);
+                const _rem = _bi.filter(i => i.status !== 'Scanned' && i.status !== 'ForceClosed').length;
+                palletAllDone = (_bi.length > 0 && _rem === 0);
+                const _fb = document.getElementById('palletModalFinishBtn');
+                if (_fb) { _fb.classList.remove('hidden'); _fb.textContent = palletAllDone ? '✅ ยิงครบแล้ว — จบงานสาขานี้' : `🏁 ปิดจบงานสาขานี้ (ค้าง ${_rem} = 0)`; }
+                const _h = document.getElementById('palletColorModalHint'); if (_h) _h.innerText = palletAllDone ? '✔ ยิงครบทุกกล่องแล้ว — กดจบงานได้เลย' : '* เลือกสีพาเลทเพื่อทำต่อ หรือกดปิดจบงาน (LPN ที่ค้างจะเป็น 0)';
+                document.getElementById('palletColorModal').classList.remove('hidden');
+                lpnInput.blur();
+                updatePalletBanner();
+            }
+            function palletModalFinish() {
+                document.getElementById('palletColorModal').classList.add('hidden');
+                palletColorMode = false;
+                endBranchJob();
+            }
+            function pickPalletColor(color) {
+                document.getElementById('palletColorModal').classList.add('hidden');
+                setActivePallet(color, 'TOTE');
+            }
+            function palletModalBack() {
+                document.getElementById('palletColorModal').classList.add('hidden');
+                palletColorMode = false;
+                backToBranchSelect();
+            }
+            function setActivePallet(color, type) {
+                const _done = allLpnsInWave.filter(i => (i.branch || 'Unknown') === selectedBranchCode && i.status === 'Scanned' && (parseInt(i.palletNo) || 0) > 0);
+                activePalletNo = (_done.length ? Math.max(..._done.map(i => parseInt(i.palletNo) || 0)) : 0) + 1;
+                activePalletColor = color; activePalletType = type || 'TOTE'; palletColorMode = false;
+                document.getElementById('palletColorModal').classList.add('hidden');
+                if (selectedBranchCode) { updateDocumentPalletCount(selectedBranchCode, activePalletNo); syncBranchPalletCountInput(); }
+                updatePalletBanner();
+                showToast(`พาเลทใบที่ ${activePalletNo} • สีพาเลท${PALLET_CLR_TH[color] || color} — ยิง LPN ได้เลย`);
+                setTimeout(() => lpnInput.focus(), 50);
+            }
+            function nextPallet() { startPalletColorPrompt(); }
+            // ✏️ เข้าแก้ไขพาเลทที่ทำไว้แล้ว: ยิง LPN ใหม่จะเข้าพาเลทนี้ (ใช้คู่กับปุ่ม ✕ ยกเลิก LPN ในการ์ดพาเลท)
+            function editPallet(no, color) {
+                activePalletNo = parseInt(no) || 0;
+                activePalletColor = color || null;
+                activePalletType = (color === 'Reuse') ? 'Carton' : 'TOTE';
+                palletColorMode = false;
+                if (colorSection) colorSection.classList.add('hidden');
+                if (qtySection) qtySection.classList.add('hidden');
+                if (colorQtyArea) colorQtyArea.classList.add('hidden');
+                document.getElementById('palletColorModal').classList.add('hidden');
+                updatePalletBanner();
+                renderPalletGroups();
+                showToast(`✏️ เข้าแก้ไขพาเลท ${no} — กด ✕ ยกเลิก LPN ที่ผิด แล้วยิงใหม่เข้าพาเลทนี้`);
+                setTimeout(() => { try { lpnInput.focus(); } catch (e) { } }, 50);
+            }
+            // ✅ เข้าสาขาเดิมซ้ำ → ทำต่อจากของเดิม (ไม่รีเซ็ตพาเลทที่ทำไว้)
+            function resumeOrStartPallet() {
+                const done = allLpnsInWave.filter(i => (i.branch || 'Unknown') === selectedBranchCode && i.status === 'Scanned' && (parseInt(i.palletNo) || 0) > 0);
+                if (done.length) {
+                    const maxNo = Math.max(...done.map(i => parseInt(i.palletNo) || 0));
+                    activePalletNo = maxNo;
+                    const lastItem = done.find(i => (parseInt(i.palletNo) || 0) === maxNo);
+                    activePalletColor = (lastItem && lastItem.palletColor) ? lastItem.palletColor : null;
+                    activePalletType = (activePalletColor === 'Reuse') ? 'Carton' : 'TOTE';
+                    palletColorMode = false;
+                    colorSection.classList.add('hidden');
+                    if (!activePalletColor) { startPalletColorPrompt(); return; }
+                    updatePalletBanner();
+                    showToast(`ทำต่อสาขาเดิม — มีพาเลทที่ทำไว้แล้ว ${maxNo} ใบ`);
+                    setTimeout(() => lpnInput.focus(), 50);
+                } else {
+                    activePalletNo = 0; activePalletColor = null;
+                    startPalletColorPrompt();
+                }
+            }
+            // 🏁 สิ้นสุดงานสาขา: ถ้ายังมี LPN ค้าง → ยืนยันแล้วบันทึกเป็น 0 (บังคับปิด); ถ้าครบแล้ว → ปิดจบปกติ
+            function endBranchJob() {
+                const remaining = allLpnsInWave.filter(i => (i.branch || 'Unknown') === selectedBranchCode && i.status !== 'Scanned' && i.status !== 'ForceClosed');
+                if (remaining.length > 0) {
+                    openConfirmModal();
+                } else {
+                    finishBranchJob();
+                }
+            }
+            function updatePalletBanner() {
+                const el = document.getElementById('palletBanner'); if (!el) return;
+                if (!activePalletColor) {
+                    el.className = 'bg-amber-50 border-2 border-dashed border-amber-300 rounded-xl px-3 py-2';
+                    el.style.background = ''; el.style.border = '';
+                    el.innerHTML = `<div class="text-sm font-black text-amber-700 text-center">👉 เลือกสีพาเลทก่อนเริ่มยิง LPN</div>`;
+                    return;
+                }
+                const hex = PALLET_CLR_HEX[activePalletColor] || '#64748b';
+                el.className = 'rounded-xl px-3 py-2 flex items-center justify-between gap-2';
+                el.style.background = hex + '18'; el.style.border = '2px solid ' + hex;
+                el.innerHTML = `<div class="flex items-center gap-2 min-w-0"><span style="width:16px;height:16px;border-radius:4px;background:${hex};display:inline-block;flex:none"></span><span class="font-black text-slate-800 text-sm truncate">พาเลทใบที่ ${activePalletNo} • สีพาเลท${PALLET_CLR_TH[activePalletColor] || activePalletColor}</span></div><button onclick="nextPallet()" class="bg-slate-800 text-white text-xs font-black px-3 py-2 rounded-lg whitespace-nowrap" style="flex:none">ปิด → ใบถัดไป</button>`;
+            }
+            function renderPalletGroups() {
+                const el = document.getElementById('palletGroupsContainer'); if (!el) return;
+                const items = allLpnsInWave.filter(i => (i.branch || 'Unknown') === selectedBranchCode && i.status === 'Scanned' && i.palletNo);
+                if (!items.length) { el.innerHTML = ''; return; }
+                const groups = {};
+                items.forEach(i => { const k = i.palletNo; (groups[k] = groups[k] || { no: k, color: i.palletColor, items: [] }).items.push(i); });
+                const nos = Object.keys(groups).map(Number).sort((a, b) => a - b);
+                el.innerHTML = `<div class="bg-white rounded-xl shadow-sm border border-slate-200 p-3">
+                    <div class="text-sm font-black text-slate-700 mb-2">📦 พาเลทที่ทำในสาขานี้ (${nos.length})</div>
+                    <div class="space-y-2">${nos.map(n => { const g = groups[n]; const hex = PALLET_CLR_HEX[g.color] || '#64748b'; const editing = (parseInt(n) === parseInt(activePalletNo)); return `
+                        <div class="border rounded-lg overflow-hidden ${editing ? 'border-blue-400 ring-2 ring-blue-200' : 'border-slate-200'}">
+                            <div class="flex items-center justify-between gap-2 px-2.5 py-1.5" style="background:${hex}15">
+                                <div class="flex items-center gap-1.5 font-black text-slate-800 text-xs min-w-0"><span style="width:12px;height:12px;border-radius:3px;background:${hex};display:inline-block;flex:none"></span> <span class="truncate">พาเลท ${n} • สีพาเลท${PALLET_CLR_TH[g.color] || g.color || '-'}</span>${editing ? '<span class="text-[10px] text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded font-black whitespace-nowrap">✏️ กำลังแก้ไข</span>' : ''}</div>
+                                <div class="flex items-center gap-2 shrink-0">
+                                    <button onclick="editPallet(${n}, '${g.color}')" class="text-[11px] font-black text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded hover:bg-blue-100 whitespace-nowrap">✏️ แก้ไข</button>
+                                    <div class="text-[11px] font-bold text-slate-500 whitespace-nowrap">${g.items.length} LPN</div>
+                                </div>
+                            </div>
+                            <div class="px-2.5 py-1.5 flex flex-wrap gap-1.5">${(function () {
+                                const masters = g.items.filter(x => x.isMaster);
+                                const kids = g.items.filter(x => x.combinedWith);
+                                const solo = g.items.filter(x => !x.isMaster && !x.combinedWith);
+                                const kidsByMaster = {}; kids.forEach(c => { (kidsByMaster[c.combinedWith] = kidsByMaster[c.combinedWith] || []).push(c); });
+                                const masterLpns = masters.map(x => x.lpn);
+                                let out = solo.map(i => `<span class="inline-flex items-center gap-1 text-[11px] font-bold bg-slate-100 text-slate-600 pl-1.5 pr-1 py-0.5 rounded">${i.lpn}${(parseInt(i.qty) > 1) ? ' (' + i.qty + ')' : ''}<button onclick="resetSingleBox('${i.lpn}')" class="text-red-500 hover:text-white hover:bg-red-500 rounded w-4 h-4 flex items-center justify-center font-black leading-none transition" title="ยกเลิก LPN นี้">✕</button></span>`).join('');
+                                out += masters.map(m => { const kidHtml = (kidsByMaster[m.lpn] || []).map(c => `<span class="inline-flex items-center gap-0.5 text-[10px] font-bold bg-white text-purple-700 border border-purple-200 px-1.5 py-0.5 rounded">↳ ${c.lpn}<button onclick="undoSingleChild('${c.lpn}')" class="text-red-500 hover:text-red-700 font-black leading-none ml-0.5" title="แยกกล่องนี้ออก">✕</button></span>`).join('') || `<span class="text-[10px] text-purple-400 font-bold">ไม่มีกล่องย่อย</span>`; const mq = (parseInt(m.qty) > 1) ? ' (' + m.qty + ')' : ''; return `<div class="basis-full w-full bg-purple-50 border border-purple-300 rounded-lg p-2 mt-0.5"><div class="flex items-center justify-between gap-2 mb-1"><span class="text-[11px] font-black text-purple-800">🔗 รวมกล่อง · LPN หลัก: ${m.lpn}${mq}</span><button onclick="undoCombine('${m.lpn}')" class="text-[10px] text-red-600 font-bold hover:underline whitespace-nowrap">ยกเลิกรวม</button></div><div class="flex flex-wrap gap-1 pl-1">${kidHtml}</div></div>`; }).join('');
+                                out += kids.filter(c => masterLpns.indexOf(c.combinedWith) === -1).map(c => `<span class="text-[10px] font-bold bg-purple-50 text-purple-600 border border-purple-200 px-1.5 py-0.5 rounded">↳ ${c.lpn} (รวมใน ${c.combinedWith})</span>`).join('');
+                                return out;
+                            })()}</div>
+                        </div>`; }).join('')}</div>
+                </div>`;
+            }
 
             // ==================== 💨 BACKGROUND CLOSE LOGIC ====================
             function openConfirmModal() { document.getElementById('confirmModal').classList.remove('hidden'); }
@@ -3393,7 +3757,7 @@
                         let successAll = true;
                         const wavesToClose = activeWavesList.length ? activeWavesList : [currentWave].filter(Boolean);
                         for (const waveNo of wavesToClose) {
-                            const res = await fetch(backendApiUrl + '/api/close-job', {
+                            const res = noSaveMode ? { ok: true } : await fetch(backendApiUrl + '/api/close-job', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ wave: waveNo, branch: branchCodeToClose, emp_id: loggedInEmpId, completed_at: completedAtIso })
@@ -3403,9 +3767,7 @@
                         if (successAll) {
                             setBranchCompletionRecord(branchCodeToClose, completedAtIso, 'force_close');
                             renderBranchGrid();
-                            showAlert('ดำเนินการสำเร็จ', `บังคับปิดงานสาขา ${branchCodeToClose} เสร็จสมบูรณ์\nบันทึกจบงานเมื่อ: ${completedAtText}\nระบบจะเปิดเอกสารเพื่อพิมพ์สรุปยอด`, 'border-green-600', true, () => {
-                                openShippingDocument(branchCodeToClose);
-                            });
+                            showAlert('ดำเนินการสำเร็จ', `บังคับปิดงานสาขา ${branchCodeToClose} เสร็จสมบูรณ์\nบันทึกจบงานเมื่อ: ${completedAtText}`, 'border-green-600', true);
                         } else {
                             showAlert('ข้อผิดพลาด', `ไม่สามารถปิดงานบาง Wave สำหรับสาขา ${branchCodeToClose} ได้`, 'border-red-600', false);
                         }
@@ -3451,7 +3813,7 @@
                         let successAll = true;
                         const wavesToClose = activeWavesList.length ? activeWavesList : [currentWave].filter(Boolean);
                         for (const waveNo of wavesToClose) {
-                            const res = await fetch(backendApiUrl + '/api/close-job', {
+                            const res = noSaveMode ? { ok: true } : await fetch(backendApiUrl + '/api/close-job', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ wave: waveNo, branch: branchCodeToClose, emp_id: loggedInEmpId, completed_at: completedAtIso })
@@ -3461,9 +3823,7 @@
                         if (successAll) {
                             setBranchCompletionRecord(branchCodeToClose, completedAtIso, 'finish');
                             renderBranchGrid();
-                            showAlert('ดำเนินการสำเร็จ', `ปิดยอดสาขา ${branchCodeToClose} เรียบร้อยแล้ว\nนับกล่อง Tote ทั้งหมดเสร็จเมื่อ: ${completedAtText}\nระบบจะเปิดเอกสารเพื่อพิมพ์สรุปยอด`, 'border-green-600', true, () => {
-                                openShippingDocument(branchCodeToClose);
-                            });
+                            showAlert('ดำเนินการสำเร็จ', `ปิดยอดสาขา ${branchCodeToClose} เรียบร้อยแล้ว\nนับกล่อง Tote ทั้งหมดเสร็จเมื่อ: ${completedAtText}`, 'border-green-600', true);
                         } else {
                             showAlert('ข้อผิดพลาด', `ไม่สามารถปิดงานบาง Wave สำหรับสาขา ${branchCodeToClose} ได้`, 'border-red-600', false);
                         }
@@ -3537,8 +3897,8 @@
                     childInput.value = '';
                 }
             });
-            function updateChildUI() { childList.innerHTML = childLpns.map(lpn => `<li class="bg-white p-2 rounded shadow-sm border text-sm flex justify-between"><b>${lpn}</b> <span class="text-red-500 font-bold px-2 cursor-pointer" onclick="removeChild('${lpn}')">X</span></li>`).reverse().join(''); }
-            function removeChild(lpn) { childLpns = childLpns.filter(item => item !== lpn); updateChildUI(); }
+            function updateChildUI() { childList.innerHTML = childLpns.map(lpn => `<li class="bg-white p-2 rounded shadow-sm border text-sm flex justify-between"><b>${lpn}</b> <span class="text-red-500 font-bold px-2 cursor-pointer" onclick="removeChildLpn('${lpn}')">X</span></li>`).reverse().join(''); }
+            function removeChildLpn(lpn) { childLpns = childLpns.filter(item => item !== lpn); updateChildUI(); }
             function resetCombineColorButtons() {
                 document.querySelectorAll('#combineColorGrid .color-btn').forEach(btn => {
                     btn.classList.remove('color-btn-active', 'color-btn-dimmed');
@@ -3553,26 +3913,107 @@
             }
 
             function executeCombineSave() {
-                const master = masterInput.value.trim().toUpperCase(); const color = document.getElementById('selectedCombineColor').value;
-                if (!master || childLpns.length === 0) return showAlert('ข้อมูลไม่ครบถ้วน', "จำเป็นต้องสแกนพาเลทหลัก 1 รายการ และกล่องสินค้าอย่างน้อย 1 รายการ"); if (childLpns.includes(master)) return showAlert('ข้อมูลไม่ถูกต้อง', 'พาเลทหลัก และ กล่องสินค้า ต้องไม่เป็นหมายเลขเดียวกัน'); if (!color) return showAlert('ข้อมูลไม่ครบถ้วน', "กรุณาระบุสีพาเลท/ตะกร้า ก่อนยืนยันการบันทึก");
+                // ✅ Combine: LPN หลัก + LPN รอง → รวมเข้า "พาเลทที่กำลังทำ" (ใช้สีพาเลทปัจจุบัน ไม่ต้องเลือกสีซ้ำ)
+                const master = masterInput.value.trim().toUpperCase();
+                const color = document.getElementById('selectedCombineColor').value;
+                if (!master || childLpns.length === 0) return showAlert('ข้อมูลไม่ครบถ้วน', 'ต้องสแกน LPN หลัก 1 รายการ และ LPN รอง อย่างน้อย 1 รายการ');
+                if (childLpns.includes(master)) return showAlert('ข้อมูลไม่ถูกต้อง', 'LPN หลัก และ LPN รอง ต้องไม่เป็นหมายเลขเดียวกัน');
+                if (!color) return showAlert('ข้อมูลไม่ครบถ้วน', 'กรุณาเลือกสี Tote ก่อนยืนยันการรวม');
+                for (let cLpn of childLpns) { const target = allLpnsInWave.find(item => item.lpn === cLpn); if (target && target.status === 'Scanned' && !target.combinedWith) { return showAlert('ข้อมูลซ้ำซ้อน', `LPN รอง ${cLpn} ถูกตรวจสอบเดี่ยวไปแล้ว รวมไม่ได้`); } }
 
-                for (let cLpn of childLpns) { const target = allLpnsInWave.find(item => item.lpn === cLpn); if (target && target.status === 'Scanned' && !target.combinedWith) { return showAlert('ข้อมูลซ้ำซ้อน', `กล่อง ${cLpn} ถูกตรวจสอบเสร็จสิ้นไปแล้ว ไม่สามารถนำมารวมกล่อง/พาเลทได้`); } }
-
-                // ✅ เซ็ตสี Tote ที่เลือกให้กล่องลูกในหน่วยความจำทันที ให้ตรงกับค่าที่ backend ส่งกลับหลังรีโหลด
-                //    (เดิมไม่ได้เซ็ต ทำให้ตอนใช้งานสดสีเป็นค่าว่าง เอกสารเลยนับตกไปช่อง M)
-                childLpns.forEach(cLpn => { const target = allLpnsInWave.find(item => item.lpn === cLpn); if (target) { target.status = 'Scanned'; target.combinedWith = master; target.color = color; target.qty = 1; target.scan_type = 'COMBINE: ' + master; target.color_breakdown = [{ color: color, qty: 1, type: 'COMBINE: ' + master }]; } });
-                const masterTarget = allLpnsInWave.find(item => item.lpn === master); if (masterTarget) { masterTarget.status = 'Scanned'; masterTarget.isMaster = true; masterTarget.childCount = (masterTarget.childCount || 0) + childLpns.length; }
-
-                updateDashboardUI(); saveCurrentWaveDataCache(); showToast(`รวมกล่อง/พาเลทสำเร็จ (${childLpns.length} รายการ)`);
-                for (const cLpn of childLpns) {
+                childLpns.forEach(cLpn => {
                     const target = allLpnsInWave.find(item => item.lpn === cLpn);
+                    if (target) {
+                        target.status = 'Scanned'; target.combinedWith = master; target.color = color; target.qty = 1;
+                        target.scan_type = 'COMBINE: ' + master; target.color_breakdown = [{ color: color, qty: 1, type: 'COMBINE: ' + master }];
+                        target.palletNo = activePalletNo; target.palletColor = color;
+                    }
                     const lpnWave = target ? (target.wave_no || currentWave) : currentWave;
-                    pushToQueue({ wave_no: lpnWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: cLpn, type: 'COMBINE: ' + master, color: color, qty: 1, emp_id: loggedInEmpId });
-                }
+                    pushToQueue({ wave_no: lpnWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: cLpn, type: 'COMBINE: ' + master, color: color, qty: 1, emp_id: loggedInEmpId, pallet_no: activePalletNo });
+                });
+                const masterTarget = allLpnsInWave.find(item => item.lpn === master);
+                if (masterTarget) { masterTarget.status = 'Scanned'; masterTarget.isMaster = true; masterTarget.childCount = (masterTarget.childCount || 0) + childLpns.length; masterTarget.color = color; masterTarget.palletNo = activePalletNo; masterTarget.palletColor = color; }
 
-                masterInput.value = ''; childInput.value = ''; childInput.disabled = true; childInput.classList.add('bg-gray-100'); childLpns = []; updateChildUI(); document.getElementById('selectedCombineColor').value = ''; resetCombineColorButtons();
+                updateDashboardUI(); saveCurrentWaveDataCache();
+                showToast(`รวม ${childLpns.length} LPN รอง เข้า LPN หลัก ${master} (สี${PALLET_TH[color] || color}) แล้ว`); flashScreen(true);
+                masterInput.value = ''; childInput.value = ''; childInput.disabled = true; childInput.classList.add('bg-gray-100'); childLpns = []; updateChildUI();
+                document.getElementById('selectedCombineColor').value = ''; resetCombineColorButtons();
                 const cBtn = document.getElementById('childScanBtn'); cBtn.disabled = true; cBtn.classList.replace('bg-purple-800', 'bg-gray-400'); cBtn.classList.remove('hover:bg-purple-900'); masterInput.focus();
             }
+    </script>
+    <div style="position:fixed;top:6px;left:6px;z-index:2000" class="bg-black/80 text-white text-[11px] font-black rounded-lg px-2.5 py-1.5 flex items-center gap-1.5 shadow-lg">
+        <input type="checkbox" id="noSaveToggle" checked class="w-4 h-4" onchange="noSaveMode=this.checked; showToast(noSaveMode ? 'โหมดทดสอบ: ไม่บันทึกจริง' : '⚠ เปิดบันทึกจริงแล้ว', !noSaveMode);">
+        <label for="noSaveToggle">🧪 ทดสอบ (ไม่บันทึก)</label>
+    </div>
+    <div id="helpModal" class="hidden fixed inset-0 bg-gray-900/70 flex items-center justify-center p-4 z-[2500]" onclick="if(event.target===this)closeHelp()">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[85vh] overflow-y-auto p-5">
+            <div class="flex items-center justify-between mb-3">
+                <h2 class="text-lg font-black text-slate-800 flex items-center gap-2">📖 วิธีใช้งาน / คำอธิบาย</h2>
+                <button onclick="closeHelp()" class="bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold px-3 py-1.5 rounded-lg text-sm">ปิด</button>
+            </div>
+            <div class="space-y-3 text-sm text-slate-700">
+                <div>
+                    <div class="font-black text-slate-800 mb-1">ขั้นตอนการทำงาน</div>
+                    <ol class="list-decimal list-inside space-y-0.5 text-slate-600">
+                        <li>เลือกสีพาเลท (เขียว/ฟ้า/แดง) ก่อนเริ่ม</li>
+                        <li>ยิง LPN กล่อง</li>
+                        <li>เลือกสี Tote ของกล่องนั้น</li>
+                        <li>ครบพาเลทแล้วกด "ปิด → ใบถัดไป"</li>
+                        <li>เสร็จทุกพาเลทกด "สิ้นสุด/ปิดงาน"</li>
+                    </ol>
+                </div>
+                <div>
+                    <div class="font-black text-slate-800 mb-1">สี Tote (5 สี)</div>
+                    <div class="flex flex-wrap gap-1.5">
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200 font-bold"><span class="w-2.5 h-2.5 rounded-full bg-red-600"></span>แดง</span>
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 font-bold"><span class="w-2.5 h-2.5 rounded-full bg-blue-600"></span>น้ำเงิน</span>
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-200 font-bold"><span class="w-2.5 h-2.5 rounded-full bg-green-600"></span>เขียว</span>
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-100 text-gray-800 border border-gray-300 font-bold"><span class="w-2.5 h-2.5 rounded-full bg-gray-800"></span>ดำ</span>
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-50 text-orange-800 border border-orange-200 font-bold"><span class="w-2.5 h-2.5 rounded-sm bg-orange-400"></span>กระดาษ</span>
+                    </div>
+                </div>
+                <div>
+                    <div class="font-black text-slate-800 mb-1">ชนิด LPN ลงช่องไหน</div>
+                    <ul class="space-y-0.5 text-slate-600 list-disc list-inside">
+                        <li><b>PP / SP</b> → กรอกจำนวนกล่อง → ลงช่อง <b>กล่อง M</b></li>
+                        <li><b>PT / PN / PR</b> → เลือกสี Tote → ลงช่องตามสี</li>
+                        <li><b>กระดาษ (Reuse)</b> → รวมเข้าช่อง กล่อง M</li>
+                    </ul>
+                </div>
+                <div>
+                    <div class="font-black text-slate-800 mb-1">รวมกล่อง (Combine)</div>
+                    <div class="text-slate-600">แท็บ "รวมกล่อง/พาเลท" → สแกน LPN หลัก → สแกน LPN รองที่จะรวม → เลือกสี Tote → ยืนยัน</div>
+                </div>
+                <div>
+                    <div class="font-black text-slate-800 mb-1">ไฟสัญญาณ</div>
+                    <div class="text-slate-600">ยิงสำเร็จ = ไฟวาบ <span class="text-green-600 font-black">เขียว ✓</span> · ผิด/ซ้ำ = ไฟวาบ <span class="text-red-600 font-black">แดง ✕</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="flashOverlay" class="hidden fixed inset-0 z-[3000] flex items-center justify-center pointer-events-none" style="transition:opacity .25s;opacity:0"></div>
+    <div id="palletColorModal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-[80]">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-5 text-center">
+            <div class="text-sm text-slate-500 font-bold">เริ่มพาเลทใหม่</div>
+            <div class="text-lg font-black text-slate-800 mb-3" id="palletColorModalTitle">เลือกสีพาเลท ลำดับที่ 1</div>
+            <button id="palletModalFinishBtn" onclick="palletModalFinish()" class="hidden mb-3 w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-3.5 rounded-xl shadow text-base">✅ ยิงครบแล้ว — จบงานสาขานี้</button>
+            <div class="grid grid-cols-1 gap-2.5">
+                <button onclick="pickPalletColor('Green')" class="bg-green-600 text-white font-black py-4 rounded-xl shadow text-xl">[1] เขียว</button>
+                <button onclick="pickPalletColor('Blue')" class="text-white font-black py-4 rounded-xl shadow text-xl" style="background:#0ea5e9">[2] ฟ้า</button>
+                <button onclick="pickPalletColor('Red')" class="bg-red-600 text-white font-black py-4 rounded-xl shadow text-xl">[3] แดง</button>
+            </div>
+            <div id="palletColorModalHint" class="text-[11px] text-slate-400 mt-3">* เลือกสีพาเลทก่อนเริ่มยิง LPN (กด 1 / 2 / 3 ได้)</div>
+            <button onclick="palletModalBack()" class="mt-3 w-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-2.5 rounded-xl text-sm">← กลับไปเลือกสาขา</button>
+        </div>
+    </div>
+    <div class="fixed bottom-1 left-1.5 z-[1400] text-[9px] leading-none text-slate-400 font-bold pointer-events-none select-none">Pro LPN Scanner · v1.1 (2026-07-13)</div>
+    <div id="quickTools" class="fixed z-[1500] flex flex-col gap-2" style="bottom:16px;right:12px">
+        <button onclick="openHelp()" title="วิธีใช้งาน / คำอธิบาย" class="w-11 h-11 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-black shadow-lg text-lg opacity-90">?</button>
+        <button onclick="toggleBigText()" id="bigTextBtn" title="ปรับตัวอักษรใหญ่" class="w-11 h-11 rounded-full bg-slate-700 hover:bg-slate-800 text-white font-black shadow-lg text-base opacity-90">ก+</button>
+        <button onclick="scrollListTop()" title="เลื่อนขึ้นบนสุด" class="w-11 h-11 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg text-2xl leading-none opacity-90">↑</button>
+    </div>
+    <script>
+        try { if (localStorage.getItem('proScannerBigText') === '1') { document.body.classList.add('big-text'); var _bt = document.getElementById('bigTextBtn'); if (_bt) _bt.textContent = 'ก'; } } catch (e) { }
     </script>
 </body>
 
