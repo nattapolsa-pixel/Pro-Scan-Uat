@@ -1126,6 +1126,7 @@
                     <div id="branchCompletionTimeDisplay"
                         class="hidden mb-3 px-3 py-2 rounded-lg bg-green-50 border border-green-200 text-green-800 text-xs font-black">
                     </div>
+                    <button onclick="hideFinishArea()" class="w-full mb-2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-2 rounded-lg text-sm flex items-center justify-center gap-1">↩ ยังไม่จบ — กลับไปแก้ไข / ดูพาเลท</button>
                     <div class="grid grid-cols-1 gap-2">
                         <button onclick="openShippingDocument(selectedBranchCode)"
                             class="w-full bg-amber-500 hover:bg-amber-600 text-gray-900 font-black text-lg py-3 rounded-xl shadow border-b-4 border-amber-700 transition flex items-center justify-center gap-2 active:scale-98">
@@ -3068,7 +3069,7 @@
                 _elTypeStats.innerHTML = `<span class="inline-flex items-center gap-1.5 bg-red-50 text-red-700 border border-red-200 px-2.5 py-1 rounded-full"><span class="w-2 h-2 rounded-full bg-red-500"></span> PR ${cntPR}</span><span class="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-1 rounded-full"><span class="w-2 h-2 rounded-full bg-blue-500"></span> PT/PN ${cntPTPN}</span><span class="inline-flex items-center gap-1.5 bg-orange-50 text-orange-700 border border-orange-200 px-2.5 py-1 rounded-full"><span class="w-2 h-2 rounded-sm bg-orange-500"></span> PP/SP ${cntDirectQty}</span>`;
                 const isFullyScanned = branchItems.every(i => i.status === 'Scanned' || i.status === 'ForceClosed');
                 if (unscannedCount > 0) _elForceBtn.classList.remove('hidden'); else _elForceBtn.classList.add('hidden');
-                if (isFullyScanned && branchItems.length > 0) _elFinishArea.classList.remove('hidden'); else _elFinishArea.classList.add('hidden');
+                if (isFullyScanned && branchItems.length > 0 && !finishAreaHidden) { _elFinishArea.classList.remove('hidden'); } else { _elFinishArea.classList.add('hidden'); if (!isFullyScanned) finishAreaHidden = false; }
 
                 const completionRecord = getBranchCompletionRecord(selectedBranchCode);
                 if (_elBranchCompletionTime) {
@@ -3569,6 +3570,7 @@
             const PALLET_CLR_HEX = { Green: '#16a34a', Blue: '#0ea5e9', Red: '#dc2626' };
             let activePalletNo = 0, activePalletColor = null, activePalletType = 'TOTE', palletColorMode = false;
             let palletAllDone = false;
+            let finishAreaHidden = false; // ✅ กด "กลับไปแก้ไข" → ซ่อนเมนูจบงานชั่วคราว (กันบังจอบน handheld)
             let noSaveMode = false; // 🟢 โหมดใช้งานจริง: บันทึกขึ้นเซิร์ฟเวอร์
             let lastScannedLpn = null; // สำหรับปุ่มยกเลิกล่าสุด
             let lpnSearchTerm = '';    // สำหรับค้นหา LPN ในรายการ
@@ -3677,6 +3679,11 @@
                 }
             }
             // 🏁 สิ้นสุดงานสาขา: ถ้ายังมี LPN ค้าง → ยืนยันแล้วบันทึกเป็น 0 (บังคับปิด); ถ้าครบแล้ว → ปิดจบปกติ
+            function hideFinishArea() {
+                finishAreaHidden = true;
+                const el = document.getElementById('finishJobArea'); if (el) el.classList.add('hidden');
+                showToast('↩ กลับไปแก้ไขได้ — จะจบงานกดปุ่ม 🏁 ด้านบน หรือแก้พาเลท/ยิงต่อได้เลย');
+            }
             function endBranchJob() {
                 const remaining = allLpnsInWave.filter(i => (i.branch || 'Unknown') === selectedBranchCode && i.status !== 'Scanned' && i.status !== 'ForceClosed');
                 if (remaining.length > 0) {
