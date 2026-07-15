@@ -2039,10 +2039,18 @@
                 });
 
                 const branchTotalBoxes = mCount + redCount + blueCount + greenCount + blackCount + paperBoxCount + yellowCount;
-                const branchPalletInputValue = getDocumentPalletCount(bCode);
-                if (branchPalletInputValue === '') allBranchesHavePalletCount = false;
-                const branchPallets = branchPalletInputValue === '' ? 0 : Number(branchPalletInputValue);
-                const branchPalletDisplay = branchPalletInputValue === '' ? '-' : branchPalletInputValue;
+                // ✅ ยอดพาเลทอัตโนมัติจากที่ยิงจริง (palletNo ที่ sync จาก backend/เครื่องนี้) → ขึ้นเองแม้เปิดเอกสารคนละเครื่อง
+                const autoPalletCount = branchItems.reduce((mx, it) => {
+                    if (it.status !== 'Scanned') return mx;
+                    const p = parseInt(it.palletNo) || parseInt(it.pallet_no) || 0;
+                    return p > mx ? p : mx;
+                }, 0);
+                // ถ้ากรอกเองไว้ (manual) → ใช้ค่ากรอก (แก้มือชนะ), ไม่งั้นใช้ค่าอัตโนมัติ
+                const manualPalletValue = getDocumentPalletCount(bCode);
+                const branchPallets = manualPalletValue !== '' ? Number(manualPalletValue) : autoPalletCount;
+                if (branchPallets === 0) allBranchesHavePalletCount = false;
+                const branchPalletInputValue = branchPallets > 0 ? String(branchPallets) : '';
+                const branchPalletDisplay = branchPallets > 0 ? String(branchPallets) : '-';
 
                 // Accumulate totals
                 totalM += mCount;
@@ -2787,6 +2795,9 @@
             }
 
             allLpnsInWave = data.lpn_list || [];
+            // ✅ เลขพาเลทที่ sync มาจาก backend (pallet_no) → ตั้งเป็น palletNo ในเครื่องนี้ (ทุกเครื่องเห็นยอดพาเลทตรงกัน)
+            //    เก็บค่าที่มากกว่าไว้ กันของที่เพิ่งยิงในเครื่องนี้หาย ถ้ายังไม่ deploy backend ค่าจะเป็น 0 = ใช้ของเดิม
+            (allLpnsInWave || []).forEach(it => { if (it) it.palletNo = Math.max(parseInt(it.pallet_no) || 0, parseInt(it.palletNo) || 0); });
             // ✅ 1 LPN มีหลายสินค้า (หลายแถว) → รวมเป็น 1 รายการต่อ LPN: สแกนครั้งเดียวจบทั้ง LPN, ความคืบหน้าถึง 100% ได้, ไม่นับซ้ำ
             (function mergeDuplicateLpns() {
                 const map = {}, order = [];
@@ -4009,7 +4020,7 @@
             <button onclick="palletModalBack()" class="mt-3 w-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-2.5 rounded-xl text-sm">← กลับไปเลือกสาขา</button>
         </div>
     </div>
-    <div class="fixed bottom-1 left-1.5 z-[1400] text-[9px] leading-none text-slate-400 font-bold pointer-events-none select-none">Pro LPN Scanner · v1.1 (2026-07-13)</div>
+    <div class="fixed bottom-1 left-1.5 z-[1400] text-[9px] leading-none text-slate-400 font-bold pointer-events-none select-none">Pro LPN Scanner · v1.2 (2026-07-15)</div>
     <div id="quickTools" class="fixed z-[1500] flex flex-col gap-2" style="bottom:16px;right:12px">
         <button onclick="openHelp()" title="วิธีใช้งาน / คำอธิบาย" class="w-11 h-11 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-black shadow-lg text-lg opacity-90">?</button>
         <button onclick="toggleBigText()" id="bigTextBtn" title="ปรับตัวอักษรใหญ่" class="w-11 h-11 rounded-full bg-slate-700 hover:bg-slate-800 text-white font-black shadow-lg text-base opacity-90">ก+</button>
