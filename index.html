@@ -2021,18 +2021,32 @@
 
                 branchItems.forEach(item => {
                     if (item.status === 'Scanned') {
-                        // ✅ กล่องแม่ที่รวมกล่อง (Combine master) เป็นแค่พาเลทรวม ไม่นับซ้ำ
-                        //    ยอดจะไปนับที่กล่องลูกตามสีแทน (ทำให้ตอนใช้งานสด = หลังรีเฟรช)
-                        if (item.isMaster) return;
+                        // ✅ Combine แสดงจำนวน "ภาชนะจริง" ในใบคุมส่งสินค้า:
+                        //    1 Master = 1 Tote และไม่เอา Child LPN ภายในมานับซ้ำเป็นหลายใบ
+                        if (item.combinedWith) return;
                         const qty = getActualQty(item);
                         const prefix = String(item.lpn || '').substring(0, 2).toUpperCase();
                         const color = String(item.color || '').toUpperCase();
                         const type = String(item.scan_type || '').toUpperCase();
 
-                        if (isDirectQtyPrefix(prefix)) {
-                            if (!item.combinedWith && !item.isMaster) {
-                                mCount += qty;
+                        if (item.isMaster) {
+                            const combinedChildren = branchItems.filter(child => child.combinedWith === item.lpn);
+                            const masterPart = getColorBreakdown(item)[0];
+                            const childPart = combinedChildren
+                                .flatMap(child => getColorBreakdown(child))
+                                .find(Boolean);
+                            const physicalContainer = masterPart || childPart;
+
+                            if (physicalContainer) {
+                                addQtyToSummary(prefix, physicalContainer.color, physicalContainer.type, 1);
+                            } else {
+                                addQtyToSummary(prefix, color, type, 1);
                             }
+                            return;
+                        }
+
+                        if (isDirectQtyPrefix(prefix)) {
+                            mCount += qty;
                         } else {
                             const breakdown = getColorBreakdown(item);
                             if (breakdown.length > 0) {
@@ -2965,6 +2979,18 @@
                 const completionMeta = completionRecord
                     ? `<div class="mt-1 text-[11px] font-black text-green-700 truncate">บันทึกจบ: ${escapeDocumentText(formatBangkokDateTime(completionRecord.completed_at))}</div>`
                     : '';
+                const palletState = readPalletWorkflowState(bCode);
+                const submittedCount = palletState && Array.isArray(palletState.submitted_nos) ? palletState.submitted_nos.length : 0;
+                const hasPendingPallet = !!(palletState && parseInt(palletState.active_no) > 0 && palletState.active_color);
+                if (hasPendingPallet) {
+                    btnStyle = 'border-orange-400 bg-orange-50 text-orange-900';
+                    statusBadge = `<div class="font-black text-xl ml-2 whitespace-nowrap px-3 py-1 rounded-full bg-orange-200 text-orange-800">${scannedBoxes}/${totalBoxes}</div>`;
+                }
+                const palletMeta = hasPendingPallet
+                    ? `<div class="mt-1 text-[11px] font-black text-orange-700 truncate">🟠 ส่งแล้ว ${submittedCount} • พาเลทใบที่ ${parseInt(palletState.active_no)} ยังไม่ส่ง</div>`
+                    : submittedCount > 0
+                        ? `<div class="mt-1 text-[11px] font-black text-emerald-700 truncate">✅ ส่งแล้ว ${submittedCount} พาเลท</div>`
+                        : '';
 
                 htmlParts.push(`
                     <button onclick="selectBranch('${bCode}', '${bName}')" class="flex items-center p-4 rounded-xl border-2 shadow-sm active:scale-95 transition ${btnStyle}">
@@ -2972,6 +2998,7 @@
                             <div class="font-black text-xl truncate">${bCode}</div>
                             <div class="text-xs font-bold truncate opacity-70">${bName}</div>
                             ${completionMeta}
+                            ${palletMeta}
                         </div>
                         ${statusBadge}
                     </button>
@@ -2993,7 +3020,7 @@
             }
 
             function selectBranch(code, name) { selectedBranchCode = code; selectedBranchName = name; document.getElementById('branchSelectorModal').classList.add('hidden'); document.getElementById('mainApp').classList.remove('hidden'); document.getElementById('mainApp').classList.add('flex'); document.getElementById('currentBranchDisplay').innerText = code; document.getElementById('currentBranchNameDisplay').innerText = name; syncBranchPalletCountInput(); updateDashboardUI(); switchTab('scan'); resumeOrStartPallet(); requestWakeLock(); }
-            function backToBranchSelect() { selectedBranchCode = ""; syncBranchPalletCountInput(); document.getElementById('mainApp').classList.add('hidden'); renderBranchGrid(); document.getElementById('branchSelectorModal').classList.remove('hidden'); document.getElementById('branchSelectorModal').classList.add('flex'); activePalletNo = 0; activePalletColor = null; palletColorMode = false; }
+            function backToBranchSelect() { if (selectedBranchCode) persistPalletWorkflowState(); correctionPalletNo = 0; correctionReturnState = null; selectedBranchCode = ""; syncBranchPalletCountInput(); document.getElementById('mainApp').classList.add('hidden'); renderBranchGrid(); document.getElementById('branchSelectorModal').classList.remove('hidden'); document.getElementById('branchSelectorModal').classList.add('flex'); activePalletNo = 0; activePalletColor = null; palletColorMode = false; submittedPalletNos = new Set(); }
 
             // ==================== REFACTOR UI ====================
             // Cache DOM elements ที่ใช้บ่อยใน updateDashboardUI
@@ -3112,7 +3139,7 @@
                 const branchItems = allLpnsInWave.filter(item => (item.branch || "Unknown") === selectedBranchCode);
                 branchItems.forEach(i => { if (i.combinedWith === masterLpn) { i.combinedWith = null; i.status = 'Pending'; i.qty = 0; pushToQueue({ wave_no: i.wave_no || currentWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: i.lpn, type: 'CANCEL_COMBINE', color: 'None', qty: 0, emp_id: loggedInEmpId }); } });
                 const master = branchItems.find(i => i.lpn === masterLpn); if (master) { master.isMaster = false; master.childCount = 0; master.status = 'Pending'; master.qty = 0; pushToQueue({ wave_no: master.wave_no || currentWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: master.lpn, type: 'CANCEL_COMBINE', color: 'None', qty: 0, emp_id: loggedInEmpId }); }
-                updateDashboardUI(); saveCurrentWaveDataCache(); showToast(`🔄 ยกเลิกการรวมกล่อง/พาเลท ${masterLpn} เรียบร้อยแล้ว`);
+                updateDashboardUI(); saveCurrentWaveDataCache(); persistPalletWorkflowState(); showToast(`🔄 ยกเลิกการรวมกล่อง/พาเลท ${masterLpn} เรียบร้อยแล้ว`); finishCorrectionAfterScan();
             }
 
             async function undoSingleChild(childLpn) {
@@ -3121,12 +3148,12 @@
                 const masterLpn = item.combinedWith; item.combinedWith = null; item.status = 'Pending'; item.qty = 0;
                 pushToQueue({ wave_no: item.wave_no || currentWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: childLpn, type: 'CANCEL_COMBINE', color: 'None', qty: 0, emp_id: loggedInEmpId });
                 const master = allLpnsInWave.find(i => i.lpn === masterLpn); if (master) { master.childCount = Math.max(0, (master.childCount || 1) - 1); if (master.childCount === 0) { master.isMaster = false; master.status = 'Pending'; pushToQueue({ wave_no: master.wave_no || currentWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: master.lpn, type: 'CANCEL_COMBINE', color: 'None', qty: 0, emp_id: loggedInEmpId }); } }
-                updateDashboardUI(); saveCurrentWaveDataCache(); showToast(`🔄 แยกกล่อง ${childLpn} ออกจากพาเลทเรียบร้อยแล้ว`);
+                updateDashboardUI(); saveCurrentWaveDataCache(); persistPalletWorkflowState(); showToast(`🔄 แยกกล่อง ${childLpn} ออกจากพาเลทเรียบร้อยแล้ว`); finishCorrectionAfterScan();
             }
 
             async function resetSingleBox(lpn) {
                 if (!confirm(`คุณต้องการยกเลิกการตรวจสอบกล่อง ${lpn} และคืนค่ากลับเป็นค้างตรวจสอบใช่หรือไม่?`)) return;
-                const item = allLpnsInWave.find(i => i.lpn === lpn); if (item) { item.status = 'Pending'; item.qty = 0; item.color = 'None'; item.scan_type = ''; item.color_breakdown = []; item.palletNo = null; item.palletColor = null; item.pallet_breakdown = []; pushToQueue({ wave_no: item.wave_no || currentWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: lpn, type: 'RESET_BOX', color: 'None', qty: 0, emp_id: loggedInEmpId }); updateDashboardUI(); saveCurrentWaveDataCache(); showToast(`🔄 คืนค่ากล่อง ${lpn} เรียบร้อยแล้ว`); }
+                const item = allLpnsInWave.find(i => i.lpn === lpn); if (item) { item.status = 'Pending'; item.qty = 0; item.color = 'None'; item.scan_type = ''; item.color_breakdown = []; item.palletNo = null; item.palletColor = null; item.pallet_breakdown = []; pushToQueue({ wave_no: item.wave_no || currentWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: lpn, type: 'RESET_BOX', color: 'None', qty: 0, emp_id: loggedInEmpId }); updateDashboardUI(); saveCurrentWaveDataCache(); persistPalletWorkflowState(); showToast(`🔄 คืนค่ากล่อง ${lpn} เรียบร้อยแล้ว`); finishCorrectionAfterScan(); }
             }
 
             function switchTab(mode) { const isScan = mode === 'scan'; document.getElementById('modeScan').classList.toggle('hidden', !isScan); document.getElementById('modeCombine').classList.toggle('hidden', isScan); document.getElementById('tabScan').className = `flex-1 py-3 font-bold flex items-center justify-center gap-2 ${isScan ? 'text-blue-700 border-b-4 border-blue-700' : 'border-b-4 border-transparent text-gray-500'}`; document.getElementById('tabCombine').className = `flex-1 py-3 font-bold flex items-center justify-center gap-2 ${!isScan ? 'text-purple-700 border-b-4 border-purple-700' : 'border-b-4 border-transparent text-gray-500'}`; syncBranchPalletCountInput(); if (selectedBranchCode !== "") { if (isScan) document.getElementById('lpnInput').focus(); else document.getElementById('masterInput').focus(); } }
@@ -3251,7 +3278,13 @@
             function confirmBackToBranchSelect() {
                 const scannedHere = allLpnsInWave.some(i => (i.branch || 'Unknown') === selectedBranchCode && i.status === 'Scanned' && (parseInt(i.palletNo) || 0) > 0);
                 if (activePalletColor || scannedHere) {
-                    showConfirm('ออกจากสาขานี้?', `กำลังทำสาขา ${selectedBranchCode} อยู่ (มีพาเลทที่ทำค้าง)\nงานจะถูกเก็บไว้ให้ทำต่อเมื่อกลับเข้ามา\n\nต้องการออกไปเลือกสาขาใหม่ไหม?`, 'ออกไปเลือกสาขา', () => backToBranchSelect());
+                    const currentItems = activePalletNo ? getPalletItems(activePalletNo).length : 0;
+                    showConfirm(
+                        'พาเลทปัจจุบันยังไม่ได้ส่ง',
+                        `สาขา ${selectedBranchCode} • ส่งแล้ว ${submittedPalletNos.size} พาเลท\n${activePalletNo ? `พาเลทใบที่ ${activePalletNo} มี ${currentItems} LPN และยังไม่ได้ส่ง\n` : ''}ระบบจะบันทึกงานค้างไว้ให้กลับมาทำต่อได้\n\nต้องการบันทึกงานค้างและออกหรือไม่?`,
+                        'บันทึกงานค้างและออก',
+                        () => { persistPalletWorkflowState(); saveCurrentWaveDataCache(); backToBranchSelect(); }
+                    );
                 } else { backToBranchSelect(); }
             }
             // ✅ เลื่อนขึ้นบนสุด / ปรับตัวอักษรใหญ่
@@ -3571,14 +3604,32 @@
                 resetScanColorButtons();
                 updateDashboardUI();
                 saveCurrentWaveDataCache();
+                persistPalletWorkflowState();
                 showToast(`บันทึกข้อมูล ${lpn} สำเร็จ (${totalQty} กล่อง / ${entries.length} สี)`);
                 lpnInput.focus();
                 const lpnWave = target ? (target.wave_no || currentWave) : currentWave;
+                const scannedPalletNo = activePalletNo;
                 entries.forEach(entry => {
-                    pushToQueue({ wave_no: lpnWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: lpn, type: entry.type, color: entry.color, qty: entry.qty, emp_id: loggedInEmpId, pallet_no: activePalletNo });
+                    pushToQueue({ wave_no: lpnWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: lpn, type: entry.type, color: entry.color, qty: entry.qty, emp_id: loggedInEmpId, pallet_no: scannedPalletNo });
                 });
+                finishCorrectionAfterScan();
             }
-            async function executeScanSave(color, type = 'TOTE', qty = 1, forceLpn = null) { const lpn = forceLpn || document.getElementById('displayLpn').innerText; colorSection.classList.add('hidden'); qtySection.classList.add('hidden'); colorQtyArea.classList.add('hidden'); resetScanColorButtons(); lastScannedLpn = lpn; const target = allLpnsInWave.find(item => item.lpn === lpn); if (target) { target.status = 'Scanned'; target.qty = qty; target.color = color; target.scan_type = type; target.color_breakdown = []; target.palletNo = activePalletNo; target.palletColor = activePalletColor; } updateDashboardUI(); saveCurrentWaveDataCache(); showToast(`บันทึกข้อมูล ${lpn} สำเร็จ`); flashScreen(true); lpnInput.focus(); const lpnWave = target ? (target.wave_no || currentWave) : currentWave; pushToQueue({ wave_no: lpnWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: lpn, type: type, color: color, qty: qty, emp_id: loggedInEmpId, pallet_no: activePalletNo }); }
+            async function executeScanSave(color, type = 'TOTE', qty = 1, forceLpn = null) {
+                const lpn = forceLpn || document.getElementById('displayLpn').innerText;
+                const scannedPalletNo = activePalletNo;
+                colorSection.classList.add('hidden'); qtySection.classList.add('hidden'); colorQtyArea.classList.add('hidden');
+                resetScanColorButtons(); lastScannedLpn = lpn;
+                const target = allLpnsInWave.find(item => item.lpn === lpn);
+                if (target) {
+                    target.status = 'Scanned'; target.qty = qty; target.color = color; target.scan_type = type;
+                    target.color_breakdown = []; target.palletNo = scannedPalletNo; target.palletColor = activePalletColor;
+                }
+                updateDashboardUI(); saveCurrentWaveDataCache(); persistPalletWorkflowState();
+                showToast(`บันทึกข้อมูล ${lpn} สำเร็จ`); flashScreen(true); lpnInput.focus();
+                const lpnWave = target ? (target.wave_no || currentWave) : currentWave;
+                pushToQueue({ wave_no: lpnWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: lpn, type: type, color: color, qty: qty, emp_id: loggedInEmpId, pallet_no: scannedPalletNo });
+                finishCorrectionAfterScan();
+            }
 
             // ==================== 🎨 PALLET-FIRST FLOW (เพิ่มใหม่) ====================
             const PALLET_TH = { Black: 'ดำ', Blue: 'น้ำเงิน', Yellow: 'เหลือง', Green: 'เขียว', Red: 'แดง', Reuse: 'กระดาษ', None: '-' };
@@ -3587,11 +3638,87 @@
             const PALLET_CLR_TH = { Green: 'เขียว', Blue: 'ฟ้า', Red: 'แดง' };
             const PALLET_CLR_HEX = { Green: '#16a34a', Blue: '#0ea5e9', Red: '#dc2626' };
             let activePalletNo = 0, activePalletColor = null, activePalletType = 'TOTE', palletColorMode = false;
+            let submittedPalletNos = new Set();
+            let correctionPalletNo = 0;
+            let correctionReturnState = null;
             let palletAllDone = false;
             let finishAreaHidden = false; // ✅ กด "กลับไปแก้ไข" → ซ่อนเมนูจบงานชั่วคราว (กันบังจอบน handheld)
             let noSaveMode = false; // 🟢 โหมดใช้งานจริง: บันทึกขึ้นเซิร์ฟเวอร์
             let lastScannedLpn = null; // สำหรับปุ่มยกเลิกล่าสุด
             let lpnSearchTerm = '';    // สำหรับค้นหา LPN ในรายการ
+
+            function getPalletWorkflowKey(branchCode = selectedBranchCode) {
+                const workKey = getCurrentWorkCompletionKey();
+                const branchKey = normalizeBranchLookupCode(branchCode);
+                return workKey && branchKey ? `proScannerPalletWorkflow:${workKey}:${branchKey}` : '';
+            }
+            function readPalletWorkflowState(branchCode = selectedBranchCode) {
+                try {
+                    const key = getPalletWorkflowKey(branchCode);
+                    return key ? (JSON.parse(localStorage.getItem(key)) || null) : null;
+                } catch (e) { return null; }
+            }
+            function getPalletItems(palletNo, branchCode = selectedBranchCode) {
+                const no = parseInt(palletNo) || 0;
+                return allLpnsInWave.filter(i =>
+                    (i.branch || 'Unknown') === branchCode
+                    && i.status === 'Scanned'
+                    && (parseInt(i.palletNo) || 0) === no
+                );
+            }
+            function getPersistedActivePallet() {
+                if (correctionPalletNo && correctionReturnState) return correctionReturnState;
+                return { no: activePalletNo, color: activePalletColor, type: activePalletType };
+            }
+            function persistPalletWorkflowState() {
+                try {
+                    const key = getPalletWorkflowKey();
+                    if (!key) return;
+                    const current = getPersistedActivePallet();
+                    localStorage.setItem(key, JSON.stringify({
+                        active_no: parseInt(current.no) || 0,
+                        active_color: current.color || null,
+                        active_type: current.type || 'TOTE',
+                        submitted_nos: Array.from(submittedPalletNos).map(Number).filter(n => n > 0).sort((a, b) => a - b),
+                        updated_at: new Date().toISOString()
+                    }));
+                } catch (e) { }
+            }
+            function syncSubmittedPalletDocumentCount() {
+                if (!selectedBranchCode) return;
+                updateDocumentPalletCount(selectedBranchCode, submittedPalletNos.size > 0 ? submittedPalletNos.size : '');
+                syncBranchPalletCountInput();
+            }
+            function markActivePalletSubmitted(showFeedback = true) {
+                const current = getPersistedActivePallet();
+                const no = parseInt(current.no) || 0;
+                if (!no || getPalletItems(no).length === 0) return false;
+                submittedPalletNos.add(no);
+                persistPalletWorkflowState();
+                syncSubmittedPalletDocumentCount();
+                if (showFeedback) {
+                    showToast(`✅ ส่งพาเลทใบที่ ${no} แล้ว • รวมส่งแล้ว ${submittedPalletNos.size} พาเลท`);
+                    flashScreen(true);
+                    try { if (navigator.vibrate) navigator.vibrate([100, 60, 100]); } catch (e) { }
+                }
+                return true;
+            }
+            function finishPalletCorrection(showFeedback = true) {
+                if (!correctionPalletNo || !correctionReturnState) return;
+                const returnNo = correctionReturnState.no;
+                activePalletNo = correctionReturnState.no;
+                activePalletColor = correctionReturnState.color;
+                activePalletType = correctionReturnState.type || 'TOTE';
+                correctionPalletNo = 0;
+                correctionReturnState = null;
+                persistPalletWorkflowState();
+                updatePalletBanner();
+                renderPalletGroups();
+                if (showFeedback) showToast(returnNo ? `กลับมาพาเลทที่กำลังทำใบที่ ${returnNo} แล้ว` : 'ออกจากโหมดแก้ไขแล้ว');
+            }
+            function finishCorrectionAfterScan() {
+                if (correctionPalletNo) setTimeout(() => finishPalletCorrection(true), 150);
+            }
 
             function undoLastScan() {
                 if (!lastScannedLpn) return;
@@ -3602,9 +3729,10 @@
                 item.combinedWith = null; item.isMaster = false; item.palletNo = null; item.palletColor = null;
                 pushToQueue({ wave_no: item.wave_no || currentWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: lpn, type: 'RESET_BOX', color: 'None', qty: 0, emp_id: loggedInEmpId, pallet_no: 0 });
                 lastScannedLpn = null;
-                updateDashboardUI(); saveCurrentWaveDataCache();
+                updateDashboardUI(); saveCurrentWaveDataCache(); persistPalletWorkflowState();
                 showToast(`↩ ยกเลิก ${lpn} แล้ว (คืนเป็นค้างตรวจสอบ)`);
                 document.getElementById('lpnInput').focus();
+                finishCorrectionAfterScan();
             }
             function renderUndoBar() {
                 const el = document.getElementById('undoBar'); if (!el) return;
@@ -3625,7 +3753,12 @@
             function startPalletColorPrompt() {
                 palletColorMode = true; activePalletColor = null;
                 colorSection.classList.add('hidden'); colorQtyArea.classList.add('hidden'); qtySection.classList.add('hidden');
-                const t = document.getElementById('palletColorModalTitle'); if (t) t.innerText = `เลือกสีพาเลท ลำดับที่ ${activePalletNo + 1}`;
+                const branchPalletNos = allLpnsInWave
+                    .filter(i => (i.branch || 'Unknown') === selectedBranchCode && i.status === 'Scanned')
+                    .map(i => parseInt(i.palletNo) || 0)
+                    .concat(Array.from(submittedPalletNos));
+                const nextNo = (branchPalletNos.length ? Math.max(...branchPalletNos) : 0) + 1;
+                const t = document.getElementById('palletColorModalTitle'); if (t) t.innerText = `เลือกสีพาเลทใบที่ ${nextNo}`;
                 const _bi = allLpnsInWave.filter(i => (i.branch || 'Unknown') === selectedBranchCode);
                 const _rem = _bi.filter(i => i.status !== 'Scanned' && i.status !== 'ForceClosed').length;
                 palletAllDone = (_bi.length > 0 && _rem === 0);
@@ -3652,17 +3785,31 @@
             }
             function setActivePallet(color, type) {
                 const _done = allLpnsInWave.filter(i => (i.branch || 'Unknown') === selectedBranchCode && i.status === 'Scanned' && (parseInt(i.palletNo) || 0) > 0);
-                activePalletNo = (_done.length ? Math.max(..._done.map(i => parseInt(i.palletNo) || 0)) : 0) + 1;
+                const usedNos = _done.map(i => parseInt(i.palletNo) || 0).concat(Array.from(submittedPalletNos));
+                activePalletNo = (usedNos.length ? Math.max(...usedNos) : 0) + 1;
                 activePalletColor = color; activePalletType = type || 'TOTE'; palletColorMode = false;
                 document.getElementById('palletColorModal').classList.add('hidden');
-                if (selectedBranchCode) { updateDocumentPalletCount(selectedBranchCode, activePalletNo); syncBranchPalletCountInput(); }
+                persistPalletWorkflowState();
                 updatePalletBanner();
                 showToast(`พาเลทใบที่ ${activePalletNo} • สีพาเลท${PALLET_CLR_TH[color] || color} — ยิง LPN ได้เลย`);
                 setTimeout(() => lpnInput.focus(), 50);
             }
-            function nextPallet() { startPalletColorPrompt(); }
+            function nextPallet() {
+                if (correctionPalletNo) { finishPalletCorrection(false); }
+                const currentNo = activePalletNo;
+                if (currentNo && getPalletItems(currentNo).length > 0) markActivePalletSubmitted(true);
+                activePalletNo = 0;
+                activePalletColor = null;
+                activePalletType = 'TOTE';
+                persistPalletWorkflowState();
+                updatePalletBanner();
+                startPalletColorPrompt();
+            }
             // ✏️ เข้าแก้ไขพาเลทที่ทำไว้แล้ว: ยิง LPN ใหม่จะเข้าพาเลทนี้ (ใช้คู่กับปุ่ม ✕ ยกเลิก LPN ในการ์ดพาเลท)
             function editPallet(no, color) {
+                if (correctionPalletNo) finishPalletCorrection(false);
+                correctionReturnState = { no: activePalletNo, color: activePalletColor, type: activePalletType };
+                correctionPalletNo = parseInt(no) || 0;
                 activePalletNo = parseInt(no) || 0;
                 activePalletColor = color || null;
                 activePalletType = (color === 'Reuse') ? 'Carton' : 'TOTE';
@@ -3673,26 +3820,36 @@
                 document.getElementById('palletColorModal').classList.add('hidden');
                 updatePalletBanner();
                 renderPalletGroups();
-                showToast(`✏️ เข้าแก้ไขพาเลท ${no} — กด ✕ ยกเลิก LPN ที่ผิด แล้วยิงใหม่เข้าพาเลทนี้`);
+                showToast(`✏️ กำลังแก้พาเลท ${no} ชั่วคราว — สแกนสำเร็จแล้วระบบจะกลับใบล่าสุดให้อัตโนมัติ`);
                 setTimeout(() => { try { lpnInput.focus(); } catch (e) { } }, 50);
             }
             // ✅ เข้าสาขาเดิมซ้ำ → ทำต่อจากของเดิม (ไม่รีเซ็ตพาเลทที่ทำไว้)
             function resumeOrStartPallet() {
                 const done = allLpnsInWave.filter(i => (i.branch || 'Unknown') === selectedBranchCode && i.status === 'Scanned' && (parseInt(i.palletNo) || 0) > 0);
+                const saved = readPalletWorkflowState();
+                submittedPalletNos = new Set((saved && Array.isArray(saved.submitted_nos) ? saved.submitted_nos : []).map(Number).filter(n => n > 0));
+                correctionPalletNo = 0;
+                correctionReturnState = null;
                 if (done.length) {
                     const maxNo = Math.max(...done.map(i => parseInt(i.palletNo) || 0));
-                    activePalletNo = maxNo;
-                    const lastItem = done.find(i => (parseInt(i.palletNo) || 0) === maxNo);
-                    activePalletColor = (lastItem && lastItem.palletColor) ? lastItem.palletColor : null;
+                    if (!saved) Array.from(new Set(done.map(i => parseInt(i.palletNo) || 0))).filter(n => n > 0 && n < maxNo).forEach(n => submittedPalletNos.add(n));
+                    const savedActiveNo = parseInt(saved && saved.active_no) || 0;
+                    activePalletNo = savedActiveNo && getPalletItems(savedActiveNo).length ? savedActiveNo : (submittedPalletNos.has(maxNo) ? 0 : maxNo);
+                    const lastItem = done.find(i => (parseInt(i.palletNo) || 0) === activePalletNo);
+                    activePalletColor = (saved && saved.active_color) || (lastItem && lastItem.palletColor) || null;
                     activePalletType = (activePalletColor === 'Reuse') ? 'Carton' : 'TOTE';
                     palletColorMode = false;
                     colorSection.classList.add('hidden');
-                    if (!activePalletColor) { startPalletColorPrompt(); return; }
+                    persistPalletWorkflowState();
+                    syncSubmittedPalletDocumentCount();
+                    if (!activePalletNo || !activePalletColor) { updatePalletBanner(); startPalletColorPrompt(); return; }
                     updatePalletBanner();
-                    showToast(`ทำต่อสาขาเดิม — มีพาเลทที่ทำไว้แล้ว ${maxNo} ใบ`);
+                    showToast(`ทำต่อพาเลทใบที่ ${activePalletNo} • ส่งแล้ว ${submittedPalletNos.size} พาเลท`);
                     setTimeout(() => lpnInput.focus(), 50);
                 } else {
                     activePalletNo = 0; activePalletColor = null;
+                    submittedPalletNos.clear();
+                    persistPalletWorkflowState();
                     startPalletColorPrompt();
                 }
             }
@@ -3712,16 +3869,25 @@
             }
             function updatePalletBanner() {
                 const el = document.getElementById('palletBanner'); if (!el) return;
-                if (!activePalletColor) {
-                    el.className = 'bg-amber-50 border-2 border-dashed border-amber-300 rounded-xl px-3 py-2';
+                if (correctionPalletNo) {
+                    const correctionItems = getPalletItems(correctionPalletNo);
+                    const returnNo = correctionReturnState ? correctionReturnState.no : 0;
+                    el.className = 'rounded-xl px-3 py-3 bg-purple-50 border-2 border-purple-400 shadow-sm';
                     el.style.background = ''; el.style.border = '';
-                    el.innerHTML = `<div class="text-sm font-black text-amber-700 text-center">👉 เลือกสีพาเลทก่อนเริ่มยิง LPN</div>`;
+                    el.innerHTML = `<div class="flex items-start justify-between gap-3"><div class="min-w-0"><div class="text-[11px] font-black text-purple-700 uppercase tracking-wide">โหมดแก้ไขชั่วคราว</div><div class="text-lg font-black text-purple-950">กำลังแก้พาเลทใบที่ ${correctionPalletNo}</div><div class="text-xs font-bold text-purple-700 mt-1">${correctionItems.length} LPN • พาเลทที่กำลังทำจริงยังเป็นใบที่ ${returnNo || '-'}</div></div><button onclick="finishPalletCorrection()" class="bg-purple-700 text-white text-xs font-black px-3 py-2.5 rounded-lg whitespace-nowrap">บันทึกและกลับใบ ${returnNo || 'ล่าสุด'}</button></div>`;
+                    return;
+                }
+                if (!activePalletColor) {
+                    el.className = 'bg-slate-50 border-2 border-dashed border-slate-300 rounded-xl px-3 py-3';
+                    el.style.background = ''; el.style.border = '';
+                    el.innerHTML = `<div class="grid grid-cols-2 gap-2 mb-2"><div class="bg-emerald-100 rounded-lg px-3 py-2 text-center"><div class="text-[10px] font-black text-emerald-700">ส่งแล้ว</div><div class="text-2xl font-black text-emerald-900">${submittedPalletNos.size}</div></div><div class="bg-white rounded-lg px-3 py-2 text-center border"><div class="text-[10px] font-black text-slate-500">สถานะปัจจุบัน</div><div class="text-sm font-black text-slate-800 mt-1">รอเริ่มใบถัดไป</div></div></div><button onclick="startPalletColorPrompt()" class="w-full bg-slate-800 text-white font-black py-3 rounded-xl">＋ เริ่มพาเลทถัดไป</button>`;
                     return;
                 }
                 const hex = PALLET_CLR_HEX[activePalletColor] || '#64748b';
-                el.className = 'rounded-xl px-3 py-2 flex items-center justify-between gap-2';
-                el.style.background = hex + '18'; el.style.border = '2px solid ' + hex;
-                el.innerHTML = `<div class="flex items-center gap-2 min-w-0"><span style="width:16px;height:16px;border-radius:4px;background:${hex};display:inline-block;flex:none"></span><span class="font-black text-slate-800 text-sm truncate">พาเลทใบที่ ${activePalletNo} • สีพาเลท${PALLET_CLR_TH[activePalletColor] || activePalletColor}</span></div><button onclick="nextPallet()" class="bg-slate-800 text-white text-xs font-black px-3 py-2 rounded-lg whitespace-nowrap" style="flex:none">ปิด → ใบถัดไป</button>`;
+                const currentItems = getPalletItems(activePalletNo);
+                el.className = 'rounded-xl px-3 py-3 shadow-sm';
+                el.style.background = hex + '12'; el.style.border = '2px solid ' + hex;
+                el.innerHTML = `<div class="grid grid-cols-3 gap-2 mb-3"><div class="bg-white/90 rounded-lg px-2 py-2 text-center border border-emerald-200"><div class="text-[10px] font-black text-emerald-700">ส่งแล้ว</div><div class="text-2xl font-black text-emerald-900">${submittedPalletNos.size}</div></div><div class="bg-white/90 rounded-lg px-2 py-2 text-center border" style="border-color:${hex}55"><div class="text-[10px] font-black text-slate-500">กำลังทำใบที่</div><div class="text-2xl font-black text-slate-900">${activePalletNo}</div></div><div class="bg-white/90 rounded-lg px-2 py-2 text-center border" style="border-color:${hex}55"><div class="text-[10px] font-black text-slate-500">LPN ในใบนี้</div><div class="text-2xl font-black text-slate-900">${currentItems.length}</div></div></div><div class="flex items-center justify-between gap-2 mb-2"><div class="flex items-center gap-2 min-w-0"><span style="width:16px;height:16px;border-radius:4px;background:${hex};display:inline-block;flex:none"></span><span class="font-black text-slate-800 text-sm truncate">สีพาเลท${PALLET_CLR_TH[activePalletColor] || activePalletColor}</span></div><span class="bg-amber-100 text-amber-800 text-[11px] font-black px-2 py-1 rounded-full whitespace-nowrap">ยังไม่ได้ส่ง</span></div><button onclick="nextPallet()" class="w-full bg-slate-900 hover:bg-black text-white text-sm font-black px-3 py-3 rounded-xl shadow active:scale-[.99]">✅ พาเลทนี้เสร็จแล้ว — ส่งและเริ่มใบถัดไป</button>`;
             }
             function renderPalletGroups() {
                 const el = document.getElementById('palletGroupsContainer'); if (!el) return;
@@ -3731,13 +3897,13 @@
                 items.forEach(i => { const k = i.palletNo; (groups[k] = groups[k] || { no: k, color: i.palletColor, items: [] }).items.push(i); });
                 const nos = Object.keys(groups).map(Number).sort((a, b) => a - b);
                 el.innerHTML = `<div class="bg-white rounded-xl shadow-sm border border-slate-200 p-3">
-                    <div class="text-sm font-black text-slate-700 mb-2">📦 พาเลทที่ทำในสาขานี้ (${nos.length})</div>
-                    <div class="space-y-2">${nos.map(n => { const g = groups[n]; const hex = PALLET_CLR_HEX[g.color] || '#64748b'; const editing = (parseInt(n) === parseInt(activePalletNo)); return `
-                        <div class="border rounded-lg overflow-hidden ${editing ? 'border-blue-400 ring-2 ring-blue-200' : 'border-slate-200'}">
+                    <div class="flex items-center justify-between gap-2 mb-2"><div class="text-sm font-black text-slate-700">📦 พาเลทในสาขานี้ (${nos.length})</div><div class="text-[11px] font-black text-emerald-700 bg-emerald-100 px-2 py-1 rounded-full">ส่งแล้ว ${submittedPalletNos.size}</div></div>
+                    <div class="space-y-2">${nos.map(n => { const g = groups[n]; const hex = PALLET_CLR_HEX[g.color] || '#64748b'; const editing = parseInt(n) === parseInt(correctionPalletNo); const isCurrent = !correctionPalletNo && parseInt(n) === parseInt(activePalletNo); const isSubmitted = submittedPalletNos.has(parseInt(n)); return `
+                        <div class="border rounded-lg overflow-hidden ${editing ? 'border-purple-500 ring-2 ring-purple-200' : isCurrent ? 'border-amber-400 ring-2 ring-amber-100' : 'border-slate-200'}">
                             <div class="flex items-center justify-between gap-2 px-2.5 py-1.5" style="background:${hex}15">
-                                <div class="flex items-center gap-1.5 font-black text-slate-800 text-xs min-w-0"><span style="width:12px;height:12px;border-radius:3px;background:${hex};display:inline-block;flex:none"></span> <span class="truncate">พาเลท ${n} • สีพาเลท${PALLET_CLR_TH[g.color] || g.color || '-'}</span>${editing ? '<span class="text-[10px] text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded font-black whitespace-nowrap">✏️ กำลังแก้ไข</span>' : ''}</div>
+                                <div class="flex items-center gap-1.5 font-black text-slate-800 text-xs min-w-0"><span style="width:12px;height:12px;border-radius:3px;background:${hex};display:inline-block;flex:none"></span> <span class="truncate">พาเลท ${n} • สีพาเลท${PALLET_CLR_TH[g.color] || g.color || '-'}</span>${editing ? '<span class="text-[10px] text-purple-700 bg-purple-100 px-1.5 py-0.5 rounded font-black whitespace-nowrap">✏️ กำลังแก้ไข</span>' : isCurrent ? '<span class="text-[10px] text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded font-black whitespace-nowrap">🟠 กำลังทำ</span>' : isSubmitted ? '<span class="text-[10px] text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded font-black whitespace-nowrap">✅ ส่งแล้ว</span>' : '<span class="text-[10px] text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded font-black whitespace-nowrap">งานค้าง</span>'}</div>
                                 <div class="flex items-center gap-2 shrink-0">
-                                    <button onclick="editPallet(${n}, '${g.color}')" class="text-[11px] font-black text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded hover:bg-blue-100 whitespace-nowrap">✏️ แก้ไข</button>
+                                    ${editing ? `<button onclick="finishPalletCorrection()" class="text-[11px] font-black text-white bg-purple-700 border border-purple-700 px-2 py-0.5 rounded whitespace-nowrap">บันทึกและกลับ</button>` : `<button onclick="editPallet(${n}, '${g.color}')" class="text-[11px] font-black text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded hover:bg-blue-100 whitespace-nowrap">✏️ แก้ไข</button>`}
                                     <div class="text-[11px] font-bold text-slate-500 whitespace-nowrap">${g.items.length} LPN</div>
                                 </div>
                             </div>
@@ -3769,6 +3935,8 @@
                 allLpnsInWave.forEach(item => { if (item.branch === branchCodeToClose && item.status === 'Pending') item.status = 'ForceClosed'; });
                 updateDashboardUI();
                 saveCurrentWaveDataCache();
+                if (correctionPalletNo) finishPalletCorrection(false);
+                markActivePalletSubmitted(false);
 
                 backToBranchSelect();
                 showToast('กำลังบังคับปิดงานสาขาเบื้องหลัง...');
@@ -3826,6 +3994,8 @@
                 const completedAtIso = new Date().toISOString();
                 const completedAtText = formatBangkokDateTime(completedAtIso);
 
+                if (correctionPalletNo) finishPalletCorrection(false);
+                markActivePalletSubmitted(false);
                 backToBranchSelect();
                 showToast('กำลังปิดจบงานสาขาเบื้องหลัง...');
                 backgroundTasks++;
@@ -3939,6 +4109,7 @@
                 // ✅ Combine: LPN หลัก + LPN รอง → รวมเข้า "พาเลทที่กำลังทำ" (ใช้สีพาเลทปัจจุบัน ไม่ต้องเลือกสีซ้ำ)
                 const master = masterInput.value.trim().toUpperCase();
                 const color = document.getElementById('selectedCombineColor').value;
+                const scannedPalletNo = activePalletNo;
                 if (!master || childLpns.length === 0) return showAlert('ข้อมูลไม่ครบถ้วน', 'ต้องสแกน LPN หลัก 1 รายการ และ LPN รอง อย่างน้อย 1 รายการ');
                 if (childLpns.includes(master)) return showAlert('ข้อมูลไม่ถูกต้อง', 'LPN หลัก และ LPN รอง ต้องไม่เป็นหมายเลขเดียวกัน');
                 if (!color) return showAlert('ข้อมูลไม่ครบถ้วน', 'กรุณาเลือกสี Tote ก่อนยืนยันการรวม');
@@ -3949,19 +4120,20 @@
                     if (target) {
                         target.status = 'Scanned'; target.combinedWith = master; target.color = color; target.qty = 1;
                         target.scan_type = 'COMBINE: ' + master; target.color_breakdown = [{ color: color, qty: 1, type: 'COMBINE: ' + master }];
-                        target.palletNo = activePalletNo; target.palletColor = color;
+                        target.palletNo = scannedPalletNo; target.palletColor = color;
                     }
                     const lpnWave = target ? (target.wave_no || currentWave) : currentWave;
-                    pushToQueue({ wave_no: lpnWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: cLpn, type: 'COMBINE: ' + master, color: color, qty: 1, emp_id: loggedInEmpId, pallet_no: activePalletNo });
+                    pushToQueue({ wave_no: lpnWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: cLpn, type: 'COMBINE: ' + master, color: color, qty: 1, emp_id: loggedInEmpId, pallet_no: scannedPalletNo });
                 });
                 const masterTarget = allLpnsInWave.find(item => item.lpn === master);
-                if (masterTarget) { masterTarget.status = 'Scanned'; masterTarget.isMaster = true; masterTarget.childCount = (masterTarget.childCount || 0) + childLpns.length; masterTarget.color = color; masterTarget.palletNo = activePalletNo; masterTarget.palletColor = color; }
+                if (masterTarget) { masterTarget.status = 'Scanned'; masterTarget.isMaster = true; masterTarget.childCount = (masterTarget.childCount || 0) + childLpns.length; masterTarget.color = color; masterTarget.palletNo = scannedPalletNo; masterTarget.palletColor = color; }
 
-                updateDashboardUI(); saveCurrentWaveDataCache();
+                updateDashboardUI(); saveCurrentWaveDataCache(); persistPalletWorkflowState();
                 showToast(`รวม ${childLpns.length} LPN รอง เข้า LPN หลัก ${master} (สี${PALLET_TH[color] || color}) แล้ว`); flashScreen(true);
                 masterInput.value = ''; childInput.value = ''; childInput.disabled = true; childInput.classList.add('bg-gray-100'); childLpns = []; updateChildUI();
                 document.getElementById('selectedCombineColor').value = ''; resetCombineColorButtons();
                 const cBtn = document.getElementById('childScanBtn'); cBtn.disabled = true; cBtn.classList.replace('bg-purple-800', 'bg-gray-400'); cBtn.classList.remove('hover:bg-purple-900'); masterInput.focus();
+                finishCorrectionAfterScan();
             }
     </script>
     <!-- โหมดทดสอบถูกปิดสำหรับใช้งานจริง -->
