@@ -1925,6 +1925,60 @@
             return '-';
         }
 
+        function getDocumentDetailHtml(item, branchItems) {
+            const pill = (label, dotClass, boxClass) => `
+                <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border font-black whitespace-nowrap ${boxClass}">
+                    <span class="w-2.5 h-2.5 rounded-full ${dotClass}"></span>${escapeDocumentText(label)}
+                </span>`;
+
+            if (item.isMaster) {
+                const children = branchItems.filter(child => child.combinedWith === item.lpn).map(child => child.lpn);
+                return `
+                    <div class="flex flex-wrap items-center gap-1.5">
+                        ${pill(`MASTER รวม ${children.length} LPN`, 'bg-violet-600', 'bg-violet-50 text-violet-800 border-violet-200')}
+                        ${children.length ? `<span class="text-[11px] text-slate-600 font-bold">รายการ: ${children.map(escapeDocumentText).join(', ')}</span>` : ''}
+                    </div>`;
+            }
+
+            if (item.combinedWith) {
+                return `
+                    <div class="flex flex-wrap items-center gap-1.5">
+                        ${pill('รวมอยู่ใน MASTER', 'bg-indigo-600', 'bg-indigo-50 text-indigo-800 border-indigo-200')}
+                        <span class="px-2 py-1 rounded bg-slate-100 text-slate-800 border border-slate-200 font-black tracking-wider">${escapeDocumentText(item.combinedWith)}</span>
+                    </div>`;
+            }
+
+            const colorStyle = {
+                RED: ['bg-red-600', 'bg-red-50 text-red-800 border-red-200'],
+                BLUE: ['bg-blue-600', 'bg-blue-50 text-blue-800 border-blue-200'],
+                GREEN: ['bg-green-600', 'bg-green-50 text-green-800 border-green-200'],
+                BLACK: ['bg-slate-900', 'bg-slate-100 text-slate-900 border-slate-300'],
+                YELLOW: ['bg-yellow-400', 'bg-yellow-50 text-yellow-900 border-yellow-300'],
+                REUSE: ['bg-orange-500', 'bg-orange-50 text-orange-800 border-orange-200']
+            };
+            const breakdown = getColorBreakdown(item);
+            if (breakdown.length > 0) {
+                return `<div class="flex flex-wrap gap-1.5">${breakdown.map(part => {
+                    const colorKey = String(part.color || '').toUpperCase();
+                    const style = colorStyle[colorKey] || ['bg-slate-400', 'bg-slate-50 text-slate-800 border-slate-200'];
+                    const containerLabel = colorKey === 'REUSE' ? 'กล่องกระดาษ (Reuse)' : `TOTE ${getColorLabel(part.color)}`;
+                    return pill(`${containerLabel} × ${part.qty}`, style[0], style[1]);
+                }).join('')}</div>`;
+            }
+
+            const scanType = String(item.scan_type || '').trim();
+            if (scanType.toUpperCase() === 'AUTO_NOT_FOUND') {
+                return pill('ไม่พบข้อมูลอัตโนมัติ', 'bg-red-500', 'bg-red-50 text-red-800 border-red-200');
+            }
+            if (scanType.toUpperCase() === 'CARTON') {
+                return pill(`กล่อง M / Carton × ${getActualQty(item)}`, 'bg-orange-500', 'bg-orange-50 text-orange-800 border-orange-200');
+            }
+            if (scanType) {
+                return pill(scanType, 'bg-slate-500', 'bg-slate-50 text-slate-800 border-slate-200');
+            }
+            return '<span class="text-slate-400 font-bold">— ยังไม่มีรายละเอียด —</span>';
+        }
+
         function buildServerReconciliationMap(items) {
             const map = new Map();
             (items || []).forEach(item => {
@@ -2442,7 +2496,7 @@
                             <td class="p-2 border-r border-slate-100 font-sans">${typeBadge}</td>
                             <td class="p-2 border-r border-slate-100 font-sans">${getStatusBadge(item)}</td>
                             <td class="p-2 border-r border-slate-100 font-black text-slate-800 font-sans">${getActualQty(item)}</td>
-                            <td class="p-2 text-left text-slate-500 font-sans">${escapeDocumentText(getDocumentDetail(item, branchItems))}</td>
+                            <td class="p-2 text-left text-slate-700 font-sans">${getDocumentDetailHtml(item, branchItems)}</td>
                         </tr>
                     `;
                 }).join('');
