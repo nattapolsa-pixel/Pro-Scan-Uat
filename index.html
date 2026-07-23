@@ -166,6 +166,102 @@
             overscroll-behavior-y: contain;
         }
 
+        /* ==================== MOBILE / HANDHELD SINGLE SCROLL ==================== */
+        /*
+         * จอเล็กใช้ตัวเลื่อนเพียงชั้นเดียวที่ #mainApp
+         * ทำให้หัวสาขา แท็บ และช่องสแกนเลื่อนพ้นจอได้เมื่อผู้ใช้ต้องการดูรายการ
+         * ลดอาการติด/กระตุกจาก scroll area ซ้อนกันหลายชั้น
+         */
+        @media (max-width: 900px) {
+            #mainApp {
+                overflow-x: hidden !important;
+                overflow-y: auto !important;
+                -webkit-overflow-scrolling: touch;
+                overscroll-behavior-y: contain;
+                scroll-behavior: smooth;
+                scrollbar-width: thin;
+            }
+
+            #mainApp > header,
+            #mainApp > div,
+            #mainApp > main {
+                flex-shrink: 0;
+            }
+
+            #mainApp > main {
+                flex: none !important;
+                min-height: 0 !important;
+                overflow: visible !important;
+            }
+
+            #modeScan,
+            #modeCombine,
+            #mainScrollingArea {
+                height: auto !important;
+                min-height: 0 !important;
+                overflow: visible !important;
+                overscroll-behavior: auto !important;
+            }
+
+            #mainApp > header > div {
+                padding: 0.4rem 0.55rem !important;
+            }
+
+            #currentBranchDisplay {
+                font-size: 1.25rem !important;
+                line-height: 1.15 !important;
+            }
+
+            #currentBranchNameDisplay {
+                margin-top: 0.15rem !important;
+                font-size: 0.75rem !important;
+            }
+
+            #empNameDisplay {
+                margin-top: 0.1rem !important;
+                font-size: 0.625rem !important;
+            }
+
+            #mainApp > header button {
+                padding: 0.35rem 0.55rem !important;
+                font-size: 0.68rem !important;
+            }
+
+            #tabScan,
+            #tabCombine {
+                padding-top: 0.55rem !important;
+                padding-bottom: 0.55rem !important;
+            }
+
+            #modeScan > div:first-child {
+                padding: 0.6rem !important;
+            }
+
+            #lpnInput {
+                padding: 0.6rem !important;
+                font-size: 1.35rem !important;
+            }
+
+            #quickTools {
+                right: 8px !important;
+                bottom: max(8px, env(safe-area-inset-bottom)) !important;
+                flex-direction: row !important;
+                gap: 0.35rem !important;
+            }
+
+            #quickTools button {
+                width: 2.35rem !important;
+                height: 2.35rem !important;
+                font-size: 0.9rem !important;
+                opacity: 0.76 !important;
+                box-shadow: 0 3px 10px rgba(15, 23, 42, 0.22) !important;
+            }
+
+            #mainApp .bg-white.rounded-xl {
+                box-shadow: 0 2px 8px rgba(15, 23, 42, 0.1) !important;
+            }
+        }
+
         /* ==================== CAMERA SCANNER ==================== */
         /* 💡 แก้ไขปัญหากล้องหน้าจอดำบนมือถือ */
         #reader {
@@ -3476,6 +3572,11 @@
             }
             // ✅ เลื่อนขึ้นบนสุด / ปรับตัวอักษรใหญ่
             function scrollListTop() {
+                const mainApp = document.getElementById('mainApp');
+                if (mainApp && window.matchMedia('(max-width: 900px)').matches) {
+                    try { mainApp.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) { mainApp.scrollTop = 0; }
+                    return;
+                }
                 ['modeScan', 'modeCombine'].forEach(id => { const el = document.getElementById(id); if (el && !el.classList.contains('hidden')) { try { el.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) { el.scrollTop = 0; } } });
             }
             function toggleBigText() {
