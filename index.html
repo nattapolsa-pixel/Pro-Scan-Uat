@@ -237,6 +237,17 @@
                 padding: 0.6rem !important;
             }
 
+            #scanLpnBar {
+                position: sticky;
+                top: 0;
+                z-index: 45;
+                background: rgba(255, 255, 255, 0.97) !important;
+                border-bottom: 1px solid rgba(148, 163, 184, 0.45);
+                box-shadow: 0 5px 14px -9px rgba(15, 23, 42, 0.7) !important;
+                backdrop-filter: blur(8px);
+                -webkit-backdrop-filter: blur(8px);
+            }
+
             #lpnInput {
                 padding: 0.6rem !important;
                 font-size: 1.35rem !important;
@@ -972,7 +983,7 @@
         <main class="flex-1 flex flex-col relative bg-gray-100" style="min-height:0;overflow:hidden;">
 
             <section id="modeScan" class="flex flex-col min-h-0" style="height:100%;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain;">
-                <div class="bg-white p-3 md:p-4 shrink-0 shadow-sm z-20" onclick="if(!event.target.closest('button')){var _i=document.getElementById('lpnInput'); if(_i) _i.focus();}">
+                <div id="scanLpnBar" class="bg-white p-3 md:p-4 shrink-0 shadow-sm z-20" onclick="if(!event.target.closest('button')){var _i=document.getElementById('lpnInput'); if(_i) _i.focus();}">
                     <label class="block text-gray-800 font-black mb-1.5 text-sm md:text-base">สแกนบาร์โค้ด LPN
                         กล่อง</label>
                     <div class="flex gap-2">
