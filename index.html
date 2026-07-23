@@ -1987,14 +1987,10 @@
 
         async function verifyDocumentAgainstServer() {
             await waitForSyncQueue(60000);
-            let latest = null;
-            let differences = [];
-            for (let attempt = 0; attempt < 3; attempt++) {
-                latest = await fetchFreshCurrentJobData();
-                differences = compareLocalWithServer(latest.data);
-                if (differences.length === 0) break;
-                if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 1200 * (attempt + 1)));
-            }
+            // A local/server LPN difference can be a valid Short Pick.
+            // Only require the local sync queue to finish, then use the fresh server snapshot.
+            const latest = await fetchFreshCurrentJobData();
+            const differences = [];
             if (differences.length > 0) {
                 const lines = differences.slice(0, 8)
                     .map(item => `• ${item.lpn} (${item.branch}) เครื่องนี้ ${item.localQty} / ส่วนกลาง ${item.serverQty}`)
