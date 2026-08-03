@@ -2941,6 +2941,16 @@
                 else if (e.key === 'Enter') { if (palletAllDone) palletModalFinish(); }
                 e.preventDefault(); return;
             }
+            // ระหว่างแก้ยอด ให้ช่องกรอกตัวเลขรับคีย์จาก Handheld โดยตรง
+            // ไม่ให้ Shortcut สี 1-6 หรือคีย์ลัดหน้า Scanner แย่งเหตุการณ์
+            const _correctionModal = document.getElementById('correctionModal');
+            if (_correctionModal && !_correctionModal.classList.contains('hidden')) {
+                if (e.key === 'Escape' || e.key === 'Esc') {
+                    e.preventDefault();
+                    closeQtyCorrection();
+                }
+                return;
+            }
             if (e.key === 'Escape' || e.key === 'Esc') {
                 e.preventDefault();
                 if (isAlertOpen) closeAlert();
@@ -4167,19 +4177,23 @@
                 document.getElementById('correctionOldQty').textContent = String(parseInt(item.qty) || 0);
                 document.getElementById('correctionPallet').textContent = String(parseInt(item.palletNo) || parseInt(item.pallet_no) || '-');
                 const newQtyInput = document.getElementById('correctionNewQty');
-                newQtyInput.value = isDirectQty ? String(parseInt(item.qty) || 0) : '0';
-                newQtyInput.readOnly = !isDirectQty;
-                newQtyInput.classList.toggle('opacity-70', !isDirectQty);
+                newQtyInput.value = String(parseInt(item.qty) || 0);
+                newQtyInput.readOnly = false;
+                newQtyInput.disabled = false;
+                newQtyInput.classList.remove('opacity-70');
                 document.getElementById('correctionQtyHint').textContent = isDirectQty
                     ? 'ใส่ 0 เมื่อต้องการคืน LPN เป็นรายการค้างตรวจสอบ'
-                    : 'TOTE จะถูกคืนเป็นรายการค้าง จากนั้นสแกนใหม่แล้วเลือกสีที่ถูกต้อง';
+                    : 'แก้จำนวน TOTE ได้โดยตรง • ใส่ 0 เพื่อคืนเป็นรายการค้าง • ถ้าสีผิดให้ใส่ 0 แล้วสแกนเลือกสีใหม่';
                 document.getElementById('correctionReason').value = '';
                 document.getElementById('correctionNote').value = '';
                 document.getElementById('correctionHistory').innerHTML = '<div class="text-xs text-slate-400 font-bold py-2">กำลังโหลดประวัติ...</div>';
                 const modal = document.getElementById('correctionModal');
                 modal.classList.remove('hidden'); modal.classList.add('flex');
                 loadCorrectionHistory(item.lpn);
-                if (isDirectQty) setTimeout(() => newQtyInput.focus(), 50);
+                setTimeout(() => {
+                    newQtyInput.focus();
+                    try { newQtyInput.select(); } catch (e) { }
+                }, 50);
             }
             function closeQtyCorrection() {
                 const modal = document.getElementById('correctionModal');
@@ -4811,7 +4825,7 @@
                 </div>
                 <div>
                     <label for="correctionNewQty" class="block text-sm font-black text-slate-800 mb-1">ยอดที่นับถูกต้อง</label>
-                    <input id="correctionNewQty" type="number" min="0" inputmode="numeric" class="w-full rounded-xl border-2 border-amber-400 bg-amber-50 p-3 text-center text-4xl font-black focus:outline-none focus:ring-4 focus:ring-amber-200">
+                    <input id="correctionNewQty" type="number" min="0" step="1" inputmode="numeric" pattern="[0-9]*" autocomplete="off" enterkeyhint="done" class="w-full rounded-xl border-2 border-amber-400 bg-amber-50 p-3 text-center text-4xl font-black focus:outline-none focus:ring-4 focus:ring-amber-200">
                     <div id="correctionQtyHint" class="text-[11px] text-slate-500 font-bold mt-1">ใส่ 0 เมื่อต้องการคืน LPN เป็นรายการค้างตรวจสอบ</div>
                 </div>
                 <div>
@@ -4855,7 +4869,7 @@
             <button onclick="palletModalBack()" class="mt-3 w-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-2.5 rounded-xl text-sm">← กลับไปเลือกสาขา</button>
         </div>
     </div>
-    <div class="fixed bottom-1 left-1.5 z-[1400] text-[9px] leading-none text-slate-400 font-bold pointer-events-none select-none">Pro LPN Scanner · v1.3.1 (2026-08-03)</div>
+    <div class="fixed bottom-1 left-1.5 z-[1400] text-[9px] leading-none text-slate-400 font-bold pointer-events-none select-none">Pro LPN Scanner · v1.3.2 (2026-08-03)</div>
     <div id="quickTools" class="fixed z-[1500] flex flex-col gap-2" style="bottom:16px;right:12px">
         <button onclick="openHelp()" title="วิธีใช้งาน / คำอธิบาย" class="w-11 h-11 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-black shadow-lg text-lg opacity-90">?</button>
         <button onclick="toggleBigText()" id="bigTextBtn" title="ปรับตัวอักษรใหญ่" class="w-11 h-11 rounded-full bg-slate-700 hover:bg-slate-800 text-white font-black shadow-lg text-base opacity-90">ก+</button>
