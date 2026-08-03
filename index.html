@@ -1430,10 +1430,20 @@
         }
 
         function getDocumentPalletCount(branchCode) {
-            const counts = getDocumentPalletCounts();
             const key = normalizeBranchLookupCode(branchCode);
-            const value = counts[key];
-            return value === undefined || value === null || value === '' ? '' : String(value);
+            const palletNos = new Set();
+            allLpnsInWave
+                .filter(item => normalizeBranchLookupCode(item.branch) === key)
+                .forEach(item => {
+                    (Array.isArray(item.branch_pallet_nos) ? item.branch_pallet_nos : []).forEach(no => {
+                        no = parseInt(no) || 0; if (no > 0) palletNos.add(no);
+                    });
+                    if (item.status === 'Scanned') {
+                        const no = parseInt(item.palletNo) || parseInt(item.pallet_no) || 0;
+                        if (no > 0) palletNos.add(no);
+                    }
+                });
+            return palletNos.size > 0 ? String(palletNos.size) : '';
         }
 
         function updateDocumentPalletCount(branchCode, value) {
@@ -1745,6 +1755,28 @@
                                 ? errorBody.detail
                                 : JSON.stringify(errorBody.detail || errorBody);
                         } catch (e) { }
+                        if (res.status === 409) {
+                            const conflictMessage = detail || 'ข้อมูล LPN ถูกอีกเครื่องอัปเดตก่อนแล้ว';
+                            // รายการนี้ห้าม retry เพราะเป็นยอดสะสมจากฐานเก่า การส่งซ้ำจะเขียนทับงานของอีกเครื่อง
+                            syncQueue.shift();
+                            syncQueue = syncQueue.filter(queued => !(
+                                String(queued.lpn || '').toUpperCase() === String(payload.lpn || '').toUpperCase()
+                                && String(queued.branch_code || '').toUpperCase() === String(payload.branch_code || '').toUpperCase()
+                                && String(queued.wave_no || '') === String(payload.wave_no || '')
+                            ));
+                            localStorage.setItem('proScannerQueue', JSON.stringify(syncQueue));
+                            syncQueueError = { status: 409, lpn: payload.lpn || '-', message: conflictMessage };
+                            updateSyncStatusUI();
+                            try {
+                                const latest = await fetchFreshCurrentJobData();
+                                applyWaveDataToScreen(latest.data, latest.isWaveOnly);
+                                saveCurrentWaveDataCache();
+                            } catch (refreshError) { }
+                            showAlert('อีกเครื่องอัปเดต LPN นี้แล้ว', `${conflictMessage}\n\nระบบยกเลิกรายการจากเครื่องนี้และโหลดค่าล่าสุด เพื่อไม่ให้ยอดของอีกคนถูกเขียนทับ`);
+                            syncQueueError = null;
+                            updateSyncStatusUI();
+                            break;
+                        }
                         syncQueueError = {
                             status: res.status,
                             lpn: payload.lpn || '-',
@@ -1777,6 +1809,36 @@
             return true;
         }
         setInterval(processQueue, 5000);
+
+        let isSharedStateRefreshing = false;
+        async function refreshSharedBranchState() {
+            if (isSharedStateRefreshing || !selectedBranchCode || !currentWave || !navigator.onLine) return;
+            if (syncQueue.length > 0 || isSyncing || syncQueueError) return;
+            const correctionModal = document.getElementById('correctionModal');
+            const palletModal = document.getElementById('palletColorModal');
+            const colorArea = document.getElementById('colorSelectionArea');
+            const qtyArea = document.getElementById('qtySelectionArea');
+            if ((correctionModal && !correctionModal.classList.contains('hidden'))
+                || (palletModal && !palletModal.classList.contains('hidden'))
+                || (colorArea && !colorArea.classList.contains('hidden'))
+                || (qtyArea && !qtyArea.classList.contains('hidden'))) return;
+            isSharedStateRefreshing = true;
+            try {
+                const isBookingMode = activeWavesList.length > 1 || String(currentWave || '').includes(',');
+                const url = isBookingMode
+                    ? backendApiUrl + `/api/check-booking?booking_no=${encodeURIComponent(currentBookingNo)}&_ts=${Date.now()}`
+                    : backendApiUrl + `/api/check-wave?wave_no=${encodeURIComponent(activeWavesList[0] || currentWave)}&_ts=${Date.now()}`;
+                const res = await fetchWithTimeout(url, { cache: 'no-store' }, 30000);
+                if (!res.ok) return;
+                const data = await res.json();
+                applyWaveDataToScreen(data, !isBookingMode);
+            } catch (e) {
+                // การรีเฟรชร่วมเป็นงานเบื้องหลัง ไม่รบกวนการสแกนเมื่อเครือข่ายช้า
+            } finally {
+                isSharedStateRefreshing = false;
+            }
+        }
+        setInterval(refreshSharedBranchState, 8000);
 
         window.addEventListener('beforeunload', function (e) {
             if (syncQueue.length > 0 || backgroundTasks > 0) {
@@ -2351,14 +2413,18 @@
 
                 const branchTotalBoxes = mCount + redCount + blueCount + greenCount + blackCount + paperBoxCount + yellowCount;
                 // ✅ ยอดพาเลทอัตโนมัติจากที่ยิงจริง (palletNo ที่ sync จาก backend/เครื่องนี้) → ขึ้นเองแม้เปิดเอกสารคนละเครื่อง
-                const autoPalletCount = branchItems.reduce((mx, it) => {
-                    if (it.status !== 'Scanned') return mx;
-                    const p = parseInt(it.palletNo) || parseInt(it.pallet_no) || 0;
-                    return p > mx ? p : mx;
-                }, 0);
-                // ถ้ากรอกเองไว้ (manual) → ใช้ค่ากรอก (แก้มือชนะ), ไม่งั้นใช้ค่าอัตโนมัติ
-                const manualPalletValue = getDocumentPalletCount(bCode);
-                const branchPallets = manualPalletValue !== '' ? Number(manualPalletValue) : autoPalletCount;
+                const autoPalletNos = new Set();
+                branchItems.forEach(it => {
+                    (Array.isArray(it.branch_pallet_nos) ? it.branch_pallet_nos : []).forEach(no => {
+                        no = parseInt(no) || 0; if (no > 0) autoPalletNos.add(no);
+                    });
+                    if (it.status === 'Scanned') {
+                        const no = parseInt(it.palletNo) || parseInt(it.pallet_no) || 0;
+                        if (no > 0) autoPalletNos.add(no);
+                    }
+                });
+                const autoPalletCount = autoPalletNos.size;
+                const branchPallets = autoPalletCount;
                 if (branchPallets === 0) allBranchesHavePalletCount = false;
                 const branchPalletInputValue = branchPallets > 0 ? String(branchPallets) : '';
                 const branchPalletDisplay = branchPallets > 0 ? String(branchPallets) : '-';
@@ -3098,6 +3164,10 @@
         function loadTestWave56245() { try { applyWaveDataToScreen(TEST_WAVE_56245, true); showToast('โหลด Wave 56245 (ข้อมูลจริง) แล้ว'); } catch (e) { showAlert('ผิดพลาด', String(e)); } }
 
         function applyWaveDataToScreen(data, isWaveOnly) {
+            const previousLocalState = new Map((allLpnsInWave || []).map(item => [
+                `${String(item.branch || '').toUpperCase()}|${String(item.lpn || '').toUpperCase()}`,
+                { palletNo: parseInt(item.palletNo) || 0, palletColor: item.palletColor || null, correctionCount: parseInt(item.correctionCount) || 0 }
+            ]));
             currentBookingNo = data.booking_no ? String(data.booking_no).trim() : '';
             currentLicensePlate = data.license_plate ? String(data.license_plate).trim() : '';
 
@@ -3110,9 +3180,12 @@
             }
 
             allLpnsInWave = data.lpn_list || [];
-            // ✅ เลขพาเลทที่ sync มาจาก backend (pallet_no) → ตั้งเป็น palletNo ในเครื่องนี้ (ทุกเครื่องเห็นยอดพาเลทตรงกัน)
-            //    เก็บค่าที่มากกว่าไว้ กันของที่เพิ่งยิงในเครื่องนี้หาย ถ้ายังไม่ deploy backend ค่าจะเป็น 0 = ใช้ของเดิม
-            (allLpnsInWave || []).forEach(it => { if (it) it.palletNo = Math.max(parseInt(it.pallet_no) || 0, parseInt(it.palletNo) || 0); });
+            // เลขพาเลทจากส่วนกลางเป็นค่าหลัก เพื่อให้หลายเครื่องเห็นตรงกันและรองรับการแก้ไขย้อนหลัง
+            (allLpnsInWave || []).forEach(it => {
+                if (it && Object.prototype.hasOwnProperty.call(it, 'pallet_no')) {
+                    it.palletNo = (parseInt(it.pallet_no) || 0) > 0 ? parseInt(it.pallet_no) : null;
+                }
+            });
             // ✅ 1 LPN มีหลายสินค้า (หลายแถว) → รวมเป็น 1 รายการต่อ LPN: สแกนครั้งเดียวจบทั้ง LPN, ความคืบหน้าถึง 100% ได้, ไม่นับซ้ำ
             (function mergeDuplicateLpns() {
                 const map = {}, order = [];
@@ -3135,6 +3208,13 @@
                 });
                 allLpnsInWave = order.map(k => map[k]);
             })();
+            allLpnsInWave.forEach(item => {
+                const previous = previousLocalState.get(`${String(item.branch || '').toUpperCase()}|${String(item.lpn || '').toUpperCase()}`);
+                if (!previous) return;
+                const serverPalletNo = parseInt(item.palletNo) || parseInt(item.pallet_no) || 0;
+                if (previous.palletColor && previous.palletNo === serverPalletNo) item.palletColor = previous.palletColor;
+                if (previous.correctionCount) item.correctionCount = previous.correctionCount;
+            });
             const savedDocumentMeta = getSavedShippingDocumentMeta(isWaveOnly ? currentWave : currentBookingNo);
             if (savedDocumentMeta.booking_no) currentBookingNo = savedDocumentMeta.booking_no;
             if (savedDocumentMeta.license_plate) currentLicensePlate = savedDocumentMeta.license_plate;
@@ -3389,7 +3469,7 @@
                             </div>`;
                         } else {
                             combineDetails = `
-                            <button onclick="resetSingleBox('${item.lpn}')" class="text-xs text-red-500 hover:underline font-bold mt-1 text-left flex items-center gap-0.5 w-max"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-4v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>ยกเลิก</button>`;
+                            <button onclick="openQtyCorrection('${item.lpn}')" class="text-xs text-amber-800 bg-amber-100 border border-amber-300 hover:bg-amber-200 font-black mt-1.5 px-2.5 py-1.5 rounded-lg text-left flex items-center gap-1 w-max">✏️ แก้ไข / ดูประวัติ</button>`;
                         }
 
                         scannedParts.push(`<div class="p-2 border-l-4 ${isPPIncomplete ? 'border-amber-500 bg-amber-50' : 'border-green-500 bg-white'} rounded shadow-sm flex flex-col"><div class="flex items-center justify-between gap-2"><div class="font-black text-sm md:text-base ${isPPIncomplete ? 'text-amber-900' : 'text-green-900'} tracking-wider flex items-center flex-wrap">${checkIcon} ${item.lpn}</div><div class="text-right shrink-0">${qtyText}${colorText}<div class="text-[10px] ${isPPIncomplete ? 'text-amber-600' : 'text-green-600'} font-bold">Zone: ${item.zone}</div></div></div>${incompleteNote}${combineDetails}</div>`);
@@ -3503,7 +3583,7 @@
                         ? target.pallet_breakdown
                         : (prevQty > 0 ? [prevQty] : []);
                     target.pallet_breakdown = [...prevBreakdown, qtyVal];
-                    executeScanSave('None', 'Carton', cumulative, lpn);
+                    executeScanSave('None', 'Carton', cumulative, lpn, prevQty);
                     if (cumulative > expectedTotal) {
                         showToast(`บันทึกแล้ว รวม ${cumulative}/${expectedTotal} — เกินเป้า ${cumulative - expectedTotal} กล่อง`, true);
                     } else if (cumulative < expectedTotal) {
@@ -3513,7 +3593,7 @@
                     }
                 } else {
                     if (target) target.pallet_breakdown = [qtyVal];
-                    executeScanSave('None', 'Carton', qtyVal, lpn);
+                    executeScanSave('None', 'Carton', qtyVal, lpn, 0);
                 }
             }
             function requiresDirectQty(lpn) { return isDirectQtyLpn(lpn); }
@@ -3908,12 +3988,14 @@
                 lpnInput.focus();
                 const lpnWave = target ? (target.wave_no || currentWave) : currentWave;
                 const scannedPalletNo = activePalletNo;
-                entries.forEach(entry => {
-                    pushToQueue({ wave_no: lpnWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: lpn, type: entry.type, color: entry.color, qty: entry.qty, emp_id: loggedInEmpId, pallet_no: scannedPalletNo });
+                entries.forEach((entry, entryIndex) => {
+                    const payload = { wave_no: lpnWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: lpn, type: entry.type, color: entry.color, qty: entry.qty, emp_id: loggedInEmpId, pallet_no: scannedPalletNo };
+                    if (entryIndex === 0) payload.expected_previous_qty = 0;
+                    pushToQueue(payload);
                 });
                 finishCorrectionAfterScan();
             }
-            async function executeScanSave(color, type = 'TOTE', qty = 1, forceLpn = null) {
+            async function executeScanSave(color, type = 'TOTE', qty = 1, forceLpn = null, expectedPreviousQty = null) {
                 const lpn = forceLpn || document.getElementById('displayLpn').innerText;
                 const scannedPalletNo = activePalletNo;
                 colorSection.classList.add('hidden'); qtySection.classList.add('hidden'); colorQtyArea.classList.add('hidden');
@@ -3926,7 +4008,10 @@
                 updateDashboardUI(); saveCurrentWaveDataCache(); persistPalletWorkflowState();
                 showToast(`บันทึกข้อมูล ${lpn} สำเร็จ`); flashScreen(true); lpnInput.focus();
                 const lpnWave = target ? (target.wave_no || currentWave) : currentWave;
-                pushToQueue({ wave_no: lpnWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: lpn, type: type, color: color, qty: qty, emp_id: loggedInEmpId, pallet_no: scannedPalletNo });
+                const scanPayload = { wave_no: lpnWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: lpn, type: type, color: color, qty: qty, emp_id: loggedInEmpId, pallet_no: scannedPalletNo };
+                if (expectedPreviousQty !== null && expectedPreviousQty !== undefined) scanPayload.expected_previous_qty = parseInt(expectedPreviousQty) || 0;
+                else if (!isDirectQtyLpn(lpn)) scanPayload.expected_previous_qty = 0;
+                pushToQueue(scanPayload);
                 finishCorrectionAfterScan();
             }
 
@@ -3937,6 +4022,7 @@
             const PALLET_CLR_TH = { Green: 'เขียว', Blue: 'ฟ้า', Red: 'แดง' };
             const PALLET_CLR_HEX = { Green: '#16a34a', Blue: '#0ea5e9', Red: '#dc2626' };
             let activePalletNo = 0, activePalletColor = null, activePalletType = 'TOTE', palletColorMode = false;
+            let isAllocatingPallet = false;
             let submittedPalletNos = new Set();
             let correctionPalletNo = 0;
             let correctionReturnState = null;
@@ -3965,6 +4051,19 @@
                     && (parseInt(i.palletNo) || 0) === no
                 );
             }
+            function getBranchScannedPalletNos(branchCode = selectedBranchCode) {
+                const palletNos = new Set();
+                allLpnsInWave.filter(i => (i.branch || 'Unknown') === branchCode).forEach(item => {
+                    (Array.isArray(item.branch_pallet_nos) ? item.branch_pallet_nos : []).forEach(no => {
+                        no = parseInt(no) || 0; if (no > 0) palletNos.add(no);
+                    });
+                    if (item.status === 'Scanned') {
+                        const no = parseInt(item.palletNo) || parseInt(item.pallet_no) || 0;
+                        if (no > 0) palletNos.add(no);
+                    }
+                });
+                return Array.from(palletNos).sort((a, b) => a - b);
+            }
             function getPersistedActivePallet() {
                 if (correctionPalletNo && correctionReturnState) return correctionReturnState;
                 return { no: activePalletNo, color: activePalletColor, type: activePalletType };
@@ -3985,8 +4084,9 @@
             }
             function syncSubmittedPalletDocumentCount() {
                 if (!selectedBranchCode) return;
-                updateDocumentPalletCount(selectedBranchCode, submittedPalletNos.size > 0 ? submittedPalletNos.size : '');
                 syncBranchPalletCountInput();
+                const modal = document.getElementById('shippingDocumentModal');
+                if (modal && !modal.classList.contains('hidden')) renderShippingDocument();
             }
             function markActivePalletSubmitted(showFeedback = true) {
                 const current = getPersistedActivePallet();
@@ -3996,7 +4096,7 @@
                 persistPalletWorkflowState();
                 syncSubmittedPalletDocumentCount();
                 if (showFeedback) {
-                    showToast(`✅ ส่งพาเลทใบที่ ${no} แล้ว • รวมส่งแล้ว ${submittedPalletNos.size} พาเลท`);
+                    showToast(`✅ ส่งพาเลทใบที่ ${no} แล้ว • รวมในระบบ ${getBranchScannedPalletNos().length} พาเลท`);
                     flashScreen(true);
                     try { if (navigator.vibrate) navigator.vibrate([100, 60, 100]); } catch (e) { }
                 }
@@ -4019,10 +4119,131 @@
                 if (correctionPalletNo) setTimeout(() => finishPalletCorrection(true), 150);
             }
 
+            let correctionTargetLpn = '';
+            let correctionRequestId = '';
+            function getCurrentCorrectionItem() {
+                return allLpnsInWave.find(i => i.lpn === correctionTargetLpn && (i.branch || 'Unknown') === selectedBranchCode);
+            }
+            function openQtyCorrection(lpn) {
+                const item = allLpnsInWave.find(i => i.lpn === lpn && (i.branch || 'Unknown') === selectedBranchCode);
+                if (!item) return showAlert('ไม่พบ LPN', 'กรุณาโหลดข้อมูลล่าสุดแล้วลองใหม่');
+                const isDirectQty = isDirectQtyLpn(item.lpn);
+                correctionTargetLpn = item.lpn;
+                correctionRequestId = '';
+                document.getElementById('correctionLpn').textContent = item.lpn;
+                document.getElementById('correctionOldQty').textContent = String(parseInt(item.qty) || 0);
+                document.getElementById('correctionPallet').textContent = String(parseInt(item.palletNo) || parseInt(item.pallet_no) || '-');
+                const newQtyInput = document.getElementById('correctionNewQty');
+                newQtyInput.value = isDirectQty ? String(parseInt(item.qty) || 0) : '0';
+                newQtyInput.readOnly = !isDirectQty;
+                newQtyInput.classList.toggle('opacity-70', !isDirectQty);
+                document.getElementById('correctionQtyHint').textContent = isDirectQty
+                    ? 'ใส่ 0 เมื่อต้องการคืน LPN เป็นรายการค้างตรวจสอบ'
+                    : 'TOTE จะถูกคืนเป็นรายการค้าง จากนั้นสแกนใหม่แล้วเลือกสีที่ถูกต้อง';
+                document.getElementById('correctionReason').value = '';
+                document.getElementById('correctionNote').value = '';
+                document.getElementById('correctionHistory').innerHTML = '<div class="text-xs text-slate-400 font-bold py-2">กำลังโหลดประวัติ...</div>';
+                const modal = document.getElementById('correctionModal');
+                modal.classList.remove('hidden'); modal.classList.add('flex');
+                loadCorrectionHistory(item.lpn);
+                if (isDirectQty) setTimeout(() => newQtyInput.focus(), 50);
+            }
+            function closeQtyCorrection() {
+                const modal = document.getElementById('correctionModal');
+                modal.classList.add('hidden'); modal.classList.remove('flex');
+                correctionTargetLpn = '';
+                correctionRequestId = '';
+                setTimeout(() => { try { lpnInput.focus(); } catch (e) { } }, 50);
+            }
+            async function loadCorrectionHistory(lpn) {
+                const container = document.getElementById('correctionHistory');
+                const waves = (activeWavesList.length ? activeWavesList : String(currentWave || '').split(','))
+                    .map(w => String(w || '').trim()).filter(Boolean).join(',');
+                try {
+                    const res = await fetchWithTimeout(backendApiUrl + `/api/corrections?waves=${encodeURIComponent(waves)}&branch=${encodeURIComponent(selectedBranchCode)}&lpn=${encodeURIComponent(lpn)}`, { cache: 'no-store' }, 30000);
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    const data = await res.json();
+                    const history = Array.isArray(data.history) ? data.history : [];
+                    if (!history.length) {
+                        container.innerHTML = '<div class="text-xs text-slate-400 font-bold py-2">ยังไม่เคยแก้ยอด LPN นี้</div>';
+                        return;
+                    }
+                    container.innerHTML = history.map(entry => `
+                        <div class="rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs">
+                            <div class="font-black text-amber-900">${escapeDocumentText(formatBangkokDateTime(entry.corrected_at))} • พนักงาน ${escapeDocumentText(entry.emp_id || '-')}</div>
+                            <div class="font-bold text-slate-700 mt-1">ยอด ${parseInt(entry.old && entry.old.qty) || 0} → ${parseInt(entry.new && entry.new.qty) || 0} กล่อง</div>
+                            <div class="text-slate-600">เหตุผล: ${escapeDocumentText(entry.reason || '-')}</div>
+                            ${entry.note ? `<div class="text-slate-500">หมายเหตุ: ${escapeDocumentText(entry.note)}</div>` : ''}
+                        </div>`).join('');
+                } catch (e) {
+                    container.innerHTML = '<div class="text-xs text-red-600 font-bold py-2">โหลดประวัติไม่สำเร็จ แต่ยังไม่กระทบยอดปัจจุบัน</div>';
+                }
+            }
+            async function submitQtyCorrection() {
+                const item = getCurrentCorrectionItem();
+                if (!item) return showAlert('ไม่พบ LPN', 'กรุณาปิดหน้าต่างแล้วเลือก LPN ใหม่');
+                const newQty = parseInt(document.getElementById('correctionNewQty').value);
+                const reason = document.getElementById('correctionReason').value;
+                const note = document.getElementById('correctionNote').value.trim();
+                if (!Number.isFinite(newQty) || newQty < 0) return showAlert('ยอดไม่ถูกต้อง', 'กรุณากรอกยอดใหม่เป็นตัวเลข 0 ขึ้นไป');
+                if (!reason) return showAlert('ยังไม่ได้เลือกเหตุผล', 'กรุณาเลือกเหตุผลก่อนยืนยันการแก้ยอด');
+                const oldQty = parseInt(item.qty) || 0;
+                if (newQty === oldQty) return showAlert('ยอดยังเท่าเดิม', `ยอดเดิมและยอดใหม่เป็น ${oldQty} กล่องเท่ากัน`);
+                if (!correctionRequestId) correctionRequestId = (self.crypto && crypto.randomUUID) ? crypto.randomUUID() : `CORR-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+                const correctionId = correctionRequestId;
+                const submitBtn = document.getElementById('correctionSubmitBtn');
+                if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'กำลังบันทึกหลักฐาน...'; submitBtn.classList.add('opacity-60'); }
+                showLoading();
+                try {
+                    await waitForSyncQueue(120000);
+                    const res = await fetchWithTimeout(backendApiUrl + '/api/correct-lpn', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            correction_id: correctionId,
+                            wave_no: item.wave_no || currentWave,
+                            branch_code: selectedBranchCode,
+                            branch_name: selectedBranchName,
+                            lpn: item.lpn,
+                            new_qty: newQty,
+                            reason,
+                            note,
+                            emp_id: loggedInEmpId,
+                            pallet_no: parseInt(item.palletNo) || parseInt(item.pallet_no) || 0,
+                            scan_type: item.scan_type || 'Carton',
+                            color: item.color || 'None'
+                        })
+                    }, 120000);
+                    let body = {};
+                    try { body = await res.json(); } catch (e) { }
+                    if (!res.ok) throw new Error(typeof body.detail === 'string' ? body.detail : `HTTP ${res.status}`);
+                    item.qty = newQty;
+                    item.status = newQty > 0 ? 'Scanned' : 'Pending';
+                    if (newQty === 0) {
+                        item.scan_type = ''; item.color = 'None'; item.color_breakdown = [];
+                        item.palletNo = null; item.pallet_no = 0; item.palletColor = null;
+                        item.combinedWith = null; item.isMaster = false; item.childCount = 0;
+                    }
+                    item.correctionCount = (parseInt(item.correctionCount) || 0) + 1;
+                    closeQtyCorrection();
+                    updateDashboardUI(); saveCurrentWaveDataCache(); persistPalletWorkflowState();
+                    showAlert('แก้ยอดและบันทึกหลักฐานแล้ว', `${item.lpn}\nยอดเดิม ${oldQty} → ยอดใหม่ ${newQty} กล่อง\nเหตุผล: ${reason}\nผู้แก้: ${loggedInEmpId || '-'}`, 'border-green-600', true);
+                } catch (e) {
+                    showAlert('แก้ยอดไม่สำเร็จ', `${e && e.message ? e.message : e}\n\nยอดเดิมยังไม่ถูกเปลี่ยน กรุณาลองใหม่`);
+                } finally {
+                    if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'ยืนยันแก้ยอดและบันทึกหลักฐาน'; submitBtn.classList.remove('opacity-60'); }
+                    hideLoading();
+                }
+            }
+
             function undoLastScan() {
                 if (!lastScannedLpn) return;
                 const item = allLpnsInWave.find(i => i.lpn === lastScannedLpn);
                 if (!item || item.status !== 'Scanned') { lastScannedLpn = null; renderUndoBar(); return; }
+                if (!item.isMaster && !item.combinedWith) {
+                    openQtyCorrection(item.lpn);
+                    return;
+                }
                 const lpn = lastScannedLpn;
                 item.status = 'Pending'; item.qty = 0; item.color = 'None'; item.scan_type = ''; item.color_breakdown = [];
                 item.combinedWith = null; item.isMaster = false; item.palletNo = null; item.palletColor = null;
@@ -4052,12 +4273,7 @@
             function startPalletColorPrompt() {
                 palletColorMode = true; activePalletColor = null;
                 colorSection.classList.add('hidden'); colorQtyArea.classList.add('hidden'); qtySection.classList.add('hidden');
-                const branchPalletNos = allLpnsInWave
-                    .filter(i => (i.branch || 'Unknown') === selectedBranchCode && i.status === 'Scanned')
-                    .map(i => parseInt(i.palletNo) || 0)
-                    .concat(Array.from(submittedPalletNos));
-                const nextNo = (branchPalletNos.length ? Math.max(...branchPalletNos) : 0) + 1;
-                const t = document.getElementById('palletColorModalTitle'); if (t) t.innerText = `เลือกสีพาเลทใบที่ ${nextNo}`;
+                const t = document.getElementById('palletColorModalTitle'); if (t) t.innerText = 'เลือกสี แล้วรับเลขพาเลทส่วนกลาง';
                 const _bi = allLpnsInWave.filter(i => (i.branch || 'Unknown') === selectedBranchCode);
                 const _rem = _bi.filter(i => i.status !== 'Scanned' && i.status !== 'ForceClosed').length;
                 palletAllDone = (_bi.length > 0 && _rem === 0);
@@ -4073,25 +4289,64 @@
                 palletColorMode = false;
                 endBranchJob();
             }
-            function pickPalletColor(color) {
+            async function pickPalletColor(color) {
+                if (isAllocatingPallet) return;
                 document.getElementById('palletColorModal').classList.add('hidden');
-                setActivePallet(color, 'TOTE');
+                await setActivePallet(color, 'TOTE');
             }
             function palletModalBack() {
                 document.getElementById('palletColorModal').classList.add('hidden');
                 palletColorMode = false;
                 backToBranchSelect();
             }
-            function setActivePallet(color, type) {
-                const _done = allLpnsInWave.filter(i => (i.branch || 'Unknown') === selectedBranchCode && i.status === 'Scanned' && (parseInt(i.palletNo) || 0) > 0);
-                const usedNos = _done.map(i => parseInt(i.palletNo) || 0).concat(Array.from(submittedPalletNos));
-                activePalletNo = (usedNos.length ? Math.max(...usedNos) : 0) + 1;
-                activePalletColor = color; activePalletType = type || 'TOTE'; palletColorMode = false;
-                document.getElementById('palletColorModal').classList.add('hidden');
-                persistPalletWorkflowState();
-                updatePalletBanner();
-                showToast(`พาเลทใบที่ ${activePalletNo} • สีพาเลท${PALLET_CLR_TH[color] || color} — ยิง LPN ได้เลย`);
-                setTimeout(() => lpnInput.focus(), 50);
+            async function requestCentralPalletNo(color) {
+                const waves = (activeWavesList.length ? activeWavesList : String(currentWave || '').split(','))
+                    .map(w => String(w || '').trim()).filter(Boolean);
+                if (noSaveMode) {
+                    const used = allLpnsInWave.map(i => parseInt(i.palletNo) || parseInt(i.pallet_no) || 0).filter(n => n > 0);
+                    return (used.length ? Math.max(...used) : 0) + 1;
+                }
+                if (!navigator.onLine) throw new Error('เครื่องออฟไลน์ จึงยังเริ่มพาเลทใหม่ไม่ได้');
+                const res = await fetchWithTimeout(backendApiUrl + '/api/start-pallet', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        waves,
+                        booking_no: currentBookingNo || '',
+                        branch_code: selectedBranchCode,
+                        branch_name: selectedBranchName,
+                        color,
+                        emp_id: loggedInEmpId
+                    })
+                }, 60000);
+                let body = {};
+                try { body = await res.json(); } catch (e) { }
+                if (!res.ok) throw new Error(typeof body.detail === 'string' ? body.detail : `Server ตอบกลับ HTTP ${res.status}`);
+                const allocated = parseInt(body.pallet_no) || 0;
+                if (!allocated) throw new Error('ไม่ได้รับเลขพาเลทจากส่วนกลาง');
+                return allocated;
+            }
+            async function setActivePallet(color, type) {
+                if (isAllocatingPallet) return;
+                isAllocatingPallet = true;
+                palletColorMode = true;
+                showLoading();
+                try {
+                    activePalletNo = await requestCentralPalletNo(color);
+                    activePalletColor = color; activePalletType = type || 'TOTE'; palletColorMode = false;
+                    document.getElementById('palletColorModal').classList.add('hidden');
+                    persistPalletWorkflowState();
+                    updatePalletBanner();
+                    showToast(`พาเลทส่วนกลางใบที่ ${activePalletNo} • สีพาเลท${PALLET_CLR_TH[color] || color} — ยิง LPN ได้เลย`);
+                    setTimeout(() => lpnInput.focus(), 50);
+                } catch (e) {
+                    palletColorMode = true;
+                    document.getElementById('palletColorModal').classList.remove('hidden');
+                    showAlert('ยังเริ่มพาเลทไม่ได้', `${e && e.message ? e.message : e}\n\nระบบยังไม่ได้สร้างเลขพาเลท กรุณาตรวจอินเทอร์เน็ตแล้วลองใหม่`);
+                } finally {
+                    isAllocatingPallet = false;
+                    hideLoading();
+                }
             }
             function nextPallet() {
                 if (correctionPalletNo) { finishPalletCorrection(false); }
@@ -4177,16 +4432,18 @@
                     return;
                 }
                 if (!activePalletColor) {
+                    const centralPalletCount = getBranchScannedPalletNos().length;
                     el.className = 'bg-slate-50 border-2 border-dashed border-slate-300 rounded-xl px-3 py-3';
                     el.style.background = ''; el.style.border = '';
-                    el.innerHTML = `<div class="grid grid-cols-2 gap-2 mb-2"><div class="bg-emerald-100 rounded-lg px-3 py-2 text-center"><div class="text-[10px] font-black text-emerald-700">ส่งแล้ว</div><div class="text-2xl font-black text-emerald-900">${submittedPalletNos.size}</div></div><div class="bg-white rounded-lg px-3 py-2 text-center border"><div class="text-[10px] font-black text-slate-500">สถานะปัจจุบัน</div><div class="text-sm font-black text-slate-800 mt-1">รอเริ่มใบถัดไป</div></div></div><button onclick="startPalletColorPrompt()" class="w-full bg-slate-800 text-white font-black py-3 rounded-xl">＋ เริ่มพาเลทถัดไป</button>`;
+                    el.innerHTML = `<div class="grid grid-cols-2 gap-2 mb-2"><div class="bg-emerald-100 rounded-lg px-3 py-2 text-center"><div class="text-[10px] font-black text-emerald-700">รวมในระบบ</div><div class="text-2xl font-black text-emerald-900">${centralPalletCount}</div></div><div class="bg-white rounded-lg px-3 py-2 text-center border"><div class="text-[10px] font-black text-slate-500">สถานะเครื่องนี้</div><div class="text-sm font-black text-slate-800 mt-1">รอเริ่มใบถัดไป</div></div></div><button onclick="startPalletColorPrompt()" class="w-full bg-slate-800 text-white font-black py-3 rounded-xl">＋ เริ่มพาเลทถัดไป</button>`;
                     return;
                 }
                 const hex = PALLET_CLR_HEX[activePalletColor] || '#64748b';
                 const currentItems = getPalletItems(activePalletNo);
+                const centralPalletCount = getBranchScannedPalletNos().length;
                 el.className = 'rounded-xl px-3 py-3 shadow-sm';
                 el.style.background = hex + '12'; el.style.border = '2px solid ' + hex;
-                el.innerHTML = `<div class="grid grid-cols-3 gap-2 mb-3"><div class="bg-white/90 rounded-lg px-2 py-2 text-center border border-emerald-200"><div class="text-[10px] font-black text-emerald-700">ส่งแล้ว</div><div class="text-2xl font-black text-emerald-900">${submittedPalletNos.size}</div></div><div class="bg-white/90 rounded-lg px-2 py-2 text-center border" style="border-color:${hex}55"><div class="text-[10px] font-black text-slate-500">กำลังทำใบที่</div><div class="text-2xl font-black text-slate-900">${activePalletNo}</div></div><div class="bg-white/90 rounded-lg px-2 py-2 text-center border" style="border-color:${hex}55"><div class="text-[10px] font-black text-slate-500">LPN ในใบนี้</div><div class="text-2xl font-black text-slate-900">${currentItems.length}</div></div></div><div class="flex items-center justify-between gap-2 mb-2"><div class="flex items-center gap-2 min-w-0"><span style="width:16px;height:16px;border-radius:4px;background:${hex};display:inline-block;flex:none"></span><span class="font-black text-slate-800 text-sm truncate">สีพาเลท${PALLET_CLR_TH[activePalletColor] || activePalletColor}</span></div><span class="bg-amber-100 text-amber-800 text-[11px] font-black px-2 py-1 rounded-full whitespace-nowrap">ยังไม่ได้ส่ง</span></div><button onclick="nextPallet()" class="w-full bg-slate-900 hover:bg-black text-white text-sm font-black px-3 py-3 rounded-xl shadow active:scale-[.99]">✅ พาเลทนี้เสร็จแล้ว — ส่งและเริ่มใบถัดไป</button>`;
+                el.innerHTML = `<div class="grid grid-cols-3 gap-2 mb-3"><div class="bg-white/90 rounded-lg px-2 py-2 text-center border border-emerald-200"><div class="text-[10px] font-black text-emerald-700">รวมในระบบ</div><div class="text-2xl font-black text-emerald-900">${centralPalletCount}</div></div><div class="bg-white/90 rounded-lg px-2 py-2 text-center border" style="border-color:${hex}55"><div class="text-[10px] font-black text-slate-500">เครื่องนี้ทำใบที่</div><div class="text-2xl font-black text-slate-900">${activePalletNo}</div></div><div class="bg-white/90 rounded-lg px-2 py-2 text-center border" style="border-color:${hex}55"><div class="text-[10px] font-black text-slate-500">LPN ในใบนี้</div><div class="text-2xl font-black text-slate-900">${currentItems.length}</div></div></div><div class="flex items-center justify-between gap-2 mb-2"><div class="flex items-center gap-2 min-w-0"><span style="width:16px;height:16px;border-radius:4px;background:${hex};display:inline-block;flex:none"></span><span class="font-black text-slate-800 text-sm truncate">สีพาเลท${PALLET_CLR_TH[activePalletColor] || activePalletColor}</span></div><span class="bg-amber-100 text-amber-800 text-[11px] font-black px-2 py-1 rounded-full whitespace-nowrap">เครื่องนี้ยังไม่ได้ส่ง</span></div><button onclick="nextPallet()" class="w-full bg-slate-900 hover:bg-black text-white text-sm font-black px-3 py-3 rounded-xl shadow active:scale-[.99]">✅ พาเลทนี้เสร็จแล้ว — ส่งและเริ่มใบถัดไป</button>`;
             }
             function renderPalletGroups() {
                 const el = document.getElementById('palletGroupsContainer'); if (!el) return;
@@ -4196,11 +4453,11 @@
                 items.forEach(i => { const k = i.palletNo; (groups[k] = groups[k] || { no: k, color: i.palletColor, items: [] }).items.push(i); });
                 const nos = Object.keys(groups).map(Number).sort((a, b) => a - b);
                 el.innerHTML = `<div class="bg-white rounded-xl shadow-sm border border-slate-200 p-3">
-                    <div class="flex items-center justify-between gap-2 mb-2"><div class="text-sm font-black text-slate-700">📦 พาเลทในสาขานี้ (${nos.length})</div><div class="text-[11px] font-black text-emerald-700 bg-emerald-100 px-2 py-1 rounded-full">ส่งแล้ว ${submittedPalletNos.size}</div></div>
+                    <div class="flex items-center justify-between gap-2 mb-2"><div class="text-sm font-black text-slate-700">📦 พาเลทในระบบของสาขานี้ (${nos.length})</div><div class="text-[11px] font-black text-emerald-700 bg-emerald-100 px-2 py-1 rounded-full">ทุกเครื่องรวมกัน</div></div>
                     <div class="space-y-2">${nos.map(n => { const g = groups[n]; const hex = PALLET_CLR_HEX[g.color] || '#64748b'; const editing = parseInt(n) === parseInt(correctionPalletNo); const isCurrent = !correctionPalletNo && parseInt(n) === parseInt(activePalletNo); const isSubmitted = submittedPalletNos.has(parseInt(n)); return `
                         <div class="border rounded-lg overflow-hidden ${editing ? 'border-purple-500 ring-2 ring-purple-200' : isCurrent ? 'border-amber-400 ring-2 ring-amber-100' : 'border-slate-200'}">
                             <div class="flex items-center justify-between gap-2 px-2.5 py-1.5" style="background:${hex}15">
-                                <div class="flex items-center gap-1.5 font-black text-slate-800 text-xs min-w-0"><span style="width:12px;height:12px;border-radius:3px;background:${hex};display:inline-block;flex:none"></span> <span class="truncate">พาเลท ${n} • สีพาเลท${PALLET_CLR_TH[g.color] || g.color || '-'}</span>${editing ? '<span class="text-[10px] text-purple-700 bg-purple-100 px-1.5 py-0.5 rounded font-black whitespace-nowrap">✏️ กำลังแก้ไข</span>' : isCurrent ? '<span class="text-[10px] text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded font-black whitespace-nowrap">🟠 กำลังทำ</span>' : isSubmitted ? '<span class="text-[10px] text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded font-black whitespace-nowrap">✅ ส่งแล้ว</span>' : '<span class="text-[10px] text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded font-black whitespace-nowrap">งานค้าง</span>'}</div>
+                                <div class="flex items-center gap-1.5 font-black text-slate-800 text-xs min-w-0"><span style="width:12px;height:12px;border-radius:3px;background:${hex};display:inline-block;flex:none"></span> <span class="truncate">พาเลท ${n} • สีพาเลท${PALLET_CLR_TH[g.color] || g.color || '-'}</span>${editing ? '<span class="text-[10px] text-purple-700 bg-purple-100 px-1.5 py-0.5 rounded font-black whitespace-nowrap">✏️ เครื่องนี้กำลังแก้</span>' : isCurrent ? '<span class="text-[10px] text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded font-black whitespace-nowrap">🟠 เครื่องนี้กำลังทำ</span>' : isSubmitted ? '<span class="text-[10px] text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded font-black whitespace-nowrap">✅ เครื่องนี้ส่งแล้ว</span>' : '<span class="text-[10px] text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded font-black whitespace-nowrap">ข้อมูลส่วนกลาง</span>'}</div>
                                 <div class="flex items-center gap-2 shrink-0">
                                     ${editing ? `<button onclick="finishPalletCorrection()" class="text-[11px] font-black text-white bg-purple-700 border border-purple-700 px-2 py-0.5 rounded whitespace-nowrap">บันทึกและกลับ</button>` : `<button onclick="editPallet(${n}, '${g.color}')" class="text-[11px] font-black text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded hover:bg-blue-100 whitespace-nowrap">✏️ แก้ไข</button>`}
                                     <div class="text-[11px] font-bold text-slate-500 whitespace-nowrap">${g.items.length} LPN</div>
@@ -4212,7 +4469,7 @@
                                 const solo = g.items.filter(x => !x.isMaster && !x.combinedWith);
                                 const kidsByMaster = {}; kids.forEach(c => { (kidsByMaster[c.combinedWith] = kidsByMaster[c.combinedWith] || []).push(c); });
                                 const masterLpns = masters.map(x => x.lpn);
-                                let out = solo.map(i => `<span class="inline-flex items-center gap-1 text-[11px] font-bold bg-slate-100 text-slate-600 pl-1.5 pr-1 py-0.5 rounded">${i.lpn}${(parseInt(i.qty) > 1) ? ' (' + i.qty + ')' : ''}<button onclick="resetSingleBox('${i.lpn}')" class="text-red-500 hover:text-white hover:bg-red-500 rounded w-4 h-4 flex items-center justify-center font-black leading-none transition" title="ยกเลิก LPN นี้">✕</button></span>`).join('');
+                                let out = solo.map(i => `<span class="inline-flex items-center gap-1 text-[11px] font-bold bg-slate-100 text-slate-600 pl-1.5 pr-1 py-0.5 rounded">${i.lpn}${(parseInt(i.qty) > 1) ? ' (' + i.qty + ')' : ''}<button onclick="openQtyCorrection('${i.lpn}')" class="text-amber-700 hover:text-white hover:bg-amber-600 rounded px-1 h-4 flex items-center justify-center font-black leading-none transition" title="แก้ไขพร้อมหลักฐาน">✏️</button></span>`).join('');
                                 out += masters.map(m => { const kidHtml = (kidsByMaster[m.lpn] || []).map(c => `<span class="inline-flex items-center gap-0.5 text-[10px] font-bold bg-white text-purple-700 border border-purple-200 px-1.5 py-0.5 rounded">↳ ${c.lpn}<button onclick="undoSingleChild('${c.lpn}')" class="text-red-500 hover:text-red-700 font-black leading-none ml-0.5" title="แยกกล่องนี้ออก">✕</button></span>`).join('') || `<span class="text-[10px] text-purple-400 font-bold">ไม่มีกล่องย่อย</span>`; const mq = (parseInt(m.qty) > 1) ? ' (' + m.qty + ')' : ''; return `<div class="basis-full w-full bg-purple-50 border border-purple-300 rounded-lg p-2 mt-0.5"><div class="flex items-center justify-between gap-2 mb-1"><span class="text-[11px] font-black text-purple-800">🔗 รวมกล่อง · LPN หลัก: ${m.lpn}${mq}</span><button onclick="undoCombine('${m.lpn}')" class="text-[10px] text-red-600 font-bold hover:underline whitespace-nowrap">ยกเลิกรวม</button></div><div class="flex flex-wrap gap-1 pl-1">${kidHtml}</div></div>`; }).join('');
                                 out += kids.filter(c => masterLpns.indexOf(c.combinedWith) === -1).map(c => `<span class="text-[10px] font-bold bg-purple-50 text-purple-600 border border-purple-200 px-1.5 py-0.5 rounded">↳ ${c.lpn} (รวมใน ${c.combinedWith})</span>`).join('');
                                 return out;
@@ -4499,6 +4756,57 @@
             </div>
         </div>
     </div>
+    <div id="correctionModal" class="hidden fixed inset-0 z-[2600] bg-slate-950/75 items-center justify-center p-3">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[92dvh] overflow-y-auto">
+            <div class="sticky top-0 z-10 bg-amber-500 text-slate-950 px-4 py-3 flex items-center justify-between gap-3 rounded-t-2xl">
+                <div>
+                    <div class="text-xs font-black opacity-75">แก้ยอดพร้อมบันทึกหลักฐาน</div>
+                    <div id="correctionLpn" class="text-lg font-black tracking-wider"></div>
+                </div>
+                <button onclick="closeQtyCorrection()" class="w-9 h-9 rounded-full bg-black/15 hover:bg-black/25 font-black text-xl">×</button>
+            </div>
+            <div class="p-4 space-y-4">
+                <div class="grid grid-cols-2 gap-2">
+                    <div class="rounded-xl bg-slate-100 border border-slate-200 p-3 text-center">
+                        <div class="text-xs text-slate-500 font-bold">ยอดเดิม</div>
+                        <div><span id="correctionOldQty" class="text-3xl font-black text-slate-900">0</span> <span class="text-xs font-bold">กล่อง</span></div>
+                    </div>
+                    <div class="rounded-xl bg-blue-50 border border-blue-200 p-3 text-center">
+                        <div class="text-xs text-blue-600 font-bold">พาเลทปัจจุบัน</div>
+                        <div id="correctionPallet" class="text-3xl font-black text-blue-900">-</div>
+                    </div>
+                </div>
+                <div>
+                    <label for="correctionNewQty" class="block text-sm font-black text-slate-800 mb-1">ยอดที่นับถูกต้อง</label>
+                    <input id="correctionNewQty" type="number" min="0" inputmode="numeric" class="w-full rounded-xl border-2 border-amber-400 bg-amber-50 p-3 text-center text-4xl font-black focus:outline-none focus:ring-4 focus:ring-amber-200">
+                    <div id="correctionQtyHint" class="text-[11px] text-slate-500 font-bold mt-1">ใส่ 0 เมื่อต้องการคืน LPN เป็นรายการค้างตรวจสอบ</div>
+                </div>
+                <div>
+                    <label for="correctionReason" class="block text-sm font-black text-slate-800 mb-1">เหตุผลที่แก้ <span class="text-red-600">*</span></label>
+                    <select id="correctionReason" class="w-full rounded-xl border-2 border-slate-300 bg-white p-3 text-base font-bold">
+                        <option value="">— เลือกเหตุผล —</option>
+                        <option value="นับเกิน">นับเกิน</option>
+                        <option value="นับขาด">นับขาด</option>
+                        <option value="เลือกสี TOTE ผิด">เลือกสี TOTE ผิด</option>
+                        <option value="ยิง LPN ผิด">ยิง LPN ผิด</option>
+                        <option value="ยิงผิดพาเลท">ยิงผิดพาเลท</option>
+                        <option value="สินค้า Short Pick">สินค้า Short Pick</option>
+                        <option value="ข้อมูลหน้างานเปลี่ยน">ข้อมูลหน้างานเปลี่ยน</option>
+                        <option value="อื่น ๆ">อื่น ๆ</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="correctionNote" class="block text-sm font-black text-slate-800 mb-1">หมายเหตุเพิ่มเติม <span class="text-slate-400">(ไม่บังคับ)</span></label>
+                    <textarea id="correctionNote" rows="2" maxlength="200" class="w-full rounded-xl border-2 border-slate-300 p-3 text-sm font-bold" placeholder="อธิบายเพิ่มเติมถ้ามี..."></textarea>
+                </div>
+                <button id="correctionSubmitBtn" onclick="submitQtyCorrection()" class="w-full rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 py-3.5 text-lg font-black shadow border-b-4 border-amber-700 active:scale-[.99] disabled:cursor-wait">ยืนยันแก้ยอดและบันทึกหลักฐาน</button>
+                <div class="border-t border-slate-200 pt-3">
+                    <div class="text-sm font-black text-slate-700 mb-2">🕘 ประวัติการแก้ LPN นี้</div>
+                    <div id="correctionHistory" class="space-y-2"></div>
+                </div>
+            </div>
+        </div>
+    </div>
     <div id="flashOverlay" class="hidden fixed inset-0 z-[3000] flex items-center justify-center pointer-events-none" style="transition:opacity .25s;opacity:0"></div>
     <div id="palletColorModal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-[80]">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-5 text-center">
@@ -4514,7 +4822,7 @@
             <button onclick="palletModalBack()" class="mt-3 w-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-2.5 rounded-xl text-sm">← กลับไปเลือกสาขา</button>
         </div>
     </div>
-    <div class="fixed bottom-1 left-1.5 z-[1400] text-[9px] leading-none text-slate-400 font-bold pointer-events-none select-none">Pro LPN Scanner · v1.2 (2026-07-15)</div>
+    <div class="fixed bottom-1 left-1.5 z-[1400] text-[9px] leading-none text-slate-400 font-bold pointer-events-none select-none">Pro LPN Scanner · v1.3 (2026-08-03)</div>
     <div id="quickTools" class="fixed z-[1500] flex flex-col gap-2" style="bottom:16px;right:12px">
         <button onclick="openHelp()" title="วิธีใช้งาน / คำอธิบาย" class="w-11 h-11 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-black shadow-lg text-lg opacity-90">?</button>
         <button onclick="toggleBigText()" id="bigTextBtn" title="ปรับตัวอักษรใหญ่" class="w-11 h-11 rounded-full bg-slate-700 hover:bg-slate-800 text-white font-black shadow-lg text-base opacity-90">ก+</button>
