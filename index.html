@@ -2061,11 +2061,32 @@
             return prefix || '-';
         }
 
+        function normalizeBranchDisplayName(name, branchCode = '') {
+            let cleanName = String(name || '').trim();
+            if (!cleanName || /^(?:unknown|null|none|-|ไม่ระบุ)$/i.test(cleanName)) return '';
+
+            cleanName = cleanName
+                .replace(/^\s*(?:ห้างหุ้นส่วนสามัญนิติบุคคล|ห้างหุ้นส่วนจำกัด|หจก\.?|บริษัทจำกัด|บริษัท|บจก\.?)\s*/i, '')
+                .replace(/\s*(?:จำกัด\s*\(มหาชน\)|จำกัด|\(มหาชน\)|มหาชน|บจก\.?|หจก\.?)\s*$/i, '')
+                .replace(/\s+/g, ' ')
+                .replace(/^[-\s]+|[-\s]+$/g, '')
+                .trim();
+
+            return cleanName;
+        }
+
+        function getBranchNameOrFallback(name, branchCode = '') {
+            return normalizeBranchDisplayName(name, branchCode) || 'ไม่พบชื่อสาขา';
+        }
+
         function getDocumentBranches() {
             const branchMap = new Map();
             allLpnsInWave.forEach(item => {
                 const code = item.branch || 'Unknown';
-                if (!branchMap.has(code)) branchMap.set(code, item.branch_name || 'ไม่ระบุ');
+                const candidate = normalizeBranchDisplayName(item.branch_name, code);
+                if (!branchMap.has(code) || (!normalizeBranchDisplayName(branchMap.get(code), code) && candidate)) {
+                    branchMap.set(code, candidate || 'ไม่พบชื่อสาขา');
+                }
             });
             return Array.from(branchMap.entries())
                 .sort(([a], [b]) => a.localeCompare(b))
@@ -2439,7 +2460,7 @@
                 totalAllBoxes += branchTotalBoxes;
                 totalPallets += branchPallets;
 
-                const cleanBranchName = branch.name.replace(/\s*\([^)]+\)\s*/g, '').trim();
+                const cleanBranchName = getBranchNameOrFallback(branch.name, bCode).replace(/\s*\([^)]+\)\s*/g, '').trim();
                 const province = getProvinceForBranch(bCode, branch.name);
                 const ownerDisplay = getOwnerDisplayName(owner);
 
@@ -2642,7 +2663,7 @@
 
             // Calculate LPN details list grouped by branch
             const branchesOptions = branches.map(branch => {
-                const cleanName = branch.name.replace(/\s*\([^)]+\)\s*/g, '').trim();
+                const cleanName = getBranchNameOrFallback(branch.name, branch.code).replace(/\s*\([^)]+\)\s*/g, '').trim();
                 return `<option value="${branch.code}">${branch.code} - ${cleanName}</option>`;
             }).join('');
 
@@ -2674,7 +2695,7 @@
                     `;
                 }).join('');
 
-                const cleanBranchName = branch.name.replace(/\s*\([^)]+\)\s*/g, '').trim();
+                const cleanBranchName = getBranchNameOrFallback(branch.name, bCode).replace(/\s*\([^)]+\)\s*/g, '').trim();
 
                 return `
                     <div class="lpn-detail-card bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mt-4 print-break-inside-avoid" data-branch="${bCode}">
@@ -3180,6 +3201,10 @@
             }
 
             allLpnsInWave = data.lpn_list || [];
+            allLpnsInWave.forEach(item => {
+                const cleanBranchName = normalizeBranchDisplayName(item.branch_name, item.branch);
+                item.branch_name = cleanBranchName || 'ไม่พบชื่อสาขา';
+            });
             // เลขพาเลทจากส่วนกลางเป็นค่าหลัก เพื่อให้หลายเครื่องเห็นตรงกันและรองรับการแก้ไขย้อนหลัง
             (allLpnsInWave || []).forEach(it => {
                 if (it && Object.prototype.hasOwnProperty.call(it, 'pallet_no')) {
@@ -3327,7 +3352,13 @@
 
         function renderBranchGrid() {
             const uniqueBranchesMap = new Map();
-            allLpnsInWave.forEach(item => { const bCode = item.branch || "Unknown"; if (!uniqueBranchesMap.has(bCode)) uniqueBranchesMap.set(bCode, item.branch_name || "ไม่ระบุ"); });
+            allLpnsInWave.forEach(item => {
+                const bCode = item.branch || "Unknown";
+                const candidate = normalizeBranchDisplayName(item.branch_name, bCode);
+                if (!uniqueBranchesMap.has(bCode) || (!normalizeBranchDisplayName(uniqueBranchesMap.get(bCode), bCode) && candidate)) {
+                    uniqueBranchesMap.set(bCode, candidate || 'ไม่พบชื่อสาขา');
+                }
+            });
             const branchGrid = document.getElementById('branchButtonGrid');
             const htmlParts = [];
             Array.from(uniqueBranchesMap.entries()).sort().forEach(([bCode, bName]) => {
@@ -3366,11 +3397,13 @@
                         ? `<div class="mt-1 text-[11px] font-black text-emerald-700 truncate">✅ ส่งแล้ว ${submittedCount} พาเลท</div>`
                         : '';
 
+                const encodedBranchCode = encodeURIComponent(bCode);
+                const encodedBranchName = encodeURIComponent(getBranchNameOrFallback(bName, bCode));
                 htmlParts.push(`
-                    <button onclick="selectBranch('${bCode}', '${bName}')" class="flex items-center p-4 rounded-xl border-2 shadow-sm active:scale-95 transition ${btnStyle}">
+                    <button onclick="selectBranch(decodeURIComponent('${encodedBranchCode}'), decodeURIComponent('${encodedBranchName}'))" class="flex items-center p-4 rounded-xl border-2 shadow-sm active:scale-95 transition ${btnStyle}">
                         <div class="flex-1 text-left min-w-0 pr-2">
-                            <div class="font-black text-xl truncate">${bCode}</div>
-                            <div class="text-xs font-bold truncate opacity-70">${bName}</div>
+                            <div class="font-black text-xl truncate">${escapeDocumentText(bCode)}</div>
+                            <div class="text-xs font-bold truncate opacity-70">${escapeDocumentText(getBranchNameOrFallback(bName, bCode))}</div>
                             ${completionMeta}
                             ${palletMeta}
                         </div>
@@ -3393,7 +3426,7 @@
                 setTimeout(() => document.getElementById('waveInput').focus(), 100);
             }
 
-            function selectBranch(code, name) { selectedBranchCode = code; selectedBranchName = name; document.getElementById('branchSelectorModal').classList.add('hidden'); document.getElementById('mainApp').classList.remove('hidden'); document.getElementById('mainApp').classList.add('flex'); document.getElementById('currentBranchDisplay').innerText = code; document.getElementById('currentBranchNameDisplay').innerText = name; syncBranchPalletCountInput(); updateDashboardUI(); switchTab('scan'); resumeOrStartPallet(); requestWakeLock(); }
+            function selectBranch(code, name) { selectedBranchCode = code; selectedBranchName = getBranchNameOrFallback(name, code); document.getElementById('branchSelectorModal').classList.add('hidden'); document.getElementById('mainApp').classList.remove('hidden'); document.getElementById('mainApp').classList.add('flex'); document.getElementById('currentBranchDisplay').innerText = code; document.getElementById('currentBranchNameDisplay').innerText = selectedBranchName; syncBranchPalletCountInput(); updateDashboardUI(); switchTab('scan'); resumeOrStartPallet(); requestWakeLock(); }
             function backToBranchSelect() { if (selectedBranchCode) persistPalletWorkflowState(); correctionPalletNo = 0; correctionReturnState = null; selectedBranchCode = ""; syncBranchPalletCountInput(); document.getElementById('mainApp').classList.add('hidden'); renderBranchGrid(); document.getElementById('branchSelectorModal').classList.remove('hidden'); document.getElementById('branchSelectorModal').classList.add('flex'); activePalletNo = 0; activePalletColor = null; palletColorMode = false; submittedPalletNos = new Set(); }
 
             // ==================== REFACTOR UI ====================
@@ -4822,7 +4855,7 @@
             <button onclick="palletModalBack()" class="mt-3 w-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-2.5 rounded-xl text-sm">← กลับไปเลือกสาขา</button>
         </div>
     </div>
-    <div class="fixed bottom-1 left-1.5 z-[1400] text-[9px] leading-none text-slate-400 font-bold pointer-events-none select-none">Pro LPN Scanner · v1.3 (2026-08-03)</div>
+    <div class="fixed bottom-1 left-1.5 z-[1400] text-[9px] leading-none text-slate-400 font-bold pointer-events-none select-none">Pro LPN Scanner · v1.3.1 (2026-08-03)</div>
     <div id="quickTools" class="fixed z-[1500] flex flex-col gap-2" style="bottom:16px;right:12px">
         <button onclick="openHelp()" title="วิธีใช้งาน / คำอธิบาย" class="w-11 h-11 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-black shadow-lg text-lg opacity-90">?</button>
         <button onclick="toggleBigText()" id="bigTextBtn" title="ปรับตัวอักษรใหญ่" class="w-11 h-11 rounded-full bg-slate-700 hover:bg-slate-800 text-white font-black shadow-lg text-base opacity-90">ก+</button>
