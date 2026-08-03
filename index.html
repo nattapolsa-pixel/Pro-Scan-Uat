@@ -1736,10 +1736,13 @@
                     syncQueueError = null;
                     updateSyncStatusUI();
                     // ✅ ใช้ fetchWithTimeout ป้องกัน request ค้างนานโดยไม่มีกำหนด
-                    const res = await fetchWithTimeout(backendApiUrl + '/api/scan', {
+                    const queueEndpoint = payload._endpoint || '/api/scan';
+                    const requestPayload = { ...payload };
+                    delete requestPayload._endpoint;
+                    const res = await fetchWithTimeout(backendApiUrl + queueEndpoint, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
+                        body: JSON.stringify(requestPayload)
                     }, 20000);
 
                     if (res.ok) {
@@ -3512,7 +3515,10 @@
                             </div>`;
                         } else {
                             combineDetails = `
-                            <button onclick="openQtyCorrection('${item.lpn}')" class="text-xs text-amber-800 bg-amber-100 border border-amber-300 hover:bg-amber-200 font-black mt-1.5 px-2.5 py-1.5 rounded-lg text-left flex items-center gap-1 w-max">✏️ แก้ไข / ดูประวัติ</button>`;
+                            <div class="flex flex-wrap items-center gap-1.5 mt-1.5">
+                                <button onclick="openQtyCorrection('${item.lpn}')" class="text-xs text-amber-800 bg-amber-100 border border-amber-300 hover:bg-amber-200 font-black px-2.5 py-1.5 rounded-lg text-left flex items-center gap-1">✏️ แก้ไข / ดูประวัติ</button>
+                                <button onclick="resetSingleBox('${item.lpn}')" class="text-xs text-red-700 bg-red-50 border border-red-300 hover:bg-red-100 font-black px-2.5 py-1.5 rounded-lg text-left flex items-center gap-1">↩ ยกเลิกการยิง LPN</button>
+                            </div>`;
                         }
 
                         scannedParts.push(`<div class="p-2 border-l-4 ${isPPIncomplete ? 'border-amber-500 bg-amber-50' : 'border-green-500 bg-white'} rounded shadow-sm flex flex-col"><div class="flex items-center justify-between gap-2"><div class="font-black text-sm md:text-base ${isPPIncomplete ? 'text-amber-900' : 'text-green-900'} tracking-wider flex items-center flex-wrap">${checkIcon} ${item.lpn}</div><div class="text-right shrink-0">${qtyText}${colorText}<div class="text-[10px] ${isPPIncomplete ? 'text-amber-600' : 'text-green-600'} font-bold">Zone: ${item.zone}</div></div></div>${incompleteNote}${combineDetails}</div>`);
@@ -3568,9 +3574,27 @@
                 updateDashboardUI(); saveCurrentWaveDataCache(); persistPalletWorkflowState(); showToast(`🔄 แยกกล่อง ${childLpn} ออกจากพาเลทเรียบร้อยแล้ว`); finishCorrectionAfterScan();
             }
 
-            async function resetSingleBox(lpn) {
-                if (!confirm(`คุณต้องการยกเลิกการตรวจสอบกล่อง ${lpn} และคืนค่ากลับเป็นค้างตรวจสอบใช่หรือไม่?`)) return;
-                const item = allLpnsInWave.find(i => i.lpn === lpn); if (item) { item.status = 'Pending'; item.qty = 0; item.color = 'None'; item.scan_type = ''; item.color_breakdown = []; item.palletNo = null; item.palletColor = null; item.pallet_breakdown = []; pushToQueue({ wave_no: item.wave_no || currentWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: lpn, type: 'RESET_BOX', color: 'None', qty: 0, emp_id: loggedInEmpId }); updateDashboardUI(); saveCurrentWaveDataCache(); persistPalletWorkflowState(); showToast(`🔄 คืนค่ากล่อง ${lpn} เรียบร้อยแล้ว`); finishCorrectionAfterScan(); }
+            async function resetSingleBox(lpn, skipConfirm = false) {
+                const item = allLpnsInWave.find(i => i.lpn === lpn && (i.branch || 'Unknown') === selectedBranchCode);
+                if (!item) return showAlert('ไม่พบ LPN', `ไม่พบ ${lpn} ในสาขานี้ กรุณาโหลดข้อมูลใหม่`);
+                if (!skipConfirm && !confirm(`ยกเลิกการยิง LPN ${lpn} ใช่หรือไม่?\n\nรายการนี้จะกลับไปอยู่ใน “ค้างตรวจสอบ” และสามารถสแกนใหม่ได้`)) return;
+                item.status = 'Pending'; item.qty = 0; item.color = 'None'; item.scan_type = ''; item.color_breakdown = [];
+                item.palletNo = null; item.pallet_no = 0; item.palletColor = null; item.pallet_breakdown = [];
+                item.combinedWith = null; item.isMaster = false; item.childCount = 0;
+                pushToQueue({
+                    wave_no: item.wave_no || currentWave,
+                    branch_code: selectedBranchCode,
+                    branch_name: selectedBranchName,
+                    lpn,
+                    type: 'RESET_BOX',
+                    color: 'None',
+                    qty: 0,
+                    emp_id: loggedInEmpId,
+                    pallet_no: 0
+                });
+                updateDashboardUI(); saveCurrentWaveDataCache(); persistPalletWorkflowState();
+                showToast(`↩ ยกเลิกการยิง ${lpn} แล้ว — สแกนใหม่ได้`);
+                finishCorrectionAfterScan();
             }
 
             function switchTab(mode) { const isScan = mode === 'scan'; document.getElementById('modeScan').classList.toggle('hidden', !isScan); document.getElementById('modeCombine').classList.toggle('hidden', isScan); document.getElementById('tabScan').className = `flex-1 py-3 font-bold flex items-center justify-center gap-2 ${isScan ? 'text-blue-700 border-b-4 border-blue-700' : 'border-b-4 border-transparent text-gray-500'}`; document.getElementById('tabCombine').className = `flex-1 py-3 font-bold flex items-center justify-center gap-2 ${!isScan ? 'text-purple-700 border-b-4 border-purple-700' : 'border-b-4 border-transparent text-gray-500'}`; syncBranchPalletCountInput(); if (selectedBranchCode !== "") { if (isScan) document.getElementById('lpnInput').focus(); else document.getElementById('masterInput').focus(); } }
@@ -4167,6 +4191,40 @@
             function getCurrentCorrectionItem() {
                 return allLpnsInWave.find(i => i.lpn === correctionTargetLpn && (i.branch || 'Unknown') === selectedBranchCode);
             }
+            function buildCorrectionPayload(item, newQty, reason, note, correctionId) {
+                return {
+                    correction_id: correctionId,
+                    wave_no: item.wave_no || currentWave,
+                    branch_code: selectedBranchCode,
+                    branch_name: selectedBranchName,
+                    lpn: item.lpn,
+                    new_qty: newQty,
+                    reason,
+                    note,
+                    emp_id: loggedInEmpId,
+                    pallet_no: parseInt(item.palletNo) || parseInt(item.pallet_no) || 0,
+                    scan_type: item.scan_type || 'Carton',
+                    color: item.color || 'None'
+                };
+            }
+            function applyQtyCorrectionLocally(item, newQty) {
+                item.qty = newQty;
+                item.status = newQty > 0 ? 'Scanned' : 'Pending';
+                if (newQty === 0) {
+                    item.scan_type = ''; item.color = 'None'; item.color_breakdown = [];
+                    item.palletNo = null; item.pallet_no = 0; item.palletColor = null;
+                    item.combinedWith = null; item.isMaster = false; item.childCount = 0;
+                }
+                item.correctionCount = (parseInt(item.correctionCount) || 0) + 1;
+            }
+            function cancelCurrentCorrectionLpn() {
+                const item = getCurrentCorrectionItem();
+                if (!item) return showAlert('ไม่พบ LPN', 'กรุณาปิดหน้าต่างแล้วเลือก LPN ใหม่');
+                const lpn = item.lpn;
+                if (!confirm(`ยกเลิกการยิง LPN ${lpn} ใช่หรือไม่?\n\nรายการนี้จะกลับไปอยู่ใน “ค้างตรวจสอบ” และสามารถสแกนใหม่ได้`)) return;
+                closeQtyCorrection();
+                resetSingleBox(lpn, true);
+            }
             function openQtyCorrection(lpn) {
                 const item = allLpnsInWave.find(i => i.lpn === lpn && (i.branch || 'Unknown') === selectedBranchCode);
                 if (!item) return showAlert('ไม่พบ LPN', 'กรุณาโหลดข้อมูลล่าสุดแล้วลองใหม่');
@@ -4238,6 +4296,7 @@
                 if (newQty === oldQty) return showAlert('ยอดยังเท่าเดิม', `ยอดเดิมและยอดใหม่เป็น ${oldQty} กล่องเท่ากัน`);
                 if (!correctionRequestId) correctionRequestId = (self.crypto && crypto.randomUUID) ? crypto.randomUUID() : `CORR-${Date.now()}-${Math.random().toString(16).slice(2)}`;
                 const correctionId = correctionRequestId;
+                const correctionPayload = buildCorrectionPayload(item, newQty, reason, note, correctionId);
                 const submitBtn = document.getElementById('correctionSubmitBtn');
                 if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'กำลังบันทึกหลักฐาน...'; submitBtn.classList.add('opacity-60'); }
                 showLoading();
@@ -4246,37 +4305,33 @@
                     const res = await fetchWithTimeout(backendApiUrl + '/api/correct-lpn', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            correction_id: correctionId,
-                            wave_no: item.wave_no || currentWave,
-                            branch_code: selectedBranchCode,
-                            branch_name: selectedBranchName,
-                            lpn: item.lpn,
-                            new_qty: newQty,
-                            reason,
-                            note,
-                            emp_id: loggedInEmpId,
-                            pallet_no: parseInt(item.palletNo) || parseInt(item.pallet_no) || 0,
-                            scan_type: item.scan_type || 'Carton',
-                            color: item.color || 'None'
-                        })
+                        body: JSON.stringify(correctionPayload)
                     }, 120000);
                     let body = {};
                     try { body = await res.json(); } catch (e) { }
                     if (!res.ok) throw new Error(typeof body.detail === 'string' ? body.detail : `HTTP ${res.status}`);
-                    item.qty = newQty;
-                    item.status = newQty > 0 ? 'Scanned' : 'Pending';
-                    if (newQty === 0) {
-                        item.scan_type = ''; item.color = 'None'; item.color_breakdown = [];
-                        item.palletNo = null; item.pallet_no = 0; item.palletColor = null;
-                        item.combinedWith = null; item.isMaster = false; item.childCount = 0;
-                    }
-                    item.correctionCount = (parseInt(item.correctionCount) || 0) + 1;
+                    applyQtyCorrectionLocally(item, newQty);
                     closeQtyCorrection();
                     updateDashboardUI(); saveCurrentWaveDataCache(); persistPalletWorkflowState();
                     showAlert('แก้ยอดและบันทึกหลักฐานแล้ว', `${item.lpn}\nยอดเดิม ${oldQty} → ยอดใหม่ ${newQty} กล่อง\nเหตุผล: ${reason}\nผู้แก้: ${loggedInEmpId || '-'}`, 'border-green-600', true);
                 } catch (e) {
-                    showAlert('แก้ยอดไม่สำเร็จ', `${e && e.message ? e.message : e}\n\nยอดเดิมยังไม่ถูกเปลี่ยน กรุณาลองใหม่`);
+                    const errorMessage = String(e && e.message ? e.message : e || '');
+                    const isConnectionError = e instanceof TypeError
+                        || /failed to fetch|networkerror|เชื่อมต่อ server|อินเทอร์เน็ตออฟไลน์/i.test(errorMessage);
+                    if (isConnectionError) {
+                        pushToQueue({ _endpoint: '/api/correct-lpn', ...correctionPayload });
+                        applyQtyCorrectionLocally(item, newQty);
+                        closeQtyCorrection();
+                        updateDashboardUI(); saveCurrentWaveDataCache(); persistPalletWorkflowState();
+                        showAlert(
+                            'บันทึกการแก้ยอดไว้ในคิวแล้ว',
+                            `${item.lpn}\nยอดเดิม ${oldQty} → ยอดใหม่ ${newQty} กล่อง\n\nเครื่องจะส่งข้อมูลและหลักฐานให้อัตโนมัติเมื่อเชื่อมต่อ Server ได้ ไม่ต้องกรอกซ้ำ`,
+                            'border-amber-500',
+                            true
+                        );
+                    } else {
+                        showAlert('แก้ยอดไม่สำเร็จ', `${errorMessage}\n\nยอดเดิมยังไม่ถูกเปลี่ยน กรุณาลองใหม่`);
+                    }
                 } finally {
                     if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'ยืนยันแก้ยอดและบันทึกหลักฐาน'; submitBtn.classList.remove('opacity-60'); }
                     hideLoading();
@@ -4847,6 +4902,7 @@
                     <textarea id="correctionNote" rows="2" maxlength="200" class="w-full rounded-xl border-2 border-slate-300 p-3 text-sm font-bold" placeholder="อธิบายเพิ่มเติมถ้ามี..."></textarea>
                 </div>
                 <button id="correctionSubmitBtn" onclick="submitQtyCorrection()" class="w-full rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 py-3.5 text-lg font-black shadow border-b-4 border-amber-700 active:scale-[.99] disabled:cursor-wait">ยืนยันแก้ยอดและบันทึกหลักฐาน</button>
+                <button onclick="cancelCurrentCorrectionLpn()" class="w-full rounded-xl bg-red-50 hover:bg-red-100 text-red-700 py-3 text-base font-black border-2 border-red-300 active:scale-[.99]">↩ ยกเลิกการยิง LPN นี้</button>
                 <div class="border-t border-slate-200 pt-3">
                     <div class="text-sm font-black text-slate-700 mb-2">🕘 ประวัติการแก้ LPN นี้</div>
                     <div id="correctionHistory" class="space-y-2"></div>
@@ -4869,7 +4925,7 @@
             <button onclick="palletModalBack()" class="mt-3 w-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-2.5 rounded-xl text-sm">← กลับไปเลือกสาขา</button>
         </div>
     </div>
-    <div class="fixed bottom-1 left-1.5 z-[1400] text-[9px] leading-none text-slate-400 font-bold pointer-events-none select-none">Pro LPN Scanner · v1.3.2 (2026-08-03)</div>
+    <div class="fixed bottom-1 left-1.5 z-[1400] text-[9px] leading-none text-slate-400 font-bold pointer-events-none select-none">Pro LPN Scanner · v1.3.3 (2026-08-03)</div>
     <div id="quickTools" class="fixed z-[1500] flex flex-col gap-2" style="bottom:16px;right:12px">
         <button onclick="openHelp()" title="วิธีใช้งาน / คำอธิบาย" class="w-11 h-11 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-black shadow-lg text-lg opacity-90">?</button>
         <button onclick="toggleBigText()" id="bigTextBtn" title="ปรับตัวอักษรใหญ่" class="w-11 h-11 rounded-full bg-slate-700 hover:bg-slate-800 text-white font-black shadow-lg text-base opacity-90">ก+</button>
