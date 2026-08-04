@@ -2253,21 +2253,21 @@
             return differences;
         }
 
-        async function fetchFreshCurrentJobData() {
+        async function fetchFreshCurrentJobData(force = false) {
             const isBookingMode = activeWavesList.length > 1 || String(currentWave || '').includes(',');
             const url = isBookingMode
-                ? backendApiUrl + `/api/check-booking?booking_no=${encodeURIComponent(currentBookingNo)}&force=true&_ts=${Date.now()}`
-                : backendApiUrl + `/api/check-wave?wave_no=${encodeURIComponent(activeWavesList[0] || currentWave)}&force=true&_ts=${Date.now()}`;
-            const res = await fetchWithTimeout(url, { cache: 'no-store' }, 60000);
+                ? backendApiUrl + `/api/check-booking?booking_no=${encodeURIComponent(currentBookingNo)}${force ? '&force=true' : ''}&_ts=${Date.now()}`
+                : backendApiUrl + `/api/check-wave?wave_no=${encodeURIComponent(activeWavesList[0] || currentWave)}${force ? '&force=true' : ''}&_ts=${Date.now()}`;
+            const res = await fetchWithTimeout(url, { cache: 'no-store' }, 15000);
             if (!res.ok) throw new Error(`โหลดข้อมูลส่วนกลางไม่สำเร็จ (HTTP ${res.status})`);
             return { data: await res.json(), isWaveOnly: !isBookingMode };
         }
 
-        async function verifyDocumentAgainstServer() {
-            await waitForSyncQueue(60000);
-            // A local/server LPN difference can be a valid Short Pick.
-            // Only require the local sync queue to finish, then use the fresh server snapshot.
-            const latest = await fetchFreshCurrentJobData();
+        async function verifyDocumentAgainstServer(forceRefresh = false) {
+            if (syncQueue.length > 0) {
+                await waitForSyncQueue(30000);
+            }
+            const latest = await fetchFreshCurrentJobData(forceRefresh);
             const differences = [];
             if (differences.length > 0) {
                 const lines = differences.slice(0, 8)
@@ -4641,8 +4641,7 @@
                 const completedAtText = formatBangkokDateTime(completedAtIso);
                 showLoading();
                 try {
-                    await waitForSyncQueue(120000);
-                    await verifyDocumentAgainstServer();
+                    await verifyDocumentAgainstServer(false);
                 } catch (e) {
                     hideLoading();
                     const msg = e && e.message ? e.message : 'ยังส่งข้อมูลไม่ครบ';
@@ -4722,8 +4721,7 @@
                 const completedAtText = formatBangkokDateTime(completedAtIso);
                 showLoading();
                 try {
-                    await waitForSyncQueue(120000);
-                    await verifyDocumentAgainstServer();
+                    await verifyDocumentAgainstServer(false);
                 } catch (e) {
                     hideLoading();
                     const msg = e && e.message ? e.message : 'ยังส่งข้อมูลไม่ครบ';
