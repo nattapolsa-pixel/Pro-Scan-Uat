@@ -903,21 +903,6 @@
             <div id="branchDocumentBanner" class="mb-4 p-4 bg-amber-500 hover:bg-amber-600 text-gray-900 rounded-xl shadow-md border-b-4 border-amber-700 flex items-center justify-between cursor-pointer active:scale-95 transition" onclick="openShippingDocument()">
                 <div class="flex items-center gap-3">
                     <div class="bg-amber-600 text-white p-2.5 rounded-lg shrink-0">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5l5 5v11a2 2 0 01-2 2z"></path>
-                        </svg>
-                    </div>
-                    <div>
-                        <h3 class="font-black text-lg leading-tight">เอกสารใบคุมส่งสินค้า (ทุกสาขา)</h3>
-                        <p class="text-xs font-bold opacity-90 mt-0.5">กดที่นี่เพื่อเปิดดูข้อมูลสรุปยอดสะสมและพิมพ์ใบส่งสินค้า</p>
-                    </div>
-                </div>
-                <svg class="w-5 h-5 text-gray-800 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M9 5l7 7-7 7"></path>
-                </svg>
-            </div>
-
-            <div id="branchButtonGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 pb-6"></div>
         </div>
     </div>
 
@@ -952,7 +937,7 @@
                                 d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
                         </svg> เลือกสาขาใหม่
                     </button>
-                    <span id="syncStatus" class="text-[10px] text-green-300 font-bold flex items-center gap-1">
+                    <span id="syncStatus" onclick="retrySyncQueueManual()" title="เธเธ”เน€เธเธทเนเธญเธฅเธญเธเธชเนเธเธเธดเธงเธเนเธณ" class="text-[10px] text-green-300 font-bold flex items-center gap-1 cursor-pointer">
                         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7">
                             </path>
@@ -1798,17 +1783,46 @@
             }
             isSyncing = false; updateSyncStatusUI();
         }
+        function retrySyncQueueManual() {
+            if (syncQueue.length === 0) {
+                showToast('ไม่มีรายการค้างในคิว');
+                return;
+            }
+            syncQueueError = null;
+            showToast(`🔄 กำลังพยายามส่งคิว ${syncQueue.length} รายการอีกครั้ง...`);
+            updateSyncStatusUI();
+            processQueue();
+        }
+
         async function waitForSyncQueue(timeoutMs = 60000) {
             const deadline = Date.now() + timeoutMs;
+            let lastErr = null;
             while (syncQueue.length > 0 && Date.now() < deadline) {
-                if (!navigator.onLine) throw new Error(`อินเทอร์เน็ตออฟไลน์ — ยังมี ${syncQueue.length} รายการที่ยังไม่ส่ง`);
+                if (!navigator.onLine) {
+                    await new Promise(resolve => setTimeout(resolve, 1500));
+                    if (!navigator.onLine && Date.now() >= deadline) {
+                        throw new Error(`อินเทอร์เน็ตออฟไลน์ — ยังมี ${syncQueue.length} รายการที่ยังไม่ส่ง`);
+                    }
+                    if (!navigator.onLine) continue;
+                }
+                syncQueueError = null;
                 await processQueue();
                 if (syncQueueError) {
-                    throw new Error(`LPN ${syncQueueError.lpn} ส่งไม่สำเร็จ (${syncQueueError.status || 'Network'}): ${syncQueueError.message}`);
+                    lastErr = syncQueueError;
+                    // หากเป็น Client Error 4xx (ยกเว้น 408/409) ที่ไม่มีทางส่งผ่าน ให้ throw ทันที
+                    if (syncQueueError.status >= 400 && syncQueueError.status < 500 && syncQueueError.status !== 408 && syncQueueError.status !== 409) {
+                        throw new Error(`LPN ${syncQueueError.lpn} ส่งไม่สำเร็จ (${syncQueueError.status}): ${syncQueueError.message}`);
+                    }
+                    // สำหรับ Network Error (status 0 / 5xx / timeout) ให้พยายามส่งซ้ำจนกว่าจะครบเวลา timeoutMs
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                } else if (syncQueue.length > 0) {
+                    await new Promise(resolve => setTimeout(resolve, 250));
                 }
-                if (syncQueue.length > 0) await new Promise(resolve => setTimeout(resolve, 250));
             }
-            if (syncQueue.length > 0) throw new Error(`ยังมี ${syncQueue.length} รายการที่ส่งไม่สำเร็จภายในเวลาที่กำหนด`);
+            if (syncQueue.length > 0) {
+                const detailStr = lastErr ? ` (${lastErr.message || 'เชื่อมต่อ Server ไม่สำเร็จ'})` : '';
+                throw new Error(`LPN ${lastErr ? lastErr.lpn : ''} ส่งไม่สำเร็จ (Network)${detailStr}\n\nยังมี ${syncQueue.length} รายการในคิว กรุณาตรวจเน็ตแล้วกดลองอีกครั้ง`);
+            }
             return true;
         }
         setInterval(processQueue, 5000);
@@ -2264,7 +2278,20 @@
                 await verifyDocumentAgainstServer();
             } catch (e) {
                 hideLoading();
-                showAlert('ยังเปิดเอกสารไม่ได้', e && e.message ? e.message : 'ไม่สามารถยืนยันข้อมูลกับส่วนกลางได้');
+                const msg = e && e.message ? e.message : 'ไม่สามารถยืนยันข้อมูลกับส่วนกลางได้';
+                if (syncQueue.length > 0) {
+                    showConfirm(
+                        'ยังเปิดเอกสารไม่ได้ (ส่งข้อมูลไม่สำเร็จ)',
+                        `${msg}\n\nต้องการลองส่งคิวอีกครั้งหรือไม่?`,
+                        '🔄 ลองส่งคิวอีกครั้ง',
+                        () => {
+                            retrySyncQueueManual();
+                            setTimeout(() => openShippingDocument(preferredBranchCode), 800);
+                        }
+                    );
+                } else {
+                    showAlert('ยังเปิดเอกสารไม่ได้', msg);
+                }
                 return;
             }
             hideLoading();
@@ -4589,11 +4616,22 @@
                 const branchCodeToClose = selectedBranchCode;
                 const completedAtIso = new Date().toISOString();
                 const completedAtText = formatBangkokDateTime(completedAtIso);
+                showLoading();
                 try {
                     await waitForSyncQueue(120000);
                     await verifyDocumentAgainstServer();
                 } catch (e) {
-                    showAlert('ยังปิดงานไม่ได้', `${e && e.message ? e.message : 'ยังส่งข้อมูลไม่ครบ'}\n\nระบบยังไม่ได้ปิดสาขา กรุณาตรวจสถานะการส่งแล้วลองใหม่`);
+                    hideLoading();
+                    const msg = e && e.message ? e.message : 'ยังส่งข้อมูลไม่ครบ';
+                    showConfirm(
+                        'ยังปิดงานไม่ได้ (ส่งข้อมูลไม่สำเร็จ)',
+                        `${msg}\n\nระบบยังไม่ได้ปิดสาขา ต้องการลองส่งคิวอีกครั้งหรือไม่?`,
+                        '🔄 ลองส่งคิวอีกครั้ง',
+                        () => {
+                            retrySyncQueueManual();
+                            setTimeout(() => confirmForceClose(), 800);
+                        }
+                    );
                     return;
                 }
 
@@ -4659,11 +4697,22 @@
                 const branchCodeToClose = selectedBranchCode;
                 const completedAtIso = new Date().toISOString();
                 const completedAtText = formatBangkokDateTime(completedAtIso);
+                showLoading();
                 try {
                     await waitForSyncQueue(120000);
                     await verifyDocumentAgainstServer();
                 } catch (e) {
-                    showAlert('ยังปิดงานไม่ได้', `${e && e.message ? e.message : 'ยังส่งข้อมูลไม่ครบ'}\n\nระบบยังไม่ได้ปิดสาขา กรุณาตรวจสถานะการส่งแล้วลองใหม่`);
+                    hideLoading();
+                    const msg = e && e.message ? e.message : 'ยังส่งข้อมูลไม่ครบ';
+                    showConfirm(
+                        'ยังปิดงานไม่ได้ (ส่งข้อมูลไม่สำเร็จ)',
+                        `${msg}\n\nระบบยังไม่ได้ปิดสาขา ต้องการลองส่งคิวอีกครั้งหรือไม่?`,
+                        '🔄 ลองส่งคิวอีกครั้ง',
+                        () => {
+                            retrySyncQueueManual();
+                            setTimeout(() => performFinishBranchJob(), 800);
+                        }
+                    );
                     return;
                 }
 
