@@ -3302,18 +3302,24 @@
             });
 
             renderBranchGrid();
+            document.getElementById('waveSelectorModal').classList.add('hidden');
             if (!selectedBranchCode) {
-                document.getElementById('waveSelectorModal').classList.add('hidden');
+                document.getElementById('mainApp').classList.add('hidden');
                 document.getElementById('branchWaveDisplay').innerText = isWaveOnly ? `WAVE: ${currentWave}` : `BOOKING: ${currentBookingNo}`;
                 document.getElementById('branchSelectorModal').classList.remove('hidden');
                 document.getElementById('branchSelectorModal').classList.add('flex');
             } else {
+                document.getElementById('branchSelectorModal').classList.add('hidden');
+                document.getElementById('mainApp').classList.remove('hidden');
+                document.getElementById('mainApp').classList.add('flex');
                 updateDashboardUI();
             }
         }
 
         async function checkAndLoadWave() {
             if (isAlertOpen) return;
+            selectedBranchCode = "";
+            selectedBranchName = "";
             const inputVal = document.getElementById('waveInput').value.trim().toUpperCase();
             if (!inputVal) return;
 
