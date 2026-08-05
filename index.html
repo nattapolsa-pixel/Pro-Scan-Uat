@@ -767,14 +767,18 @@
                         class="bg-slate-700 hover:bg-slate-600 text-slate-200 font-bold px-3 py-2 rounded-lg text-xs transition flex items-center gap-1 active:scale-95">
                         🔄 คืนค่ายอดสแกนจริง
                     </button>
-                    <button onclick="confirmAndPrintShippingDocument()"
+                    <button onclick="saveDocumentOverridesUI()" title="บันทึกยอดที่แก้ไขลงเครื่อง"
+                        class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-2 rounded-lg text-xs md:text-sm transition flex items-center gap-1 shadow active:scale-95">
+                        💾 บันทึกยอดแก้ไข
+                    </button>
+                    <button onclick="printShippingDocument()" title="สั่งพิมพ์เอกสารใบคุมส่งสินค้า"
                         class="bg-blue-600 hover:bg-blue-700 text-white font-black px-4 py-2 rounded-lg shadow flex items-center justify-center gap-2 text-sm transition active:scale-95">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                 d="M6 9V2h12v7m-9 8h6m-7 4h8a2 2 0 002-2v-5H6v5a2 2 0 002 2zm12-12H4a2 2 0 00-2 2v4h4v-3h12v3h4v-4a2 2 0 00-2-2z">
                             </path>
                         </svg>
-                        💾 บันทึกและพิมพ์เอกสาร
+                        🖨️ พิมพ์เอกสาร
                     </button>
                 </div>
             </div>
@@ -1985,6 +1989,11 @@
         function updateDocumentPalletCount(branchCode, value) {
             updateDocumentFieldValue(branchCode, 'pallet', value);
         }
+        function saveDocumentOverridesUI() {
+            saveDocumentOverrides();
+            renderShippingDocument();
+            showToast('💾 บันทึกยอดที่แก้ไขในเอกสารเรียบร้อยแล้ว');
+        }
         function resetDocumentOverrides() {
             showGenericConfirm(
                 '🔄 คืนค่าเป็นยอดสแกนจริง',
@@ -1994,20 +2003,6 @@
                     saveDocumentOverrides();
                     renderShippingDocument();
                     showToast('คืนค่าเป็นยอดสแกนจริงในระบบเรียบร้อยแล้ว');
-                }
-            );
-        }
-        function confirmAndPrintShippingDocument() {
-            showGenericConfirm(
-                '⚠️ ยืนยันการปรับเปลี่ยนยอดและพิมพ์เอกสาร',
-                'คุณต้องการยืนยันบันทึกการเปลี่ยนยอดสินค้าในเอกสารใบคุมส่งสินค้าทั้งหมด และพิมพ์เอกสารใช่หรือไม่?',
-                () => {
-                    saveDocumentOverrides();
-                    renderShippingDocument();
-                    showToast('บันทึกยอดเอกสารเรียบร้อย — กำลังสั่งพิมพ์...');
-                    setTimeout(() => {
-                        window.print();
-                    }, 300);
                 }
             );
         }
@@ -3020,6 +3015,9 @@
                 showAlert('ข้อมูลเอกสารยังไม่พร้อมพิมพ์', 'กรุณาปิดเอกสารแล้วเปิดใหม่ ระบบจะส่งคิวและตรวจข้อมูลส่วนกลางอีกครั้งก่อนพิมพ์');
                 return;
             }
+
+            saveDocumentOverrides();
+            renderShippingDocument();
 
             const missingPalletBranches = getBranchesMissingPalletCount();
             if (missingPalletBranches.length > 0) {
