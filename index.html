@@ -758,17 +758,25 @@
                     ปิด
                 </button>
             </div>
-            <div class="flex items-center justify-between gap-3 mt-3 bg-gray-800 p-2.5 rounded-lg border border-gray-700">
-                <span class="font-bold text-yellow-300 text-xs md:text-sm">📄 รวมใบคุมส่งสินค้าทุกสาขาในรอบงานนี้</span>
-                <button onclick="printShippingDocument()"
-                    class="bg-blue-600 hover:bg-blue-700 text-white font-black px-4 py-2.5 rounded-lg shadow flex items-center justify-center gap-2 text-sm transition active:scale-95">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M6 9V2h12v7m-9 8h6m-7 4h8a2 2 0 002-2v-5H6v5a2 2 0 002 2zm12-12H4a2 2 0 00-2 2v4h4v-3h12v3h4v-4a2 2 0 00-2-2z">
-                        </path>
-                    </svg>
-                    พิมพ์เอกสารทั้งหมด (Print All)
-                </button>
+            <div class="flex flex-wrap items-center justify-between gap-3 mt-3 bg-gray-800 p-2.5 rounded-lg border border-gray-700">
+                <span class="font-bold text-yellow-300 text-xs md:text-sm flex items-center gap-1">
+                    📄 เอกสารใบคุมส่งสินค้า (สามารถแก้ไขตัวเลขในตารางได้ทุกช่อง)
+                </span>
+                <div class="flex items-center gap-2">
+                    <button onclick="resetDocumentOverrides()" title="คืนค่าเป็นยอดสแกนจริงในระบบ"
+                        class="bg-slate-700 hover:bg-slate-600 text-slate-200 font-bold px-3 py-2 rounded-lg text-xs transition flex items-center gap-1 active:scale-95">
+                        🔄 คืนค่ายอดสแกนจริง
+                    </button>
+                    <button onclick="confirmAndPrintShippingDocument()"
+                        class="bg-blue-600 hover:bg-blue-700 text-white font-black px-4 py-2 rounded-lg shadow flex items-center justify-center gap-2 text-sm transition active:scale-95">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M6 9V2h12v7m-9 8h6m-7 4h8a2 2 0 002-2v-5H6v5a2 2 0 002 2zm12-12H4a2 2 0 00-2 2v4h4v-3h12v3h4v-4a2 2 0 00-2-2z">
+                            </path>
+                        </svg>
+                        💾 บันทึกและพิมพ์เอกสาร
+                    </button>
+                </div>
             </div>
         </header>
         <div class="flex-1 overflow-y-auto p-3 md:p-6 bg-gray-200">
@@ -1891,6 +1899,63 @@
             showToast(currentLicensePlate ? 'บันทึกทะเบียนรถแล้ว' : 'ล้างทะเบียนรถแล้ว');
         }
 
+        let documentOverrides = {};
+        function getDocumentOverridesStorageKey() {
+            return 'proScannerDocOverrides_' + (currentBookingNo || currentWave || 'default');
+        }
+        function loadDocumentOverrides() {
+            try {
+                documentOverrides = JSON.parse(localStorage.getItem(getDocumentOverridesStorageKey())) || {};
+            } catch (e) {
+                documentOverrides = {};
+            }
+        }
+        function saveDocumentOverrides() {
+            try {
+                localStorage.setItem(getDocumentOverridesStorageKey(), JSON.stringify(documentOverrides));
+            } catch (e) { }
+        }
+        function updateDocumentFieldValue(branchCode, field, value) {
+            if (!branchCode || !field) return;
+            if (!documentOverrides[branchCode]) documentOverrides[branchCode] = {};
+            const val = String(value || '').trim();
+            if (val === '') {
+                delete documentOverrides[branchCode][field];
+            } else {
+                documentOverrides[branchCode][field] = Math.max(0, parseInt(val) || 0);
+            }
+            saveDocumentOverrides();
+            renderShippingDocument();
+        }
+        function updateDocumentPalletCount(branchCode, value) {
+            updateDocumentFieldValue(branchCode, 'pallet', value);
+        }
+        function resetDocumentOverrides() {
+            showGenericConfirm(
+                '🔄 คืนค่าเป็นยอดสแกนจริง',
+                'คุณต้องการล้างการแก้ไขตัวเลขทั้งหมด และคืนค่ากลับเป็นยอดที่สแกนจริงในระบบใช่หรือไม่?',
+                () => {
+                    documentOverrides = {};
+                    saveDocumentOverrides();
+                    renderShippingDocument();
+                    showToast('คืนค่าเป็นยอดสแกนจริงในระบบเรียบร้อยแล้ว');
+                }
+            );
+        }
+        function confirmAndPrintShippingDocument() {
+            showGenericConfirm(
+                '⚠️ ยืนยันการปรับเปลี่ยนยอดและพิมพ์เอกสาร',
+                'คุณต้องการยืนยันบันทึกการเปลี่ยนยอดสินค้าในเอกสารใบคุมส่งสินค้าทั้งหมด และพิมพ์เอกสารใช่หรือไม่?',
+                () => {
+                    saveDocumentOverrides();
+                    showToast('บันทึกยอดเอกสารเรียบร้อย — กำลังสั่งพิมพ์...');
+                    setTimeout(() => {
+                        window.print();
+                    }, 300);
+                }
+            );
+        }
+
         function normalizeBranchLookupCode(value) {
             return String(value === undefined || value === null ? '' : value)
                 .normalize('NFKC')
@@ -2311,6 +2376,7 @@
         }
 
         function renderShippingDocument() {
+            loadDocumentOverrides();
             const content = document.getElementById('shippingDocumentContent');
             const branches = getDocumentBranches();
             if (branches.length === 0) {
@@ -2349,8 +2415,6 @@
                 
                 // Get owner from the items (if any item has a valid owner)
                 let owner = 'Unknown';
-                // ✅ เลือก owner ที่อยู่ในตารางแปลงชื่อก่อน (DM02/DP02/DG02/1115) — กันกรณีสาขามีหลาย owner
-                //    แล้ว LPN ตัวแรกเป็น DCWN แต่จริงๆ สาขานี้มี DM02 (MAXMART) อยู่ถัดไป
                 const mappedOwnerItem = branchItems.find(item => item.owner && ownerDisplayMap[normalizeBranchLookupCode(item.owner)]);
                 if (mappedOwnerItem) {
                     owner = mappedOwnerItem.owner;
@@ -2363,12 +2427,12 @@
                     }
                 }
 
-                // Sum quantities by category
-                let mCount = 0;
-                let redCount = 0;
-                let blueCount = 0;
-                let greenCount = 0;
-                let blackCount = 0;
+                // Sum quantities by category (Auto scanned totals)
+                let autoM = 0;
+                let autoRed = 0;
+                let autoBlue = 0;
+                let autoGreen = 0;
+                let autoBlack = 0;
                 let yellowCount = 0;
                 let paperBoxCount = 0;
 
@@ -2380,25 +2444,21 @@
                         && (normalizedType === 'CARTON' || normalizedColor === 'REUSE');
 
                     if (isPaperTote) {
-                        mCount += qty; // ✅ รวมกล่องกระดาษเข้ากล่อง M (ตามที่ขอ ไม่มีคอลัมน์กระดาษแยกแล้ว)
+                        autoM += qty;
                     } else if (normalizedPrefix === 'PP' || normalizedPrefix === 'SP' || normalizedType === 'CARTON' || normalizedColor === 'REUSE') {
-                        // ✅ PR ถูกเอาออกจากช่อง M แล้ว → ให้ไปนับตามสี Tote ที่หน้างานเลือก (เหมือน PT/PN)
-                        //    (PR ที่เลือกสีรียูส ยังลง M ตามเงื่อนไข color REUSE ด้านบน เพราะไม่มีช่องรียูสแยก)
-                        mCount += qty;
+                        autoM += qty;
                     } else {
-                        if (normalizedColor === 'RED') redCount += qty;
-                        else if (normalizedColor === 'BLUE') blueCount += qty;
-                        else if (normalizedColor === 'GREEN') greenCount += qty;
-                        else if (normalizedColor === 'BLACK') blackCount += qty;
+                        if (normalizedColor === 'RED') autoRed += qty;
+                        else if (normalizedColor === 'BLUE') autoBlue += qty;
+                        else if (normalizedColor === 'GREEN') autoGreen += qty;
+                        else if (normalizedColor === 'BLACK') autoBlack += qty;
                         else if (normalizedColor === 'YELLOW') yellowCount += qty;
-                        else mCount += qty;
+                        else autoM += qty;
                     }
                 };
 
                 branchItems.forEach(item => {
                     if (item.status === 'Scanned') {
-                        // ✅ Combine แสดงจำนวน "ภาชนะจริง" ในใบคุมส่งสินค้า:
-                        //    1 Master = 1 Tote และไม่เอา Child LPN ภายในมานับซ้ำเป็นหลายใบ
                         if (item.combinedWith) return;
                         const qty = getActualQty(item);
                         const prefix = String(item.lpn || '').substring(0, 2).toUpperCase();
@@ -2422,7 +2482,7 @@
                         }
 
                         if (isDirectQtyPrefix(prefix)) {
-                            mCount += qty;
+                            autoM += qty;
                         } else {
                             const breakdown = getColorBreakdown(item);
                             if (breakdown.length > 0) {
@@ -2435,8 +2495,7 @@
                     }
                 });
 
-                const branchTotalBoxes = mCount + redCount + blueCount + greenCount + blackCount + paperBoxCount + yellowCount;
-                // ✅ ยอดพาเลทอัตโนมัติจากที่ยิงจริง (palletNo ที่ sync จาก backend/เครื่องนี้) → ขึ้นเองแม้เปิดเอกสารคนละเครื่อง
+                // Auto Pallet Nos
                 const autoPalletNos = new Set();
                 branchItems.forEach(it => {
                     (Array.isArray(it.branch_pallet_nos) ? it.branch_pallet_nos : []).forEach(no => {
@@ -2448,9 +2507,18 @@
                     }
                 });
                 const autoPalletCount = autoPalletNos.size;
-                const branchPallets = autoPalletCount;
+
+                // Check manual overrides per field
+                const ov = documentOverrides[bCode] || {};
+                const mCount = (ov.m !== undefined && ov.m !== null && ov.m !== '') ? (parseInt(ov.m) || 0) : autoM;
+                const redCount = (ov.red !== undefined && ov.red !== null && ov.red !== '') ? (parseInt(ov.red) || 0) : autoRed;
+                const blueCount = (ov.blue !== undefined && ov.blue !== null && ov.blue !== '') ? (parseInt(ov.blue) || 0) : autoBlue;
+                const greenCount = (ov.green !== undefined && ov.green !== null && ov.green !== '') ? (parseInt(ov.green) || 0) : autoGreen;
+                const blackCount = (ov.black !== undefined && ov.black !== null && ov.black !== '') ? (parseInt(ov.black) || 0) : autoBlack;
+                const branchPallets = (ov.pallet !== undefined && ov.pallet !== null && ov.pallet !== '') ? (parseInt(ov.pallet) || 0) : autoPalletCount;
+
+                const branchTotalBoxes = mCount + redCount + blueCount + greenCount + blackCount + paperBoxCount + yellowCount;
                 if (branchPallets === 0) allBranchesHavePalletCount = false;
-                const branchPalletInputValue = branchPallets > 0 ? String(branchPallets) : '';
                 const branchPalletDisplay = branchPallets > 0 ? String(branchPallets) : '-';
 
                 // Accumulate totals
@@ -2486,28 +2554,73 @@
 
                 return `
                     <tr class="hover:bg-slate-50 transition-colors text-center text-slate-700">
-                        <td class="p-3 border-r border-slate-200 font-medium font-sans">${index + 1}</td>
-                        <td class="p-3 border-r border-slate-200 font-bold text-slate-900 font-sans">${escapeDocumentText(ownerDisplay)}</td>
-                        <td class="p-3 border-r border-slate-200 font-bold text-indigo-600 tracking-wider font-sans">${escapeDocumentText(bCode)}</td>
-                        <td class="p-3 border-r border-slate-200 text-left font-medium font-sans">${escapeDocumentText(cleanBranchName)}</td>
-                        <td class="p-3 border-r border-slate-200 text-slate-600 font-sans">${escapeDocumentText(province)}</td>
-                        <td class="p-3 border-r border-slate-200 font-bold font-sans">${mCount || ''}</td>
-                        <td class="p-3 border-r border-slate-200 text-red-600 font-bold font-sans">${redCount || ''}</td>
-                        <td class="p-3 border-r border-slate-200 text-blue-600 font-bold font-sans">${blueCount || ''}</td>
-                        <td class="p-3 border-r border-slate-200 text-green-600 font-bold font-sans">${greenCount || ''}</td>
-                        <td class="p-3 border-r border-slate-200 text-slate-800 font-bold font-sans">${blackCount || ''}</td>
-                        <td class="p-3 border-r border-slate-200 bg-slate-50/50 font-black text-slate-900 font-sans">${branchTotalBoxes}</td>
-                        <td class="p-3 font-black bg-slate-50/50 text-indigo-900 font-sans">
-                            <input type="number"
-                                min="0"
-                                step="1"
-                                value="${escapeDocumentText(branchPalletInputValue)}"
-                                placeholder="-"
-                                data-branch="${escapeDocumentText(bCode)}"
-                                onchange="updateDocumentPalletCount(this.dataset.branch, this.value)"
+                        <td class="p-2 border-r border-slate-200 font-medium font-sans">${index + 1}</td>
+                        <td class="p-2 border-r border-slate-200 font-bold text-slate-900 font-sans">${escapeDocumentText(ownerDisplay)}</td>
+                        <td class="p-2 border-r border-slate-200 font-bold text-indigo-600 tracking-wider font-sans">${escapeDocumentText(bCode)}</td>
+                        <td class="p-2 border-r border-slate-200 text-left font-medium font-sans">${escapeDocumentText(cleanBranchName)}</td>
+                        <td class="p-2 border-r border-slate-200 text-slate-600 font-sans">${escapeDocumentText(province)}</td>
+                        
+                        <!-- 📦 กล่อง M -->
+                        <td class="p-2 border-r border-slate-200 font-bold font-sans">
+                            <input type="number" min="0" step="1" value="${mCount || ''}" placeholder="0"
+                                data-branch="${escapeDocumentText(bCode)}" data-field="m"
+                                onchange="updateDocumentFieldValue(this.dataset.branch, 'm', this.value)"
                                 onkeydown="if (event.key === 'Enter') this.blur()"
-                                class="no-print w-16 max-w-full text-center bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-indigo-900 font-black outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
-                            <span class="print-only">${escapeDocumentText(branchPalletDisplay)}</span>
+                                class="no-print w-14 max-w-full text-center bg-white border border-slate-200 rounded-lg px-1 py-1 text-slate-900 font-black outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
+                            <span class="print-only">${mCount || ''}</span>
+                        </td>
+                        
+                        <!-- 🔴 TOTE แดง -->
+                        <td class="p-2 border-r border-slate-200 font-bold font-sans">
+                            <input type="number" min="0" step="1" value="${redCount || ''}" placeholder="0"
+                                data-branch="${escapeDocumentText(bCode)}" data-field="red"
+                                onchange="updateDocumentFieldValue(this.dataset.branch, 'red', this.value)"
+                                onkeydown="if (event.key === 'Enter') this.blur()"
+                                class="no-print w-14 max-w-full text-center bg-white border border-slate-200 rounded-lg px-1 py-1 text-red-600 font-black outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100">
+                            <span class="print-only">${redCount || ''}</span>
+                        </td>
+                        
+                        <!-- 🔵 TOTE น้ำเงิน -->
+                        <td class="p-2 border-r border-slate-200 font-bold font-sans">
+                            <input type="number" min="0" step="1" value="${blueCount || ''}" placeholder="0"
+                                data-branch="${escapeDocumentText(bCode)}" data-field="blue"
+                                onchange="updateDocumentFieldValue(this.dataset.branch, 'blue', this.value)"
+                                onkeydown="if (event.key === 'Enter') this.blur()"
+                                class="no-print w-14 max-w-full text-center bg-white border border-slate-200 rounded-lg px-1 py-1 text-blue-600 font-black outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
+                            <span class="print-only">${blueCount || ''}</span>
+                        </td>
+                        
+                        <!-- 🟢 TOTE เขียว -->
+                        <td class="p-2 border-r border-slate-200 font-bold font-sans">
+                            <input type="number" min="0" step="1" value="${greenCount || ''}" placeholder="0"
+                                data-branch="${escapeDocumentText(bCode)}" data-field="green"
+                                onchange="updateDocumentFieldValue(this.dataset.branch, 'green', this.value)"
+                                onkeydown="if (event.key === 'Enter') this.blur()"
+                                class="no-print w-14 max-w-full text-center bg-white border border-slate-200 rounded-lg px-1 py-1 text-green-600 font-black outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100">
+                            <span class="print-only">${greenCount || ''}</span>
+                        </td>
+                        
+                        <!-- ⚫ TOTE ดำ -->
+                        <td class="p-2 border-r border-slate-200 font-bold font-sans">
+                            <input type="number" min="0" step="1" value="${blackCount || ''}" placeholder="0"
+                                data-branch="${escapeDocumentText(bCode)}" data-field="black"
+                                onchange="updateDocumentFieldValue(this.dataset.branch, 'black', this.value)"
+                                onkeydown="if (event.key === 'Enter') this.blur()"
+                                class="no-print w-14 max-w-full text-center bg-white border border-slate-200 rounded-lg px-1 py-1 text-slate-800 font-black outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-100">
+                            <span class="print-only">${blackCount || ''}</span>
+                        </td>
+                        
+                        <!-- 📊 รวมกล่อง -->
+                        <td class="p-2 border-r border-slate-200 bg-slate-50/50 font-black text-slate-900 font-sans">${branchTotalBoxes}</td>
+                        
+                        <!-- 📦 พาเลท -->
+                        <td class="p-2 font-black bg-slate-50/50 text-indigo-900 font-sans">
+                            <input type="number" min="0" step="1" value="${branchPallets || ''}" placeholder="0"
+                                data-branch="${escapeDocumentText(bCode)}" data-field="pallet"
+                                onchange="updateDocumentFieldValue(this.dataset.branch, 'pallet', this.value)"
+                                onkeydown="if (event.key === 'Enter') this.blur()"
+                                class="no-print w-14 max-w-full text-center bg-white border border-slate-200 rounded-lg px-1 py-1 text-indigo-900 font-black outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100">
+                            <span class="print-only">${branchPallets || '-'}</span>
                         </td>
                     </tr>
                 `;
