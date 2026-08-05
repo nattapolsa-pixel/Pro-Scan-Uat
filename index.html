@@ -2934,6 +2934,18 @@
                 else { e.preventDefault(); }
                 return;
             }
+            // ✅ ระหว่างเปิดหน้าต่างเลือกพาเลทเดิม/พาเลทใหม่
+            const _bpm = document.getElementById('branchPalletChoiceModal');
+            if (_bpm && !_bpm.classList.contains('hidden')) {
+                if (e.key === 'Escape' || e.key === 'Esc') { e.preventDefault(); closePalletChoiceModal(); }
+                else if (e.key >= '1' && e.key <= '9') {
+                    const btns = document.querySelectorAll('#existingPalletsChoiceList button');
+                    const idx = parseInt(e.key) - 1;
+                    if (btns[idx]) { e.preventDefault(); btns[idx].click(); }
+                }
+                else if (e.key === 'Enter') { e.preventDefault(); chooseStartNewPallet(); }
+                e.preventDefault(); return;
+            }
             // ✅ ระหว่างเลือกสีพาเลท: กด 1/2/3 เลือกสี, ปุ่มอื่น (รวม Esc) บล็อก — บังคับเลือก
             const _pcm = document.getElementById('palletColorModal');
             if (_pcm && !_pcm.classList.contains('hidden')) {
@@ -3439,8 +3451,111 @@
                 setTimeout(() => document.getElementById('waveInput').focus(), 100);
             }
 
-            function selectBranch(code, name) { selectedBranchCode = code; selectedBranchName = getBranchNameOrFallback(name, code); document.getElementById('branchSelectorModal').classList.add('hidden'); document.getElementById('mainApp').classList.remove('hidden'); document.getElementById('mainApp').classList.add('flex'); document.getElementById('currentBranchDisplay').innerText = code; document.getElementById('currentBranchNameDisplay').innerText = selectedBranchName; syncBranchPalletCountInput(); updateDashboardUI(); switchTab('scan'); resumeOrStartPallet(); requestWakeLock(); }
-            function backToBranchSelect() { if (selectedBranchCode) persistPalletWorkflowState(); correctionPalletNo = 0; correctionReturnState = null; selectedBranchCode = ""; syncBranchPalletCountInput(); document.getElementById('mainApp').classList.add('hidden'); renderBranchGrid(); document.getElementById('branchSelectorModal').classList.remove('hidden'); document.getElementById('branchSelectorModal').classList.add('flex'); activePalletNo = 0; activePalletColor = null; palletColorMode = false; submittedPalletNos = new Set(); }
+            let pendingBranchCode = '';
+            let pendingBranchName = '';
+
+            function selectBranch(code, name) {
+                const existingPalletNos = getBranchScannedPalletNos(code);
+                if (existingPalletNos.length > 0) {
+                    openPalletChoiceModal(code, name, existingPalletNos);
+                } else {
+                    executeBranchEntry(code, name);
+                    resumeOrStartPallet();
+                }
+            }
+
+            function openPalletChoiceModal(code, name, palletNos) {
+                pendingBranchCode = code;
+                pendingBranchName = getBranchNameOrFallback(name, code);
+                const modal = document.getElementById('branchPalletChoiceModal');
+                const title = document.getElementById('palletChoiceBranchTitle');
+                const container = document.getElementById('existingPalletsChoiceList');
+                if (!modal || !container) {
+                    executeBranchEntry(code, name);
+                    resumeOrStartPallet();
+                    return;
+                }
+                if (title) title.innerText = `${code} - ${pendingBranchName}`;
+                
+                const listHtml = palletNos.map((no, idx) => {
+                    const palletItems = getPalletItems(no, code);
+                    const sampleItem = palletItems[0] || (allLpnsInWave.find(i => (i.branch || 'Unknown') === code && (parseInt(i.palletNo) || parseInt(i.pallet_no) || 0) === no) || {});
+                    const color = sampleItem.palletColor || 'Green';
+                    const hex = PALLET_CLR_HEX[color] || '#16a34a';
+                    const colorName = PALLET_CLR_TH[color] || color;
+                    return `
+                        <button onclick="chooseExistingPallet(${no}, '${color}')" class="w-full text-left p-3 rounded-xl border-2 border-slate-200 hover:border-blue-500 bg-slate-50 hover:bg-blue-50 transition flex items-center justify-between gap-2 shadow-sm active:scale-98">
+                            <div class="flex items-center gap-2 min-w-0">
+                                <span class="w-4 h-4 rounded shrink-0" style="background:${hex}"></span>
+                                <div>
+                                    <div class="font-black text-sm text-slate-800">[${idx + 1}] ทำงานต่อ / เข้าแก้ไข พาเลท ${no}</div>
+                                    <div class="text-xs font-bold text-slate-500">สีพาเลท${colorName} • ${palletItems.length} LPN</div>
+                                </div>
+                            </div>
+                            <span class="text-xs font-black text-blue-700 bg-blue-100 px-2 py-1 rounded-lg shrink-0">เลือก ➔</span>
+                        </button>
+                    `;
+                }).join('');
+                
+                container.innerHTML = listHtml;
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            }
+
+            function closePalletChoiceModal() {
+                const modal = document.getElementById('branchPalletChoiceModal');
+                if (modal) {
+                    modal.classList.add('hidden');
+                    modal.classList.remove('flex');
+                }
+                pendingBranchCode = '';
+                pendingBranchName = '';
+            }
+
+            function executeBranchEntry(code, name) {
+                selectedBranchCode = code;
+                selectedBranchName = getBranchNameOrFallback(name, code);
+                document.getElementById('branchSelectorModal').classList.add('hidden');
+                document.getElementById('mainApp').classList.remove('hidden');
+                document.getElementById('mainApp').classList.add('flex');
+                document.getElementById('currentBranchDisplay').innerText = code;
+                document.getElementById('currentBranchNameDisplay').innerText = selectedBranchName;
+                syncBranchPalletCountInput();
+                updateDashboardUI();
+                switchTab('scan');
+                requestWakeLock();
+            }
+
+            function chooseExistingPallet(palletNo, color) {
+                const bCode = pendingBranchCode;
+                const bName = pendingBranchName;
+                closePalletChoiceModal();
+                executeBranchEntry(bCode, bName);
+                activePalletNo = parseInt(palletNo) || 0;
+                activePalletColor = color || null;
+                activePalletType = (color === 'Reuse') ? 'Carton' : 'TOTE';
+                palletColorMode = false;
+                if (colorSection) colorSection.classList.add('hidden');
+                document.getElementById('palletColorModal').classList.add('hidden');
+                persistPalletWorkflowState();
+                updatePalletBanner();
+                showToast(`เข้าสแกนต่อในพาเลทใบที่ ${activePalletNo} (${PALLET_CLR_TH[color] || color})`);
+                setTimeout(() => { try { lpnInput.focus(); } catch (e) { } }, 50);
+            }
+
+            function chooseStartNewPallet() {
+                const bCode = pendingBranchCode;
+                const bName = pendingBranchName;
+                closePalletChoiceModal();
+                executeBranchEntry(bCode, bName);
+                activePalletNo = 0;
+                activePalletColor = null;
+                persistPalletWorkflowState();
+                updatePalletBanner();
+                startPalletColorPrompt();
+            }
+
+            function backToBranchSelect() { closePalletChoiceModal(); if (selectedBranchCode) persistPalletWorkflowState(); correctionPalletNo = 0; correctionReturnState = null; selectedBranchCode = ""; syncBranchPalletCountInput(); document.getElementById('mainApp').classList.add('hidden'); renderBranchGrid(); document.getElementById('branchSelectorModal').classList.remove('hidden'); document.getElementById('branchSelectorModal').classList.add('flex'); activePalletNo = 0; activePalletColor = null; palletColorMode = false; submittedPalletNos = new Set(); }
 
             // ==================== REFACTOR UI ====================
             // Cache DOM elements ที่ใช้บ่อยใน updateDashboardUI
@@ -4498,7 +4613,7 @@
                     colorSection.classList.add('hidden');
                     persistPalletWorkflowState();
                     syncSubmittedPalletDocumentCount();
-                    if (!activePalletNo || !activePalletColor) { updatePalletBanner(); startPalletColorPrompt(); return; }
+                    if (!activePalletNo || !activePalletColor) { updatePalletBanner(); if (!done.length) startPalletColorPrompt(); return; }
                     updatePalletBanner();
                     showToast(`ทำต่อพาเลทใบที่ ${activePalletNo} • ส่งแล้ว ${submittedPalletNos.size} พาเลท`);
                     setTimeout(() => lpnInput.focus(), 50);
@@ -4910,7 +5025,25 @@
             </div>
         </div>
     </div>
-    <div id="flashOverlay" class="hidden fixed inset-0 z-[3000] flex items-center justify-center pointer-events-none" style="transition:opacity .25s;opacity:0"></div>
+    <!-- 📦 หน้าต่างเลือกพาเลทเมื่อเข้าสาขาที่มีพาเลทอยู่แล้ว -->
+    <div id="branchPalletChoiceModal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-[85]">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-5 text-center border-t-8 border-blue-600">
+            <div class="text-xs font-black text-blue-600 uppercase tracking-wide">สาขานี้มีพาเลทในระบบแล้ว</div>
+            <div id="palletChoiceBranchTitle" class="text-xl font-black text-slate-800 mb-1">สาขา</div>
+            <div class="text-xs font-bold text-slate-500 mb-3">เลือกพาเลทเดิมเพื่อสแกนต่อ/เข้าแก้ไข หรือเปิดพาเลทใบใหม่</div>
+            
+            <div class="text-left mb-1.5 text-xs font-black text-slate-700">พาเลทที่มีอยู่แล้วในสาขานี้:</div>
+            <div id="existingPalletsChoiceList" class="space-y-2 max-h-52 overflow-y-auto mb-4 p-1"></div>
+            
+            <button onclick="chooseStartNewPallet()" class="w-full bg-slate-900 hover:bg-black text-white font-black py-3.5 rounded-xl shadow text-base transition flex items-center justify-center gap-1 active:scale-98">
+                ＋ เปิดพาเลทใบใหม่ (ขอเลขพาเลทส่วนกลางเพิ่ม)
+            </button>
+            <button onclick="closePalletChoiceModal()" class="mt-2.5 w-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-2.5 rounded-xl text-sm transition">
+                ← กลับไปเลือกสาขา
+            </button>
+        </div>
+    </div>
+
     <div id="palletColorModal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-[80]">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-5 text-center">
             <div class="text-sm text-slate-500 font-bold">เริ่มพาเลทใหม่</div>
