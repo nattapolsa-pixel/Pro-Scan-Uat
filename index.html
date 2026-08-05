@@ -725,7 +725,7 @@
 
     <!-- ✅ กล่องยืนยันแบบ ใช่/ไม่ (ใช้ซ้ำได้: ยิงซ้ำ PP, เตือนปิดจบไม่ครบ ฯลฯ) -->
     <div id="genericConfirmModal"
-        class="hidden fixed inset-0 bg-gray-900 bg-opacity-80 flex items-center justify-center p-4 z-[130]">
+        class="hidden fixed inset-0 bg-gray-900 bg-opacity-80 items-center justify-center p-4 z-[3000]">
         <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm text-center border-t-8 border-orange-500">
             <svg class="w-12 h-12 text-orange-500 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -1927,6 +1927,61 @@
             saveDocumentOverrides();
             renderShippingDocument();
         }
+        let genericConfirmCallback = null;
+        let isConfirmOpen = false;
+
+        function showGenericConfirm(title, message, callback, okBtnText = 'ยืนยัน') {
+            genericConfirmCallback = (typeof callback === 'function') ? callback : null;
+            const titleEl = document.getElementById('genericConfirmTitle');
+            const msgEl = document.getElementById('genericConfirmMessage');
+            const okBtn = document.getElementById('genericConfirmOkBtn');
+            if (titleEl) titleEl.innerText = title;
+            if (msgEl) msgEl.innerText = message;
+            if (okBtn) okBtn.innerText = okBtnText;
+
+            const modal = document.getElementById('genericConfirmModal');
+            if (modal) {
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            }
+            isConfirmOpen = true;
+            if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+        }
+
+        function showConfirm(title, message, confirmText = 'ยืนยัน', onConfirm = null) {
+            let callback = onConfirm;
+            let okText = confirmText;
+            if (typeof confirmText === 'function') {
+                callback = confirmText;
+                okText = 'ยืนยัน';
+            }
+            showGenericConfirm(title, message, callback, okText);
+        }
+
+        function closeGenericConfirm() {
+            const modal = document.getElementById('genericConfirmModal');
+            if (modal) {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+            isConfirmOpen = false;
+            genericConfirmCallback = null;
+            if (typeof rescanPromptLpn !== 'undefined') rescanPromptLpn = null;
+            if (typeof directQtyContinuationLpn !== 'undefined') directQtyContinuationLpn = null;
+            const lpnInput = document.getElementById('lpnInput');
+            if (typeof selectedBranchCode !== 'undefined' && selectedBranchCode !== "" && lpnInput) {
+                lpnInput.focus();
+            }
+        }
+
+        function acceptGenericConfirm() {
+            const cb = genericConfirmCallback;
+            closeGenericConfirm();
+            if (cb && typeof cb === 'function') {
+                cb();
+            }
+        }
+
         function updateDocumentPalletCount(branchCode, value) {
             updateDocumentFieldValue(branchCode, 'pallet', value);
         }
@@ -1948,6 +2003,7 @@
                 'คุณต้องการยืนยันบันทึกการเปลี่ยนยอดสินค้าในเอกสารใบคุมส่งสินค้าทั้งหมด และพิมพ์เอกสารใช่หรือไม่?',
                 () => {
                     saveDocumentOverrides();
+                    renderShippingDocument();
                     showToast('บันทึกยอดเอกสารเรียบร้อย — กำลังสั่งพิมพ์...');
                     setTimeout(() => {
                         window.print();
@@ -4028,33 +4084,7 @@
                 setTimeout(() => { qtyInput.focus(); }, 10);
             }
 
-            // ==================== ✅ กล่องยืนยันแบบ ใช่/ไม่ (ใช้ซ้ำได้) ====================
-            let isConfirmOpen = false;
-            let genericConfirmCallback = null;
-            function showConfirm(title, message, confirmText = 'ยืนยัน', onConfirm = null) {
-                genericConfirmCallback = (typeof onConfirm === 'function') ? onConfirm : null;
-                document.getElementById('genericConfirmTitle').innerText = title;
-                document.getElementById('genericConfirmMessage').innerText = message;
-                document.getElementById('genericConfirmOkBtn').innerText = confirmText;
-                document.getElementById('genericConfirmModal').classList.remove('hidden');
-                isConfirmOpen = true;
-                if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
-            }
-            function closeGenericConfirm() {
-                document.getElementById('genericConfirmModal').classList.add('hidden');
-                isConfirmOpen = false;
-                genericConfirmCallback = null;
-                rescanPromptLpn = null;
-                directQtyContinuationLpn = null;
-                if (selectedBranchCode !== "") document.getElementById('lpnInput').focus();
-            }
-            function acceptGenericConfirm() {
-                const cb = genericConfirmCallback;
-                document.getElementById('genericConfirmModal').classList.add('hidden');
-                isConfirmOpen = false;
-                genericConfirmCallback = null;
-                if (cb) cb();
-            }
+            // ==================== ✅ กล่องยืนยันแบบ ใช่/ไม่ (ใช้ซ้ำได้ - ย้ายไปที่ top-level around L1930) ====================
             function getColorLabel(color) {
                 const normalizedColor = String(color || '').toUpperCase();
                 const labels = { BLACK: 'ดำ', BLUE: 'น้ำเงิน', YELLOW: 'เหลือง', GREEN: 'เขียว', RED: 'แดง', REUSE: 'กล่องกระดาษ (Reuse)' };
