@@ -1126,7 +1126,7 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                     d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                             </svg>
-                            จำนวนเป้าหมายจากระบบ: <span id="guideQty" class="font-black text-2xl mx-1">0</span> กล่อง
+                            <span id="qtyGuideLabel">จำนวนเป้าหมายจากระบบ:</span> <span id="guideQty" class="font-black text-2xl mx-1">0</span> กล่อง
                         </div>
                         <label
                             class="block text-gray-700 font-bold text-center text-sm mb-2">ระบุจำนวนที่นับได้จริง</label>
@@ -3889,9 +3889,11 @@
                     if (found.branch !== selectedBranchCode) { showAlert('รหัสสาขาไม่ตรงกัน', `บาร์โค้ด ${lpn} เป็นของสาขา [${found.branch}]\nกรุณาตรวจสอบและเลือกสาขาให้ถูกต้อง`); lpnInput.value = ''; return; }
                     if (found.status === 'Scanned') {
                         lpnInput.value = '';
-                        // ✅ PP หลายพาเลทต่อ 1 LPN: ยิงซ้ำได้เพื่อสะสมยอดที่เหลือ (แทนการบล็อก)
+                        // ✅ ยิงซ้ำ LPN: เปิดหน้าต่างระบุจำนวน/เลือกสีทันทีโดยไม่ต้องผ่านกล่องข้อความเตือน
                         if (isMultiPalletLpn(found.lpn) && !found.isMaster && !found.combinedWith) {
-                            promptRescanContinuation(found);
+                            openDirectQtyEntryForContinuation(found);
+                        } else if (!found.isMaster && !found.combinedWith) {
+                            openToteColorSelectionForContinuation(found);
                         } else {
                             flashScreen(false);
                             showAlert('ข้อมูลซ้ำซ้อน', `บาร์โค้ด ${lpn}\nได้รับการสแกนไปแล้ว`, 'border-yellow-500');
@@ -3899,7 +3901,25 @@
                         return;
                     }
                     resetScanColorButtons();
-                    if (requiresDirectQty(lpn)) { directQtyContinuationLpn = null; document.getElementById('displayLpnQty').innerText = lpn; document.getElementById('qtyScanTitle').innerText = `สแกนกล่อง ${lpn.substring(0, 2)}`; document.getElementById('guideQty').innerText = found.Total_Qty || found.total_qty || 1; qtyInput.value = ''; qtySection.classList.remove('hidden'); colorSection.classList.add('hidden'); colorQtyArea.classList.add('hidden'); lpnInput.blur(); setTimeout(() => { qtyInput.focus(); }, 10); } else { if (!activePalletColor) { showToast('เลือกสีพาเลทก่อน', true); startPalletColorPrompt(); lpnInput.value = ''; return; } const _cb2 = document.getElementById('cancelColorBtn'); if (_cb2) _cb2.classList.remove('hidden'); var _sl = document.getElementById('colorAreaSubLabel'); if (_sl) _sl.innerText = 'เลือกสี Tote ของกล่องนี้'; document.getElementById('displayLpn').innerText = lpn; document.getElementById('selectedScanColor').value = ''; document.getElementById('selectedScanType').value = 'TOTE'; document.getElementById('selectedScanColorLabel').innerText = '-'; colorQtyInput.value = ''; colorQtyArea.classList.add('hidden'); colorSection.classList.remove('hidden'); qtySection.classList.add('hidden'); lpnInput.blur(); } lpnInput.value = '';
+                    if (requiresDirectQty(lpn)) {
+                        directQtyContinuationLpn = null;
+                        document.getElementById('displayLpnQty').innerText = lpn;
+                        document.getElementById('qtyScanTitle').innerText = `สแกนกล่อง ${lpn.substring(0, 2)}`;
+                        const guideLabel = document.getElementById('qtyGuideLabel');
+                        if (guideLabel) guideLabel.innerText = 'จำนวนเป้าหมายจากระบบ:';
+                        document.getElementById('guideQty').innerText = found.Total_Qty || found.total_qty || 1;
+                        qtyInput.value = '';
+                        qtySection.classList.remove('hidden');
+                        colorSection.classList.add('hidden');
+                        colorQtyArea.classList.add('hidden');
+                        lpnInput.blur();
+                        setTimeout(() => { qtyInput.focus(); }, 10);
+                    } else {
+                        if (!activePalletColor) { showToast('เลือกสีพาเลทก่อน', true); startPalletColorPrompt(); lpnInput.value = ''; return; }
+                        const _cb2 = document.getElementById('cancelColorBtn'); if (_cb2) _cb2.classList.remove('hidden');
+                        var _sl = document.getElementById('colorAreaSubLabel'); if (_sl) _sl.innerText = 'เลือกสี Tote ของกล่องนี้';
+                        document.getElementById('displayLpn').innerText = lpn; document.getElementById('selectedScanColor').value = ''; document.getElementById('selectedScanType').value = 'TOTE'; document.getElementById('selectedScanColorLabel').innerText = '-'; colorQtyInput.value = ''; colorQtyArea.classList.add('hidden'); colorSection.classList.remove('hidden'); qtySection.classList.add('hidden'); lpnInput.blur();
+                    } lpnInput.value = '';
                 }
             });
             qtyInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') { e.preventDefault(); executeQtyScanSave(); } });
@@ -4066,19 +4086,68 @@
             }
 
             function openDirectQtyEntryForContinuation(item) {
+                if (!item) return;
                 const already = parseInt(item.qty) || 0;
                 const total = getExpectedQty(item);
                 const remaining = Math.max(0, total - already);
                 directQtyContinuationLpn = item.lpn;
                 document.getElementById('displayLpnQty').innerText = item.lpn;
-                document.getElementById('qtyScanTitle').innerText = `ยิงซ้ำ ${item.lpn.substring(0, 2)} · พาเลทถัดไป`;
-                document.getElementById('guideQty').innerText = remaining > 0 ? remaining : total;
+                
+                const titleEl = document.getElementById('qtyScanTitle');
+                if (titleEl) titleEl.innerText = `ยิงซ้ำ ${item.lpn.substring(0, 2)} · พาเลทถัดไป`;
+                
+                const guideLabel = document.getElementById('qtyGuideLabel');
+                if (already > 0) {
+                    if (guideLabel) guideLabel.innerText = `เคยยิงแล้ว ${already}/${total} · เป้าหมายที่เหลือ:`;
+                    document.getElementById('guideQty').innerText = remaining > 0 ? remaining : total;
+                    showToast(`🔁 ยิงซ้ำ ${item.lpn} — เคยยิงแล้ว ${already}/${total} (เหลืออีก ${remaining} กล่อง)`);
+                } else {
+                    if (guideLabel) guideLabel.innerText = 'จำนวนเป้าหมายจากระบบ:';
+                    document.getElementById('guideQty').innerText = total;
+                }
+                
                 qtyInput.value = '';
                 qtySection.classList.remove('hidden');
                 colorSection.classList.add('hidden');
                 colorQtyArea.classList.add('hidden');
                 lpnInput.blur();
                 setTimeout(() => { qtyInput.focus(); }, 10);
+            }
+
+            function openToteColorSelectionForContinuation(item) {
+                if (!item) return;
+                resetScanColorButtons();
+                if (!activePalletColor) {
+                    showToast('เลือกสีพาเลทก่อน', true);
+                    startPalletColorPrompt();
+                    lpnInput.value = '';
+                    return;
+                }
+                const cancelBtn = document.getElementById('cancelColorBtn');
+                if (cancelBtn) cancelBtn.classList.remove('hidden');
+                
+                const subLabel = document.getElementById('colorAreaSubLabel');
+                const alreadyText = getColorBreakdownText(item) || `${item.qty || 1} กล่อง`;
+                if (subLabel) subLabel.innerText = `เคยยิงแล้ว (${alreadyText}) — เลือกสีเพื่อสแกนเพิ่ม`;
+                
+                document.getElementById('displayLpn').innerText = item.lpn;
+                document.getElementById('selectedScanColor').value = '';
+                document.getElementById('selectedScanType').value = 'TOTE';
+                document.getElementById('selectedScanColorLabel').innerText = '-';
+                colorQtyInput.value = '';
+                colorQtyArea.classList.add('hidden');
+                colorSection.classList.remove('hidden');
+                qtySection.classList.add('hidden');
+                lpnInput.blur();
+                showToast(`🔁 LPN ${item.lpn} เคยสแกนแล้ว — เลือกสี Tote เพื่อสแกนเพิ่มได้ทันที`);
+            }
+
+            function cancelQtySelection() {
+                directQtyContinuationLpn = null;
+                qtySection.classList.add('hidden');
+                const guideLabel = document.getElementById('qtyGuideLabel');
+                if (guideLabel) guideLabel.innerText = 'จำนวนเป้าหมายจากระบบ:';
+                lpnInput.focus();
             }
 
             // ==================== ✅ กล่องยืนยันแบบ ใช่/ไม่ (ใช้ซ้ำได้ - ย้ายไปที่ top-level around L1930) ====================
