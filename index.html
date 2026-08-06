@@ -1970,12 +1970,6 @@
             }
             isConfirmOpen = false;
             genericConfirmCallback = null;
-            if (typeof rescanPromptLpn !== 'undefined') rescanPromptLpn = null;
-            if (typeof directQtyContinuationLpn !== 'undefined') directQtyContinuationLpn = null;
-            const lpnInput = document.getElementById('lpnInput');
-            if (typeof selectedBranchCode !== 'undefined' && selectedBranchCode !== "" && lpnInput) {
-                lpnInput.focus();
-            }
         }
 
         function acceptGenericConfirm() {
@@ -1983,6 +1977,11 @@
             closeGenericConfirm();
             if (cb && typeof cb === 'function') {
                 cb();
+            } else {
+                const lpnInput = document.getElementById('lpnInput');
+                if (typeof selectedBranchCode !== 'undefined' && selectedBranchCode !== "" && lpnInput) {
+                    lpnInput.focus();
+                }
             }
         }
 
@@ -3951,7 +3950,7 @@
             // ==================== 📦 PP หลายพาเลทต่อ 1 LPN: ยิงซ้ำสะสมยอด ====================
             let directQtyContinuationLpn = null;
             let rescanPromptLpn = null;
-            function isMultiPalletLpn(lpn) { return String(lpn || '').substring(0, 2).toUpperCase() === 'PP'; }
+            function isMultiPalletLpn(lpn) { return isDirectQtyLpn(lpn); }
             // ✅ ช่วยเหลือ + ออกจากระบบ
             function openHelp() { const m = document.getElementById('helpModal'); if (m) m.classList.remove('hidden'); }
             function closeHelp() { const m = document.getElementById('helpModal'); if (m) m.classList.add('hidden'); }
@@ -4053,14 +4052,14 @@
                 const already = parseInt(item.qty) || 0;
                 const total = getExpectedQty(item);
                 const remaining = Math.max(0, total - already);
-                rescanPromptLpn = item.lpn;
+                const targetLpn = item.lpn;
+                const prefix = String(targetLpn || '').substring(0, 2).toUpperCase();
                 showConfirm(
-                    `LPN ${item.lpn} ยิงไปแล้ว`,
-                    `พาเลทนี้บันทึกไปแล้ว ${already}/${total} กล่อง\nยังเหลืออีก ${remaining} กล่อง\n\nถ้านี่คือ PP พาเลทถัดไปของ LPN เดียวกัน กด "ใช่ ยิงซ้ำต่อ" เพื่อบันทึกยอดที่เหลือเพิ่ม`,
+                    `LPN ${targetLpn} ยิงไปแล้ว`,
+                    `พาเลทนี้บันทึกไปแล้ว ${already}/${total} กล่อง\nยังเหลืออีก ${remaining} กล่อง\n\nถ้านี่คือ ${prefix} พาเลทถัดไปของ LPN เดียวกัน กด "ใช่ ยิงซ้ำต่อ" เพื่อบันทึกยอดที่เหลือเพิ่ม`,
                     'ใช่ ยิงซ้ำต่อ',
                     () => {
-                        const target = allLpnsInWave.find(i => i.lpn === rescanPromptLpn);
-                        rescanPromptLpn = null;
+                        const target = allLpnsInWave.find(i => i.lpn === targetLpn && (i.branch || 'Unknown') === selectedBranchCode);
                         if (target) openDirectQtyEntryForContinuation(target);
                     }
                 );
@@ -4073,7 +4072,7 @@
                 directQtyContinuationLpn = item.lpn;
                 document.getElementById('displayLpnQty').innerText = item.lpn;
                 document.getElementById('qtyScanTitle').innerText = `ยิงซ้ำ ${item.lpn.substring(0, 2)} · พาเลทถัดไป`;
-                document.getElementById('guideQty').innerText = remaining;
+                document.getElementById('guideQty').innerText = remaining > 0 ? remaining : total;
                 qtyInput.value = '';
                 qtySection.classList.remove('hidden');
                 colorSection.classList.add('hidden');
