@@ -422,6 +422,158 @@
                 font-family: 'Sarabun', 'Inter', sans-serif;
             }
 
+            /* เอกสารหลายสาขา: ย่อเฉพาะตอนพิมพ์ให้รวมเป็นหน้าเดียว */
+            .print-page.print-compact {
+                height: 186mm;
+                min-height: 186mm;
+                max-height: 186mm;
+                overflow: hidden !important;
+            }
+
+            .print-page.print-compact .print-header {
+                gap: 4px;
+                padding-bottom: 4px;
+                margin-bottom: 4px;
+            }
+
+            .print-page.print-compact .print-logo {
+                height: 48px;
+                margin-bottom: 3px;
+            }
+
+            .print-page.print-compact .print-meta-lines,
+            .print-page.print-compact .print-date {
+                font-size: 9px;
+                line-height: 1.2;
+            }
+
+            .print-page.print-compact .print-meta-lines strong {
+                min-width: 45px;
+            }
+
+            .print-page.print-compact .print-title {
+                padding-top: 4px;
+            }
+
+            .print-page.print-compact .print-title h1 {
+                font-size: 16px;
+            }
+
+            .print-page.print-compact .print-date {
+                padding-top: 4px;
+            }
+
+            .print-page.print-compact .print-job-table {
+                font-size: 9px !important;
+                line-height: 1.1 !important;
+            }
+
+            .print-page.print-compact .print-job-table th,
+            .print-page.print-compact .print-job-table td {
+                padding: 1px 3px !important;
+                height: 16px !important;
+                line-height: 1.1 !important;
+            }
+
+            .print-page.print-compact .print-job-table .print-branch-name {
+                width: 48mm;
+            }
+
+            .print-page.print-compact .print-signature-section {
+                padding-top: 2mm;
+                font-size: 9px;
+            }
+
+            .print-page.print-compact .print-role {
+                font-size: 6px;
+            }
+
+            .print-page.print-compact .print-dotted-line {
+                min-width: 30mm;
+            }
+
+            /* จำนวนสาขามากเป็นพิเศษ: ลดลงอีกระดับเพื่อไม่ให้ตารางล้นกระดาษ */
+            .print-page.print-compact-dense .print-logo {
+                height: 34px;
+            }
+
+            .print-page.print-compact-dense .print-meta-lines,
+            .print-page.print-compact-dense .print-date {
+                font-size: 7.5px;
+            }
+
+            .print-page.print-compact-dense .print-title h1 {
+                font-size: 13px;
+            }
+
+            .print-page.print-compact-dense .print-job-table {
+                font-size: 7.5px !important;
+            }
+
+            .print-page.print-compact-dense .print-job-table th,
+            .print-page.print-compact-dense .print-job-table td {
+                padding: 0 2px !important;
+                height: 11px !important;
+                line-height: 1 !important;
+            }
+
+            .print-page.print-compact-dense .print-signature-section {
+                font-size: 7.5px;
+                padding-top: 1mm;
+            }
+
+            .print-page.print-compact-dense .print-role {
+                font-size: 5px;
+            }
+
+            .print-page.print-compact-dense .print-dotted-line {
+                min-width: 25mm;
+            }
+
+            /* กรณีมีสาขาจำนวนมากมากจริง ๆ */
+            .print-page.print-compact-ultra .print-logo {
+                height: 26px;
+                margin-bottom: 1px;
+            }
+
+            .print-page.print-compact-ultra .print-meta-lines,
+            .print-page.print-compact-ultra .print-date {
+                font-size: 6.5px;
+                line-height: 1.05;
+            }
+
+            .print-page.print-compact-ultra .print-title {
+                padding-top: 1px;
+            }
+
+            .print-page.print-compact-ultra .print-title h1 {
+                font-size: 11px;
+            }
+
+            .print-page.print-compact-ultra .print-job-table {
+                font-size: 6.5px !important;
+            }
+
+            .print-page.print-compact-ultra .print-job-table th,
+            .print-page.print-compact-ultra .print-job-table td {
+                padding: 0 1px !important;
+                height: 9px !important;
+                line-height: .95 !important;
+            }
+
+            .print-page.print-compact-ultra .print-signature-section {
+                font-size: 6.5px;
+                padding-top: .5mm;
+            }
+
+            .print-page.print-compact-ultra .print-role {
+                font-size: 4px;
+            }
+
+            .print-page.print-compact-ultra .print-dotted-line {
+                min-width: 20mm;
+            }
+
             .print-header {
                 display: grid;
                 grid-template-columns: 1fr 2.2fr 1fr;
@@ -2747,7 +2899,16 @@
                 </tr>
             `;
 
-            const rowsPerPrintPage = 14;
+            // ถ้ามีหลายสาขา ให้รวมทุกสาขาไว้หน้าเดียวและใช้ CSS compact ตามจำนวนแถว
+            const isCompactPrint = printRows.length > 14;
+            const printDensityClass = !isCompactPrint
+                ? ''
+                : printRows.length > 45
+                    ? 'print-compact print-compact-dense print-compact-ultra'
+                    : printRows.length > 30
+                        ? 'print-compact print-compact-dense'
+                        : 'print-compact';
+            const rowsPerPrintPage = isCompactPrint ? Math.max(1, printRows.length) : 14;
             const printChunks = [];
             for (let i = 0; i < printRows.length; i += rowsPerPrintPage) {
                 printChunks.push(printRows.slice(i, i + rowsPerPrintPage));
@@ -2762,7 +2923,7 @@
                 ).join('');
 
                 return `
-                    <section class="print-page">
+                    <section class="print-page ${printDensityClass}">
                         <div class="print-header">
                             <div class="print-meta-left">
                                 <img src="logo.png" alt="PT Logo" class="print-logo" />
@@ -3519,7 +3680,7 @@
                         showToast('ยังใช้ข้อมูลที่โหลดไว้ก่อนหน้าอยู่', true);
                         return;
                     }
-                    showAlert('ข้อผิดพลาด', `ไม่พบ Wave/Booking สำหรับ [${inputVal}]\nถ้ามี Booking No. ให้ลองใส่เช่น B001-260755319`);
+                    showAlert('ข้อผิดพลาด', `ไม่พบ Wave/Booking สำหรับ [${inputVal}]\nถ้าเป็น Booking No. ให้ลองใส่เช่น B001-260755319 หรือ TRLHUB-20260808`);
                     document.getElementById('waveInput').value = '';
                     return;
                 }
