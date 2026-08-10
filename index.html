@@ -1617,6 +1617,21 @@
             return activeNos.filter(no => no < actualNo).length + 1;
         }
 
+        function getSharedSubmittedPalletNos(branchCode) {
+            const key = normalizeBranchLookupCode(branchCode);
+            const livePalletNos = new Set(getCurrentBranchPalletNos(branchCode));
+            const submitted = new Set();
+            allLpnsInWave
+                .filter(item => normalizeBranchLookupCode(item.branch) === key)
+                .forEach(item => {
+                    (Array.isArray(item.branch_submitted_pallet_nos) ? item.branch_submitted_pallet_nos : []).forEach(no => {
+                        const parsed = parseInt(no) || 0;
+                        if (livePalletNos.has(parsed)) submitted.add(parsed);
+                    });
+                });
+            return Array.from(submitted).sort((a, b) => a - b);
+        }
+
         function getDocumentPalletCount(branchCode) {
             const palletCount = getCurrentBranchPalletNos(branchCode).length;
             return palletCount > 0 ? String(palletCount) : '';
@@ -1814,13 +1829,29 @@
         }
 
         function getBranchCompletionRecord(branchCode = selectedBranchCode) {
+            const branchKey = normalizeBranchLookupCode(branchCode);
+            const sharedRecords = allLpnsInWave
+                .filter(item => normalizeBranchLookupCode(item.branch) === branchKey && item.branch_closed_at)
+                .map(item => ({
+                    branch_code: branchCode,
+                    branch_name: item.branch_name || '',
+                    completed_at: item.branch_closed_at,
+                    completed_at_text: formatBangkokDateTime(item.branch_closed_at),
+                    emp_id: item.branch_closed_by || '',
+                    mode: 'shared'
+                }))
+                .sort((a, b) => new Date(b.completed_at) - new Date(a.completed_at));
             try {
                 const key = getBranchCompletionKey(branchCode);
-                if (!key) return null;
+                if (!key) return sharedRecords[0] || null;
                 const record = JSON.parse(localStorage.getItem(key));
-                return record && record.completed_at ? record : null;
+                const localRecord = record && record.completed_at ? record : null;
+                const sharedRecord = sharedRecords[0] || null;
+                if (!localRecord) return sharedRecord;
+                if (!sharedRecord) return localRecord;
+                return new Date(sharedRecord.completed_at) >= new Date(localRecord.completed_at) ? sharedRecord : localRecord;
             } catch (e) {
-                return null;
+                return sharedRecords[0] || null;
             }
         }
 
@@ -2017,7 +2048,7 @@
                 isSharedStateRefreshing = false;
             }
         }
-        setInterval(refreshSharedBranchState, 8000);
+        setInterval(refreshSharedBranchState, 4000);
 
         window.addEventListener('beforeunload', function (e) {
             if (syncQueue.length > 0 || backgroundTasks > 0) {
@@ -2361,6 +2392,12 @@
             return normalizeBranchDisplayName(name, branchCode) || 'ไม่พบชื่อสาขา';
         }
 
+        function compareLpnDesc(a, b) {
+            const aLpn = String(a && a.lpn !== undefined ? a.lpn : a || '').trim();
+            const bLpn = String(b && b.lpn !== undefined ? b.lpn : b || '').trim();
+            return bLpn.localeCompare(aLpn, undefined, { numeric: true, sensitivity: 'base' });
+        }
+
         function getDocumentBranches() {
             const branchMap = new Map();
             allLpnsInWave.forEach(item => {
@@ -2387,7 +2424,7 @@
 
         function getDocumentDetail(item, branchItems) {
             if (item.isMaster) {
-                const children = branchItems.filter(child => child.combinedWith === item.lpn).map(child => child.lpn);
+                const children = branchItems.filter(child => child.combinedWith === item.lpn).map(child => child.lpn).sort(compareLpnDesc);
                 return `Master รวม ${children.length} รายการ${children.length ? ': ' + children.join(', ') : ''}`;
             }
             if (item.combinedWith) return `รวมอยู่ในพาเลท ${item.combinedWith}`;
@@ -2404,7 +2441,7 @@
                 </span>`;
 
             if (item.isMaster) {
-                const children = branchItems.filter(child => child.combinedWith === item.lpn).map(child => child.lpn);
+                const children = branchItems.filter(child => child.combinedWith === item.lpn).map(child => child.lpn).sort(compareLpnDesc);
                 return `
                     <div class="flex flex-wrap items-center gap-1.5">
                         ${pill(`MASTER รวม ${children.length} LPN`, 'bg-violet-600', 'bg-violet-50 text-violet-800 border-violet-200')}
@@ -2625,7 +2662,7 @@
             const printRows = [];
             const activeRows = branches.map((branch, index) => {
                 const bCode = branch.code;
-                const branchItems = allLpnsInWave.filter(item => (item.branch || 'Unknown') === bCode);
+                const branchItems = allLpnsInWave.filter(item => (item.branch || 'Unknown') === bCode).slice().sort(compareLpnDesc);
                 
                 // Get owner from the items (if any item has a valid owner)
                 let owner = 'Unknown';
@@ -2999,7 +3036,7 @@
 
             const lpnDetailsHtml = branches.map(branch => {
                 const bCode = branch.code;
-                const branchItems = allLpnsInWave.filter(item => (item.branch || 'Unknown') === bCode);
+                const branchItems = allLpnsInWave.filter(item => (item.branch || 'Unknown') === bCode).slice().sort(compareLpnDesc);
 
                 const itemRows = branchItems.map((item, index) => {
                     const lpnPrefix = item.lpn.substring(0, 2);
@@ -3565,6 +3602,7 @@
                 if (it && Object.prototype.hasOwnProperty.call(it, 'pallet_no')) {
                     it.palletNo = (parseInt(it.pallet_no) || 0) > 0 ? parseInt(it.pallet_no) : null;
                 }
+                if (it && it.pallet_color) it.palletColor = it.pallet_color;
             });
             // ✅ 1 LPN มีหลายสินค้า (หลายแถว) → รวมเป็น 1 รายการต่อ LPN: สแกนครั้งเดียวจบทั้ง LPN, ความคืบหน้าถึง 100% ได้, ไม่นับซ้ำ
             (function mergeDuplicateLpns() {
@@ -3592,7 +3630,7 @@
                 const previous = previousLocalState.get(`${String(item.branch || '').toUpperCase()}|${String(item.lpn || '').toUpperCase()}`);
                 if (!previous) return;
                 const serverPalletNo = parseInt(item.palletNo) || parseInt(item.pallet_no) || 0;
-                if (previous.palletColor && previous.palletNo === serverPalletNo) item.palletColor = previous.palletColor;
+                if (!item.palletColor && previous.palletColor && previous.palletNo === serverPalletNo) item.palletColor = previous.palletColor;
                 if (previous.correctionCount) item.correctionCount = previous.correctionCount;
             });
             const savedDocumentMeta = getSavedShippingDocumentMeta(isWaveOnly ? currentWave : currentBookingNo);
@@ -3615,6 +3653,13 @@
                     }
                 }
             });
+
+            if (selectedBranchCode) {
+                const sharedSubmitted = getSharedSubmittedPalletNos(selectedBranchCode);
+                if (sharedSubmitted.length > 0) {
+                    submittedPalletNos = new Set([...Array.from(submittedPalletNos), ...sharedSubmitted]);
+                }
+            }
 
             renderBranchGrid();
             if (!selectedBranchCode) {
@@ -3741,9 +3786,11 @@
                     : '';
                 const palletState = readPalletWorkflowState(bCode);
                 const activeBranchPalletNos = new Set(getCurrentBranchPalletNos(bCode));
-                const submittedCount = palletState && Array.isArray(palletState.submitted_nos)
-                    ? palletState.submitted_nos.map(Number).filter(no => activeBranchPalletNos.has(no)).length
-                    : 0;
+                const submittedForBranch = new Set(getSharedSubmittedPalletNos(bCode));
+                if (palletState && Array.isArray(palletState.submitted_nos)) {
+                    palletState.submitted_nos.map(Number).filter(no => activeBranchPalletNos.has(no)).forEach(no => submittedForBranch.add(no));
+                }
+                const submittedCount = submittedForBranch.size;
                 const hasPendingPallet = !!(palletState && parseInt(palletState.active_no) > 0 && palletState.active_color);
                 if (hasPendingPallet) {
                     btnStyle = 'border-orange-400 bg-orange-50 text-orange-900';
@@ -3904,7 +3951,7 @@
 
             function updateDashboardUI() {
                 if (!selectedBranchCode) return;
-                const branchItems = allLpnsInWave.filter(item => (item.branch || "Unknown") === selectedBranchCode);
+                const branchItems = allLpnsInWave.filter(item => (item.branch || "Unknown") === selectedBranchCode).slice().sort(compareLpnDesc);
 
                 const unscannedParts = [], scannedParts = [];
                 let unscannedCount = 0; let scannedCount = 0;
@@ -3948,18 +3995,18 @@
 
                         let combineDetails = '';
                         if (item.isMaster) {
-                            const childLpnsList = branchItems.filter(i => i.combinedWith === item.lpn).map(i => i.lpn).join(', ');
+                            const childLpnsList = branchItems.filter(i => i.combinedWith === item.lpn).map(i => i.lpn).sort(compareLpnDesc).join(', ');
                             combineDetails = `
                             <div class="text-[11px] text-purple-700 bg-purple-50 p-2 mt-1.5 rounded-lg border border-purple-200 flex flex-col gap-1 w-full">
                                 <div class="font-bold flex items-center gap-1"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>กล่องที่บรรจุภายใน (${item.childCount || 0} กล่อง):</div>
                                 <div class="font-medium tracking-wider text-gray-700 bg-white px-2 py-1 rounded border border-purple-100 break-all">${childLpnsList || 'ไม่มีกล่องย่อย'}</div>
-                                <button onclick="undoCombine('${item.lpn}')" class="text-xs text-red-600 font-bold mt-1 text-left flex items-center gap-0.5 hover:underline w-max"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-4v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>ยกเลิกการรวมกล่อง/พาเลทนี้</button>
+                                <div class="flex flex-wrap gap-2 mt-1"><button onclick="editCombinedTote('${item.lpn}')" class="text-xs text-purple-800 bg-purple-100 border border-purple-300 font-black px-2 py-1 rounded-lg">✏️ แก้ Combine Tote</button><button onclick="undoCombine('${item.lpn}')" class="text-xs text-red-600 font-bold text-left flex items-center gap-0.5 hover:underline"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-4v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>ยกเลิกการรวม</button></div>
                             </div>`;
                         } else if (item.combinedWith) {
                             combineDetails = `
                             <div class="text-[11px] text-purple-600 font-bold mt-1.5 bg-purple-50 p-1.5 rounded-lg inline-flex items-center justify-between border border-purple-100 w-full">
                                 <span class="flex items-center gap-1"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>↳ รวมอยู่ใน LPN: ${item.combinedWith}</span>
-                                <button onclick="undoSingleChild('${item.lpn}')" class="text-red-600 hover:underline text-xs flex items-center">แยกกล่องออก</button>
+                                <div class="flex gap-2"><button onclick="editCombinedTote('${item.combinedWith}')" class="text-purple-700 hover:underline text-xs font-black">✏️ แก้ Combine</button><button onclick="undoSingleChild('${item.lpn}')" class="text-red-600 hover:underline text-xs flex items-center">แยกกล่องออก</button></div>
                             </div>`;
                         } else {
                             combineDetails = `
@@ -4644,6 +4691,18 @@
                 const no = parseInt(current.no) || 0;
                 if (!no || getPalletItems(no).length === 0) return false;
                 submittedPalletNos.add(no);
+                const waves = (activeWavesList.length ? activeWavesList : String(currentWave || '').split(','))
+                    .map(w => String(w || '').trim()).filter(Boolean);
+                pushToQueue({
+                    _endpoint: '/api/submit-pallet',
+                    waves,
+                    booking_no: currentBookingNo || '',
+                    branch_code: selectedBranchCode,
+                    branch_name: selectedBranchName,
+                    pallet_no: no,
+                    color: current.color || '',
+                    emp_id: loggedInEmpId
+                });
                 persistPalletWorkflowState();
                 syncSubmittedPalletDocumentCount();
                 if (showFeedback) {
@@ -4972,6 +5031,7 @@
                 const saved = readPalletWorkflowState();
                 const livePalletNos = new Set(done.map(i => parseInt(i.palletNo) || 0).filter(n => n > 0));
                 submittedPalletNos = new Set((saved && Array.isArray(saved.submitted_nos) ? saved.submitted_nos : []).map(Number).filter(n => livePalletNos.has(n)));
+                getSharedSubmittedPalletNos(selectedBranchCode).forEach(no => submittedPalletNos.add(no));
                 correctionPalletNo = 0;
                 correctionReturnState = null;
                 if (done.length) {
@@ -5040,7 +5100,7 @@
             }
             function renderPalletGroups() {
                 const el = document.getElementById('palletGroupsContainer'); if (!el) return;
-                const items = allLpnsInWave.filter(i => (i.branch || 'Unknown') === selectedBranchCode && i.status === 'Scanned' && i.palletNo);
+                const items = allLpnsInWave.filter(i => (i.branch || 'Unknown') === selectedBranchCode && i.status === 'Scanned' && i.palletNo).slice().sort(compareLpnDesc);
                 if (!items.length) { el.innerHTML = ''; return; }
                 const groups = {};
                 items.forEach(i => { const k = i.palletNo; (groups[k] = groups[k] || { no: k, color: i.palletColor, items: [] }).items.push(i); });
@@ -5057,13 +5117,13 @@
                                 </div>
                             </div>
                             <div class="px-2.5 py-1.5 flex flex-wrap gap-1.5">${(function () {
-                                const masters = g.items.filter(x => x.isMaster);
-                                const kids = g.items.filter(x => x.combinedWith);
-                                const solo = g.items.filter(x => !x.isMaster && !x.combinedWith);
+                                const masters = g.items.filter(x => x.isMaster).sort(compareLpnDesc);
+                                const kids = g.items.filter(x => x.combinedWith).sort(compareLpnDesc);
+                                const solo = g.items.filter(x => !x.isMaster && !x.combinedWith).sort(compareLpnDesc);
                                 const kidsByMaster = {}; kids.forEach(c => { (kidsByMaster[c.combinedWith] = kidsByMaster[c.combinedWith] || []).push(c); });
                                 const masterLpns = masters.map(x => x.lpn);
                                 let out = solo.map(i => `<span class="inline-flex items-center gap-1 text-[11px] font-bold bg-slate-100 text-slate-600 pl-1.5 pr-1 py-0.5 rounded">${i.lpn}${(parseInt(i.qty) > 1) ? ' (' + i.qty + ')' : ''}<button onclick="openQtyCorrection('${i.lpn}')" class="text-amber-700 hover:text-white hover:bg-amber-600 rounded px-1 h-4 flex items-center justify-center font-black leading-none transition" title="แก้ไขพร้อมหลักฐาน">✏️</button></span>`).join('');
-                                out += masters.map(m => { const kidHtml = (kidsByMaster[m.lpn] || []).map(c => `<span class="inline-flex items-center gap-0.5 text-[10px] font-bold bg-white text-purple-700 border border-purple-200 px-1.5 py-0.5 rounded">↳ ${c.lpn}<button onclick="undoSingleChild('${c.lpn}')" class="text-red-500 hover:text-red-700 font-black leading-none ml-0.5" title="แยกกล่องนี้ออก">✕</button></span>`).join('') || `<span class="text-[10px] text-purple-400 font-bold">ไม่มีกล่องย่อย</span>`; const mq = (parseInt(m.qty) > 1) ? ' (' + m.qty + ')' : ''; return `<div class="basis-full w-full bg-purple-50 border border-purple-300 rounded-lg p-2 mt-0.5"><div class="flex items-center justify-between gap-2 mb-1"><span class="text-[11px] font-black text-purple-800">🔗 รวมกล่อง · LPN หลัก: ${m.lpn}${mq}</span><button onclick="undoCombine('${m.lpn}')" class="text-[10px] text-red-600 font-bold hover:underline whitespace-nowrap">ยกเลิกรวม</button></div><div class="flex flex-wrap gap-1 pl-1">${kidHtml}</div></div>`; }).join('');
+                                out += masters.map(m => { const kidHtml = (kidsByMaster[m.lpn] || []).map(c => `<span class="inline-flex items-center gap-0.5 text-[10px] font-bold bg-white text-purple-700 border border-purple-200 px-1.5 py-0.5 rounded">↳ ${c.lpn}<button onclick="undoSingleChild('${c.lpn}')" class="text-red-500 hover:text-red-700 font-black leading-none ml-0.5" title="แยกกล่องนี้ออก">✕</button></span>`).join('') || `<span class="text-[10px] text-purple-400 font-bold">ไม่มีกล่องย่อย</span>`; const mq = (parseInt(m.qty) > 1) ? ' (' + m.qty + ')' : ''; return `<div class="basis-full w-full bg-purple-50 border border-purple-300 rounded-lg p-2 mt-0.5"><div class="flex items-center justify-between gap-2 mb-1"><span class="text-[11px] font-black text-purple-800">🔗 รวมกล่อง · LPN หลัก: ${m.lpn}${mq}</span><span class="flex gap-2"><button onclick="editCombinedTote('${m.lpn}')" class="text-[10px] text-purple-700 font-black hover:underline whitespace-nowrap">✏️ แก้ Combine</button><button onclick="undoCombine('${m.lpn}')" class="text-[10px] text-red-600 font-bold hover:underline whitespace-nowrap">ยกเลิกรวม</button></span></div><div class="flex flex-wrap gap-1 pl-1">${kidHtml}</div></div>`; }).join('');
                                 out += kids.filter(c => masterLpns.indexOf(c.combinedWith) === -1).map(c => `<span class="text-[10px] font-bold bg-purple-50 text-purple-600 border border-purple-200 px-1.5 py-0.5 rounded">↳ ${c.lpn} (รวมใน ${c.combinedWith})</span>`).join('');
                                 return out;
                             })()}</div>
@@ -5075,14 +5135,37 @@
             function openConfirmModal() { document.getElementById('confirmModal').classList.remove('hidden'); }
             function closeConfirm() { document.getElementById('confirmModal').classList.add('hidden'); document.getElementById('lpnInput').focus(); }
 
+            async function prepareBranchClose() {
+                // รอเฉพาะข้อมูลที่เครื่องนี้ยังส่งไม่จบ ไม่ query BigQuery ซ้ำก่อนปิด
+                await waitForSyncQueue(45000);
+            }
+
+            async function closeBranchWaves(waves, branchCode, completedAtIso) {
+                if (noSaveMode) return true;
+                const results = await Promise.all(waves.map(async waveNo => {
+                    try {
+                        const res = await fetchWithTimeout(backendApiUrl + '/api/close-job', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ wave: waveNo, branch: branchCode, emp_id: loggedInEmpId, completed_at: completedAtIso })
+                        }, 25000);
+                        return res.ok;
+                    } catch (e) {
+                        return false;
+                    }
+                }));
+                return results.every(Boolean);
+            }
+
             async function confirmForceClose() {
                 closeConfirm();
                 const branchCodeToClose = selectedBranchCode;
                 const completedAtIso = new Date().toISOString();
                 const completedAtText = formatBangkokDateTime(completedAtIso);
+                if (correctionPalletNo) finishPalletCorrection(false);
+                markActivePalletSubmitted(false);
                 try {
-                    await waitForSyncQueue(120000);
-                    await verifyDocumentAgainstServer();
+                    await prepareBranchClose();
                 } catch (e) {
                     showAlert('ยังปิดงานไม่ได้', `${e && e.message ? e.message : 'ยังส่งข้อมูลไม่ครบ'}\n\nระบบยังไม่ได้ปิดสาขา กรุณาตรวจสถานะการส่งแล้วลองใหม่`);
                     return;
@@ -5091,8 +5174,6 @@
                 allLpnsInWave.forEach(item => { if (item.branch === branchCodeToClose && item.status === 'Pending') item.status = 'ForceClosed'; });
                 updateDashboardUI();
                 saveCurrentWaveDataCache();
-                if (correctionPalletNo) finishPalletCorrection(false);
-                markActivePalletSubmitted(false);
 
                 backToBranchSelect();
                 showToast('กำลังบังคับปิดงานสาขาเบื้องหลัง...');
@@ -5100,16 +5181,8 @@
 
                 (async () => {
                     try {
-                        let successAll = true;
                         const wavesToClose = activeWavesList.length ? activeWavesList : [currentWave].filter(Boolean);
-                        for (const waveNo of wavesToClose) {
-                            const res = noSaveMode ? { ok: true } : await fetch(backendApiUrl + '/api/close-job', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ wave: waveNo, branch: branchCodeToClose, emp_id: loggedInEmpId, completed_at: completedAtIso })
-                            });
-                            if (!res.ok) successAll = false;
-                        }
+                        const successAll = await closeBranchWaves(wavesToClose, branchCodeToClose, completedAtIso);
                         if (successAll) {
                             setBranchCompletionRecord(branchCodeToClose, completedAtIso, 'force_close');
                             renderBranchGrid();
@@ -5150,32 +5223,23 @@
                 const branchCodeToClose = selectedBranchCode;
                 const completedAtIso = new Date().toISOString();
                 const completedAtText = formatBangkokDateTime(completedAtIso);
+                if (correctionPalletNo) finishPalletCorrection(false);
+                markActivePalletSubmitted(false);
                 try {
-                    await waitForSyncQueue(120000);
-                    await verifyDocumentAgainstServer();
+                    await prepareBranchClose();
                 } catch (e) {
                     showAlert('ยังปิดงานไม่ได้', `${e && e.message ? e.message : 'ยังส่งข้อมูลไม่ครบ'}\n\nระบบยังไม่ได้ปิดสาขา กรุณาตรวจสถานะการส่งแล้วลองใหม่`);
                     return;
                 }
 
-                if (correctionPalletNo) finishPalletCorrection(false);
-                markActivePalletSubmitted(false);
                 backToBranchSelect();
                 showToast('กำลังปิดจบงานสาขาเบื้องหลัง...');
                 backgroundTasks++;
 
                 (async () => {
                     try {
-                        let successAll = true;
                         const wavesToClose = activeWavesList.length ? activeWavesList : [currentWave].filter(Boolean);
-                        for (const waveNo of wavesToClose) {
-                            const res = noSaveMode ? { ok: true } : await fetch(backendApiUrl + '/api/close-job', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ wave: waveNo, branch: branchCodeToClose, emp_id: loggedInEmpId, completed_at: completedAtIso })
-                            });
-                            if (!res.ok) successAll = false;
-                        }
+                        const successAll = await closeBranchWaves(wavesToClose, branchCodeToClose, completedAtIso);
                         if (successAll) {
                             setBranchCompletionRecord(branchCodeToClose, completedAtIso, 'finish');
                             renderBranchGrid();
@@ -5191,6 +5255,8 @@
 
             // ==================== COMBINE LOGIC ====================
             const masterInput = document.getElementById('masterInput'); const childInput = document.getElementById('childInput'); const childList = document.getElementById('childList'); let childLpns = [];
+            let combineEditingMaster = '';
+            let combineEditingPalletNo = 0;
             const branchPalletCountInput = document.getElementById('branchPalletCountInput');
             branchPalletCountInput.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') {
@@ -5255,7 +5321,7 @@
                     childInput.value = '';
                 }
             });
-            function updateChildUI() { childList.innerHTML = childLpns.map(lpn => `<li class="bg-white p-2 rounded shadow-sm border text-sm flex justify-between"><b>${lpn}</b> <span class="text-red-500 font-bold px-2 cursor-pointer" onclick="removeChildLpn('${lpn}')">X</span></li>`).reverse().join(''); }
+            function updateChildUI() { childList.innerHTML = childLpns.slice().sort(compareLpnDesc).map(lpn => `<li class="bg-white p-2 rounded shadow-sm border text-sm flex justify-between"><b>${lpn}</b> <span class="text-red-500 font-bold px-2 cursor-pointer" onclick="removeChildLpn('${lpn}')">X</span></li>`).join(''); }
             function removeChildLpn(lpn) { childLpns = childLpns.filter(item => item !== lpn); updateChildUI(); }
             function resetCombineColorButtons() {
                 document.querySelectorAll('#combineColorGrid .color-btn').forEach(btn => {
@@ -5270,15 +5336,56 @@
                 });
             }
 
+            function editCombinedTote(masterLpn) {
+                const master = allLpnsInWave.find(item => item.lpn === masterLpn && (item.branch || 'Unknown') === selectedBranchCode);
+                const children = allLpnsInWave
+                    .filter(item => item.combinedWith === masterLpn && (item.branch || 'Unknown') === selectedBranchCode)
+                    .slice().sort(compareLpnDesc);
+                if (!master || children.length === 0) return showAlert('ไม่พบข้อมูล Combine', `ไม่พบรายการที่รวมอยู่ใน ${masterLpn}`);
+
+                combineEditingMaster = masterLpn;
+                combineEditingPalletNo = parseInt(master.palletNo) || parseInt(children[0].palletNo) || 0;
+                switchTab('combine');
+                masterInput.value = masterLpn;
+                childLpns = children.map(item => item.lpn);
+                updateChildUI();
+                childInput.disabled = false;
+                childInput.classList.remove('bg-gray-100');
+                childInput.classList.add('bg-white');
+                const cBtn = document.getElementById('childScanBtn');
+                cBtn.disabled = false;
+                cBtn.classList.replace('bg-gray-400', 'bg-purple-800');
+                cBtn.classList.add('hover:bg-purple-900');
+
+                const existingColor = String(children[0].color || master.color || '').trim();
+                document.getElementById('selectedCombineColor').value = existingColor;
+                const matchingColorButton = Array.from(document.querySelectorAll('#combineColorGrid .color-btn'))
+                    .find(btn => String(btn.getAttribute('onclick') || '').includes(`'${existingColor}'`));
+                if (matchingColorButton) selectCombineColor(existingColor, matchingColorButton);
+                showToast(`✏️ แก้ Combine ${masterLpn}: เพิ่ม/ลบ LPN หรือเปลี่ยนสี แล้วกดยืนยัน`);
+                setTimeout(() => { try { childInput.focus(); } catch (e) { } }, 80);
+            }
+
             function executeCombineSave() {
                 // ✅ Combine: LPN หลัก + LPN รอง → รวมเข้า "พาเลทที่กำลังทำ" (ใช้สีพาเลทปัจจุบัน ไม่ต้องเลือกสีซ้ำ)
                 const master = masterInput.value.trim().toUpperCase();
                 const color = document.getElementById('selectedCombineColor').value;
-                const scannedPalletNo = activePalletNo;
+                const scannedPalletNo = combineEditingMaster ? combineEditingPalletNo : activePalletNo;
                 if (!master || childLpns.length === 0) return showAlert('ข้อมูลไม่ครบถ้วน', 'ต้องสแกน LPN หลัก 1 รายการ และ LPN รอง อย่างน้อย 1 รายการ');
                 if (childLpns.includes(master)) return showAlert('ข้อมูลไม่ถูกต้อง', 'LPN หลัก และ LPN รอง ต้องไม่เป็นหมายเลขเดียวกัน');
                 if (!color) return showAlert('ข้อมูลไม่ครบถ้วน', 'กรุณาเลือกสี Tote ก่อนยืนยันการรวม');
                 for (let cLpn of childLpns) { const target = allLpnsInWave.find(item => item.lpn === cLpn); if (target && target.status === 'Scanned' && !target.combinedWith) { return showAlert('ข้อมูลซ้ำซ้อน', `LPN รอง ${cLpn} ถูกตรวจสอบเดี่ยวไปแล้ว รวมไม่ได้`); } }
+
+                const isEditingCombine = combineEditingMaster === master;
+                if (isEditingCombine) {
+                    const previousChildren = allLpnsInWave.filter(item => item.combinedWith === master && (item.branch || 'Unknown') === selectedBranchCode);
+                    previousChildren.forEach(item => {
+                        item.combinedWith = null; item.status = 'Pending'; item.qty = 0;
+                        item.scan_type = ''; item.color = 'None'; item.color_breakdown = [];
+                        item.palletNo = null; item.pallet_no = 0; item.palletColor = null;
+                        pushToQueue({ wave_no: item.wave_no || currentWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: item.lpn, type: 'CANCEL_COMBINE', color: 'None', qty: 0, emp_id: loggedInEmpId, pallet_no: 0 });
+                    });
+                }
 
                 childLpns.forEach(cLpn => {
                     const target = allLpnsInWave.find(item => item.lpn === cLpn);
@@ -5291,12 +5398,13 @@
                     pushToQueue({ wave_no: lpnWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: cLpn, type: 'COMBINE: ' + master, color: color, qty: 1, emp_id: loggedInEmpId, pallet_no: scannedPalletNo });
                 });
                 const masterTarget = allLpnsInWave.find(item => item.lpn === master);
-                if (masterTarget) { masterTarget.status = 'Scanned'; masterTarget.isMaster = true; masterTarget.childCount = (masterTarget.childCount || 0) + childLpns.length; masterTarget.color = color; masterTarget.palletNo = scannedPalletNo; masterTarget.palletColor = color; }
+                if (masterTarget) { masterTarget.status = 'Scanned'; masterTarget.isMaster = true; masterTarget.childCount = childLpns.length; masterTarget.color = color; masterTarget.palletNo = scannedPalletNo; masterTarget.palletColor = color; }
 
                 updateDashboardUI(); saveCurrentWaveDataCache(); persistPalletWorkflowState();
-                showToast(`รวม ${childLpns.length} LPN รอง เข้า LPN หลัก ${master} (สี${PALLET_TH[color] || color}) แล้ว`); flashScreen(true);
+                showToast(`${isEditingCombine ? 'บันทึกการแก้ Combine' : 'รวม'} ${childLpns.length} LPN รอง เข้า LPN หลัก ${master} (สี${PALLET_TH[color] || color}) แล้ว`); flashScreen(true);
                 masterInput.value = ''; childInput.value = ''; childInput.disabled = true; childInput.classList.add('bg-gray-100'); childLpns = []; updateChildUI();
                 document.getElementById('selectedCombineColor').value = ''; resetCombineColorButtons();
+                combineEditingMaster = ''; combineEditingPalletNo = 0;
                 const cBtn = document.getElementById('childScanBtn'); cBtn.disabled = true; cBtn.classList.replace('bg-purple-800', 'bg-gray-400'); cBtn.classList.remove('hover:bg-purple-900'); masterInput.focus();
                 finishCorrectionAfterScan();
             }
