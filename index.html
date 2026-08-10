@@ -4572,6 +4572,7 @@
                 executeMultiColorScanSave(entries, document.getElementById('displayLpn').innerText);
             }
             async function executeMultiColorScanSave(entries, forceLpn = null) {
+                if (!(await ensurePalletAllocationReady())) return;
                 const lpn = forceLpn || document.getElementById('displayLpn').innerText;
                 colorSection.classList.add('hidden');
                 qtySection.classList.add('hidden');
@@ -4602,6 +4603,7 @@
                 finishCorrectionAfterScan();
             }
             async function executeScanSave(color, type = 'TOTE', qty = 1, forceLpn = null, expectedPreviousQty = null) {
+                if (!(await ensurePalletAllocationReady())) return;
                 const lpn = forceLpn || document.getElementById('displayLpn').innerText;
                 const scannedPalletNo = activePalletNo;
                 colorSection.classList.add('hidden'); qtySection.classList.add('hidden'); colorQtyArea.classList.add('hidden');
@@ -4629,6 +4631,7 @@
             const PALLET_CLR_HEX = { Green: '#16a34a', Blue: '#0ea5e9', Red: '#dc2626' };
             let activePalletNo = 0, activePalletColor = null, activePalletType = 'TOTE', palletColorMode = false;
             let isAllocatingPallet = false;
+            let palletAllocationPromise = null;
             let submittedPalletNos = new Set();
             let correctionPalletNo = 0;
             let correctionReturnState = null;
@@ -4977,23 +4980,44 @@
             async function setActivePallet(color, type) {
                 if (isAllocatingPallet) return;
                 isAllocatingPallet = true;
-                palletColorMode = true;
-                showLoading();
+                palletColorMode = false;
+                activePalletNo = 0;
+                activePalletColor = color;
+                activePalletType = type || 'TOTE';
+                document.getElementById('palletColorModal').classList.add('hidden');
+                updatePalletBanner();
+                showToast(`เลือกสีพาเลท${PALLET_CLR_TH[color] || color}แล้ว — ยิง LPN ได้เลย`);
+                setTimeout(() => lpnInput.focus(), 20);
+
+                palletAllocationPromise = requestCentralPalletNo(color);
                 try {
-                    activePalletNo = await requestCentralPalletNo(color);
-                    activePalletColor = color; activePalletType = type || 'TOTE'; palletColorMode = false;
-                    document.getElementById('palletColorModal').classList.add('hidden');
+                    activePalletNo = await palletAllocationPromise;
                     persistPalletWorkflowState();
                     updatePalletBanner();
-                    showToast(`เริ่มพาเลทใบที่ ${getPalletDisplayNo(activePalletNo, selectedBranchCode)} • สีพาเลท${PALLET_CLR_TH[color] || color} — ยิง LPN ได้เลย`);
-                    setTimeout(() => lpnInput.focus(), 50);
                 } catch (e) {
                     palletColorMode = true;
+                    activePalletNo = 0;
+                    activePalletColor = null;
                     document.getElementById('palletColorModal').classList.remove('hidden');
                     showAlert('ยังเริ่มพาเลทไม่ได้', `${e && e.message ? e.message : e}\n\nระบบยังไม่ได้สร้างเลขพาเลท กรุณาตรวจอินเทอร์เน็ตแล้วลองใหม่`);
                 } finally {
                     isAllocatingPallet = false;
-                    hideLoading();
+                    palletAllocationPromise = null;
+                }
+            }
+            async function ensurePalletAllocationReady() {
+                if (activePalletNo > 0) return true;
+                if (!palletAllocationPromise) {
+                    showToast('ยังไม่ได้เปิดพาเลท กรุณาเลือกสีพาเลทก่อน', true);
+                    startPalletColorPrompt();
+                    return false;
+                }
+                showToast('กำลังรับเลขพาเลท กรุณารอสักครู่...');
+                try {
+                    await palletAllocationPromise;
+                    return activePalletNo > 0;
+                } catch (e) {
+                    return false;
                 }
             }
             function nextPallet() {
