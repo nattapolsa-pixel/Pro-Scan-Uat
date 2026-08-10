@@ -804,7 +804,7 @@
     <div id="loadingOverlay"
         class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 flex flex-col items-center justify-center z-[90]">
         <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-400 mb-4"></div>
-        <h2 class="text-white text-xl font-bold tracking-widest animate-pulse">กำลังประมวลผล...</h2>
+        <h2 id="loadingOverlayText" class="text-white text-xl font-bold tracking-widest animate-pulse">กำลังประมวลผล...</h2>
     </div>
 
     <div id="scannerModal"
@@ -3246,8 +3246,16 @@
             if (syncQueue.length > 0) { updateSyncStatusUI(); processQueue(); }
         };
 
-        function showLoading() { document.getElementById('loadingOverlay').classList.remove('hidden'); }
-        function hideLoading() { document.getElementById('loadingOverlay').classList.add('hidden'); }
+        function showLoading(message = 'กำลังประมวลผล...') {
+            const text = document.getElementById('loadingOverlayText');
+            if (text) text.innerText = message;
+            document.getElementById('loadingOverlay').classList.remove('hidden');
+        }
+        function hideLoading() {
+            document.getElementById('loadingOverlay').classList.add('hidden');
+            const text = document.getElementById('loadingOverlayText');
+            if (text) text.innerText = 'กำลังประมวลผล...';
+        }
 
         let toastTimeout;
         function showToast(msg, isError = false) {
@@ -5183,17 +5191,12 @@
 
             async function confirmForceClose() {
                 closeConfirm();
+                showLoading('กำลังดำเนินการปิดงานสาขา...');
                 const branchCodeToClose = selectedBranchCode;
                 const completedAtIso = new Date().toISOString();
                 const completedAtText = formatBangkokDateTime(completedAtIso);
                 if (correctionPalletNo) finishPalletCorrection(false);
                 markActivePalletSubmitted(false);
-                try {
-                    await prepareBranchClose();
-                } catch (e) {
-                    showAlert('ยังปิดงานไม่ได้', `${e && e.message ? e.message : 'ยังส่งข้อมูลไม่ครบ'}\n\nระบบยังไม่ได้ปิดสาขา กรุณาตรวจสถานะการส่งแล้วลองใหม่`);
-                    return;
-                }
 
                 allLpnsInWave.forEach(item => { if (item.branch === branchCodeToClose && item.status === 'Pending') item.status = 'ForceClosed'; });
                 updateDashboardUI();
@@ -5216,7 +5219,7 @@
                         }
                     } catch (e) {
                         showAlert('ข้อผิดพลาด', `ปิดงานสาขา ${branchCodeToClose} ไม่สำเร็จ: ${e && e.message ? e.message : e}`, 'border-red-600', false);
-                    } finally { backgroundTasks--; }
+                    } finally { backgroundTasks--; hideLoading(); }
                 })();
             }
 
@@ -5244,17 +5247,12 @@
             }
 
             async function performFinishBranchJob() {
+                showLoading('กำลังดำเนินการปิดงานสาขา...');
                 const branchCodeToClose = selectedBranchCode;
                 const completedAtIso = new Date().toISOString();
                 const completedAtText = formatBangkokDateTime(completedAtIso);
                 if (correctionPalletNo) finishPalletCorrection(false);
                 markActivePalletSubmitted(false);
-                try {
-                    await prepareBranchClose();
-                } catch (e) {
-                    showAlert('ยังปิดงานไม่ได้', `${e && e.message ? e.message : 'ยังส่งข้อมูลไม่ครบ'}\n\nระบบยังไม่ได้ปิดสาขา กรุณาตรวจสถานะการส่งแล้วลองใหม่`);
-                    return;
-                }
 
                 backToBranchSelect();
                 showToast('กำลังปิดจบงานสาขาเบื้องหลัง...');
@@ -5273,7 +5271,7 @@
                         }
                     } catch (e) {
                         showAlert('ข้อผิดพลาด', `ปิดงานสาขา ${branchCodeToClose} ไม่สำเร็จ: ${e && e.message ? e.message : e}`, 'border-red-600', false);
-                    } finally { backgroundTasks--; }
+                    } finally { backgroundTasks--; hideLoading(); }
                 })();
             }
 
