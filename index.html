@@ -5167,9 +5167,25 @@
             function openConfirmModal() { document.getElementById('confirmModal').classList.remove('hidden'); }
             function closeConfirm() { document.getElementById('confirmModal').classList.add('hidden'); document.getElementById('lpnInput').focus(); }
 
-            async function prepareBranchClose() {
-                // รอเฉพาะข้อมูลที่เครื่องนี้ยังส่งไม่จบ ไม่ query BigQuery ซ้ำก่อนปิด
-                await waitForSyncQueue(45000);
+            async function prepareBranchClose(timeoutMs = 120000) {
+                // ต้องส่งยอด LPN ให้ถึง Server ก่อนจึงค่อย Stamp ปิดสาขา
+                // ล้าง error ชั่วคราวและลองส่งซ้ำระหว่างที่ popup ปิดงานแสดงอยู่
+                const deadline = Date.now() + timeoutMs;
+                while (syncQueue.length > 0 && Date.now() < deadline) {
+                    if (!navigator.onLine) throw new Error(`อินเทอร์เน็ตออฟไลน์ — ยังมียอด LPN ค้างส่ง ${syncQueue.length} รายการ`);
+                    syncQueueError = null;
+                    updateSyncStatusUI();
+                    await processQueue();
+                    if (syncQueue.length === 0) break;
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+                if (syncQueue.length > 0) {
+                    const failedLpn = syncQueueError && syncQueueError.lpn ? ` (ล่าสุด: ${syncQueueError.lpn})` : '';
+                    throw new Error(`ยังมียอด LPN ค้างส่ง ${syncQueue.length} รายการ${failedLpn}`);
+                }
+                syncQueueError = null;
+                updateSyncStatusUI();
+                return true;
             }
 
             async function closeBranchWaves(waves, branchCode, completedAtIso) {
@@ -5197,6 +5213,13 @@
                 const completedAtText = formatBangkokDateTime(completedAtIso);
                 if (correctionPalletNo) finishPalletCorrection(false);
                 markActivePalletSubmitted(false);
+                try {
+                    await prepareBranchClose();
+                } catch (e) {
+                    hideLoading();
+                    showAlert('ยังไม่ Stamp ปิดสาขา', `${e && e.message ? e.message : 'ยังส่งยอด LPN ไม่ครบ'}\n\nระบบเก็บงานไว้แล้ว กรุณาตรวจอินเทอร์เน็ตและกดปิดสาขาอีกครั้ง เพื่อป้องกัน Timestamp ขึ้นแต่ยอดไม่ขึ้น`);
+                    return;
+                }
 
                 allLpnsInWave.forEach(item => { if (item.branch === branchCodeToClose && item.status === 'Pending') item.status = 'ForceClosed'; });
                 updateDashboardUI();
@@ -5253,6 +5276,13 @@
                 const completedAtText = formatBangkokDateTime(completedAtIso);
                 if (correctionPalletNo) finishPalletCorrection(false);
                 markActivePalletSubmitted(false);
+                try {
+                    await prepareBranchClose();
+                } catch (e) {
+                    hideLoading();
+                    showAlert('ยังไม่ Stamp ปิดสาขา', `${e && e.message ? e.message : 'ยังส่งยอด LPN ไม่ครบ'}\n\nระบบเก็บงานไว้แล้ว กรุณาตรวจอินเทอร์เน็ตและกดปิดสาขาอีกครั้ง เพื่อป้องกัน Timestamp ขึ้นแต่ยอดไม่ขึ้น`);
+                    return;
+                }
 
                 backToBranchSelect();
                 showToast('กำลังปิดจบงานสาขาเบื้องหลัง...');
