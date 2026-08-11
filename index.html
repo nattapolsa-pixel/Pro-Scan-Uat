@@ -1677,16 +1677,31 @@
             updateDocumentPalletCount(selectedBranchCode, input.value);
         }
 
+        let backendReadyAt = 0;
+        let backendReadyPromise = null;
+        async function ensureBackendReady(showStatus = false) {
+            if (Date.now() - backendReadyAt < 240000) return true;
+            if (backendReadyPromise) return backendReadyPromise;
+            if (showStatus) updateSyncStatusUI('waking');
+            backendReadyPromise = (async () => {
+                let lastError = null;
+                for (let attempt = 0; attempt < 3; attempt++) {
+                    try {
+                        const res = await fetchWithTimeout(backendApiUrl + '/api/health', { cache: 'no-store' }, 65000);
+                        if (res.ok) { backendReadyAt = Date.now(); return true; }
+                    } catch (e) { lastError = e; }
+                    await new Promise(resolve => setTimeout(resolve, 1500));
+                }
+                throw lastError || new Error('Server ยังไม่พร้อม');
+            })().finally(() => { backendReadyPromise = null; updateSyncStatusUI(); });
+            return backendReadyPromise;
+        }
+
         function keepAliveHeartbeat() {
-            // ✅ Ping /api/health ทุก 10 นาที เพื่อป้องกัน Render.com free-tier cold start
-            const ping = () => {
-                fetch(backendApiUrl + '/api/health', { cache: 'no-store' })
-                    .catch(() => { });
-            };
+            const ping = () => ensureBackendReady(false).catch(() => { });
             ping();
             prefetchPendingWaves();
-            // ตั้ง heartbeat ทุก 10 นาที (600,000ms)
-            setInterval(ping, 600000);
+            setInterval(ping, 240000);
         }
 
         // ✅ fetchWithTimeout: fetch พร้อม AbortController เพื่อไม่ให้ request ค้างนานโดยไม่จำกัด
@@ -1931,7 +1946,16 @@
         let isSyncing = false;
         let syncQueueError = null;
         let shippingDocumentVerifiedAt = 0;
-        function pushToQueue(payload) { if (typeof noSaveMode !== 'undefined' && noSaveMode) { return; } shippingDocumentVerifiedAt = 0; syncQueue.push(payload); localStorage.setItem('proScannerQueue', JSON.stringify(syncQueue)); updateSyncStatusUI(); processQueue(); }
+        const MAX_QUEUE_RETRIES = 6;
+        const scannerDeviceId = localStorage.getItem('proScannerDeviceId') || (crypto.randomUUID ? crypto.randomUUID() : `device-${Date.now()}-${Math.random()}`);
+        localStorage.setItem('proScannerDeviceId', scannerDeviceId);
+        function pushToQueue(payload) {
+            if (typeof noSaveMode !== 'undefined' && noSaveMode) return;
+            shippingDocumentVerifiedAt = 0;
+            if (!payload.transaction_id) payload.transaction_id = crypto.randomUUID ? crypto.randomUUID() : `${scannerDeviceId}-${Date.now()}-${Math.random()}`;
+            payload._queuedAt = payload._queuedAt || new Date().toISOString();
+            syncQueue.push(payload); saveSyncQueue(); updateSyncStatusUI(); processQueue();
+        }
 
         function getQueuePayloadWaves(payload) {
             const values = Array.isArray(payload && payload.waves)
@@ -1958,16 +1982,76 @@
         }
 
         function getCurrentJobQueueError() {
-            return syncQueueError && isQueuePayloadForCurrentJob(syncQueueError) ? syncQueueError : null;
+            const dead = getCurrentJobQueue().find(item => item._deadLetter);
+            return dead || (syncQueueError && isQueuePayloadForCurrentJob(syncQueueError) ? syncQueueError : null);
         }
 
         function saveSyncQueue() {
             localStorage.setItem('proScannerQueue', JSON.stringify(syncQueue));
+            reportDeviceState();
+        }
+
+        let deviceStateTimer = null;
+        function reportDeviceState() {
+            clearTimeout(deviceStateTimer);
+            deviceStateTimer = setTimeout(async () => {
+                if (!navigator.onLine) return;
+                const pending = getCurrentJobQueue();
+                try {
+                    await fetchWithTimeout(backendApiUrl + '/api/device-state', {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ device_id: scannerDeviceId, waves: [...getCurrentJobWaves()], branch_code: selectedBranchCode || '', pending_count: pending.length, pending_lpns: pending.slice(0, 10).map(item => item.lpn || '-'), emp_id: loggedInEmpId || '' })
+                    }, 8000);
+                } catch (e) { }
+            }, 250);
+        }
+
+        async function assertNoOtherDevicePending() {
+            const waves = [...getCurrentJobWaves()];
+            if (!waves.length) return true;
+            const res = await fetchWithTimeout(backendApiUrl + `/api/device-states?waves=${encodeURIComponent(waves.join(','))}&branch_code=${encodeURIComponent(selectedBranchCode || '')}&exclude_device_id=${encodeURIComponent(scannerDeviceId)}`, { cache: 'no-store' }, 12000);
+            if (!res.ok) throw new Error('ตรวจคิวจากเครื่องอื่นไม่สำเร็จ');
+            const data = await res.json();
+            const devices = data.devices || [];
+            if (devices.length) {
+                const total = devices.reduce((sum, item) => sum + Number(item.pending_count || 0), 0);
+                const lpns = devices.flatMap(item => item.pending_lpns || []).slice(0, 5).join(', ');
+                throw new Error(`ยังมีอีก ${devices.length} เครื่องกำลังส่งงานค้างรวม ${total} รายการ${lpns ? ` (LPN: ${lpns})` : ''} กรุณารอให้เครื่องนั้นขึ้นคำว่า อัปเดตแล้ว`);
+            }
+            return true;
+        }
+
+        function archiveQueueItem(index) {
+            const item = syncQueue[index]; if (!item) return;
+            if (!confirm(`เก็บรายการ ${item.lpn || '-'} ออกจากคิวใช่หรือไม่? รายการจะถูกเก็บเป็นหลักฐานและยอดนี้จะไม่ถูกส่ง`)) return;
+            const archive = JSON.parse(localStorage.getItem('proScannerQueueArchive') || '[]');
+            archive.unshift({ ...item, _archivedAt: new Date().toISOString(), _archivedBy: loggedInEmpId || '' });
+            localStorage.setItem('proScannerQueueArchive', JSON.stringify(archive.slice(0, 500)));
+            syncQueue.splice(index, 1); saveSyncQueue(); renderQueueManager(); updateSyncStatusUI();
+        }
+
+        function retryQueueItem(index) {
+            const item = syncQueue[index]; if (!item) return;
+            delete item._deadLetter; delete item._deadReason; delete item._failedAt; delete item._retryAfter; item._retryCount = 0;
+            saveSyncQueue(); renderQueueManager(); processQueue();
+        }
+
+        function renderQueueManager() {
+            let modal = document.getElementById('queueManagerModal');
+            if (!modal) {
+                modal = document.createElement('div'); modal.id = 'queueManagerModal'; modal.className = 'fixed inset-0 z-[9999] bg-slate-950/70 p-3 flex items-center justify-center';
+                document.body.appendChild(modal);
+            }
+            const rows = syncQueue.map((item, index) => `<div class="border rounded-lg p-3 ${item._deadLetter ? 'border-red-400 bg-red-50' : 'border-amber-300 bg-amber-50'}"><div class="font-black">${escapeDocumentText(item.lpn || '-')} • Wave ${escapeDocumentText(getQueuePayloadWaves(item).join(',') || '-')}</div><div class="text-xs mt-1">${item._deadLetter ? 'หยุดส่งอัตโนมัติ' : 'รอส่ง'} • ลองแล้ว ${Number(item._retryCount || 0)} ครั้ง<br>${escapeDocumentText(item._deadReason || item._lastError || '')}</div><div class="flex gap-2 mt-2"><button onclick="retryQueueItem(${index})" class="bg-blue-600 text-white px-3 py-2 rounded font-bold">ส่งใหม่</button><button onclick="archiveQueueItem(${index})" class="bg-red-600 text-white px-3 py-2 rounded font-bold">เก็บออกจากคิว</button></div></div>`).join('');
+            modal.innerHTML = `<div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[85vh] overflow-auto p-4 text-slate-800"><div class="flex justify-between items-center mb-3"><div><h2 class="text-xl font-black">คิวส่งข้อมูล</h2><p class="text-xs">รายการเสียจะไม่วนยิงจนระบบช้า และจะไม่ถูกลบเอง</p></div><button onclick="document.getElementById('queueManagerModal').classList.add('hidden')" class="text-2xl font-black">×</button></div><div class="space-y-2">${rows || '<div class="text-center py-8 text-green-700 font-bold">ไม่มีรายการค้าง</div>'}</div></div>`;
+            modal.classList.remove('hidden');
         }
 
         async function processQueue() {
             if (isSyncing || syncQueue.length === 0) return;
             isSyncing = true; updateSyncStatusUI();
+            try { await ensureBackendReady(false); }
+            catch (e) { isSyncing = false; syncQueueError = { ...getCurrentJobQueue()[0], status: 0, message: 'กำลังรอ Server พร้อมใช้งาน' }; updateSyncStatusUI(); return; }
 
             // Process a bounded batch. Current Wave gets priority and one bad/stale
             // item is rotated to the back instead of blocking every later scan.
@@ -1975,8 +2059,8 @@
             let attempts = 0;
             while (syncQueue.length > 0 && attempts < maxAttempts) {
                 const now = Date.now();
-                let nextIndex = syncQueue.findIndex(item => isQueuePayloadForCurrentJob(item) && Number(item._retryAfter || 0) <= now);
-                if (nextIndex < 0) nextIndex = syncQueue.findIndex(item => Number(item._retryAfter || 0) <= now);
+                let nextIndex = syncQueue.findIndex(item => !item._deadLetter && isQueuePayloadForCurrentJob(item) && Number(item._retryAfter || 0) <= now);
+                if (nextIndex < 0) nextIndex = syncQueue.findIndex(item => !item._deadLetter && Number(item._retryAfter || 0) <= now);
                 if (nextIndex < 0) break;
                 const payload = syncQueue.splice(nextIndex, 1)[0];
                 attempts += 1;
@@ -1990,6 +2074,10 @@
                     delete requestPayload._retryCount;
                     delete requestPayload._retryAfter;
                     delete requestPayload._lastError;
+                    delete requestPayload._deadLetter;
+                    delete requestPayload._deadReason;
+                    delete requestPayload._failedAt;
+                    delete requestPayload._queuedAt;
                     const res = await fetchWithTimeout(backendApiUrl + queueEndpoint, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -2032,6 +2120,9 @@
                         payload._retryCount = Number(payload._retryCount || 0) + 1;
                         payload._retryAfter = Date.now() + Math.min(30000, 1500 * Math.pow(2, Math.min(payload._retryCount, 4)));
                         payload._lastError = detail || `HTTP ${res.status}`;
+                        if ([400, 404, 422].includes(res.status) || payload._retryCount >= MAX_QUEUE_RETRIES) {
+                            payload._deadLetter = true; payload._deadReason = payload._lastError; payload._failedAt = new Date().toISOString();
+                        }
                         syncQueue.push(payload);
                         saveSyncQueue();
                         syncQueueError = {
@@ -2045,6 +2136,9 @@
                     payload._retryCount = Number(payload._retryCount || 0) + 1;
                     payload._retryAfter = Date.now() + Math.min(30000, 1500 * Math.pow(2, Math.min(payload._retryCount, 4)));
                     payload._lastError = e && e.name === 'AbortError' ? 'หมดเวลารอ Server' : 'เชื่อมต่อ Server ไม่สำเร็จ';
+                    if (payload._retryCount >= MAX_QUEUE_RETRIES) {
+                        payload._deadLetter = true; payload._deadReason = payload._lastError; payload._failedAt = new Date().toISOString();
+                    }
                     syncQueue.push(payload);
                     saveSyncQueue();
                     syncQueueError = {
@@ -2113,22 +2207,28 @@
             }
         });
 
-        function updateSyncStatusUI() {
+        function updateSyncStatusUI(forcedState = '') {
             const statusEl = document.getElementById('syncStatus');
+            if (!statusEl) return;
+            statusEl.onclick = renderQueueManager;
+            statusEl.title = 'กดเพื่อดูและจัดการคิวส่งข้อมูล';
+            statusEl.style.cursor = 'pointer';
+            if (forcedState === 'waking') { statusEl.innerHTML = '⏳ กำลังปลุก Server กรุณารอสักครู่...'; statusEl.className = "text-[10px] text-yellow-200 font-black flex items-center gap-1 animate-pulse"; return; }
             if (!navigator.onLine) { statusEl.innerHTML = `<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636L5.636 18.364M5.636 5.636l12.728 12.728"></path></svg> ⚠ ออฟไลน์ (เน็ตหลุด)`; statusEl.className = "text-[10px] text-red-300 font-black flex items-center gap-1 animate-pulse"; return; }
             const currentPending = getCurrentJobQueue().length;
             const oldPending = Math.max(0, syncQueue.length - currentPending);
+            const deadCount = syncQueue.filter(item => item._deadLetter).length;
             const currentError = getCurrentJobQueueError();
             if (currentError) {
-                statusEl.innerHTML = `⚠ งานนี้ส่งไม่สำเร็จ: ${escapeDocumentText(currentError.lpn)} (ค้าง ${currentPending})`;
+                statusEl.innerHTML = `⚠ งานนี้มีคิวต้องตรวจ: ${escapeDocumentText(currentError.lpn || '-')} (ค้าง ${currentPending}) — กดดู`;
                 statusEl.className = "text-[10px] text-red-300 font-black flex items-center gap-1 animate-pulse";
                 return;
             }
             if (currentPending > 0) {
                 statusEl.innerHTML = `<svg class="w-3 h-3 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg> กำลังส่งงานนี้ (${currentPending})...`;
                 statusEl.className = "text-[10px] text-yellow-300 font-bold animate-pulse flex items-center gap-1";
-            } else if (oldPending > 0) {
-                statusEl.innerHTML = `⏳ งานนี้ส่งครบแล้ว • กำลังเคลียร์คิวงานเดิม ${oldPending}`;
+            } else if (oldPending > 0 || deadCount > 0) {
+                statusEl.innerHTML = `⏳ งานนี้ส่งครบแล้ว • คิวงานเดิม ${oldPending}${deadCount ? ` / ต้องตรวจ ${deadCount}` : ''} — กดดู`;
                 statusEl.className = "text-[10px] text-yellow-200 font-bold flex items-center gap-1";
             } else {
                 statusEl.innerHTML = `<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> อัปเดตแล้ว`;
@@ -2137,6 +2237,7 @@
         }
         window.addEventListener('online', updateSyncStatusUI);
         window.addEventListener('offline', updateSyncStatusUI);
+        setInterval(reportDeviceState, 15000);
 
         // ==================== SHIPPING CONTROL DOCUMENT ====================
         function escapeDocumentText(value) {
@@ -2611,7 +2712,9 @@
         }
 
         async function verifyDocumentAgainstServer() {
+            await ensureBackendReady(true);
             await waitForSyncQueue(60000);
+            await assertNoOtherDevicePending();
             // A local/server LPN difference can be a valid Short Pick.
             // Only require the local sync queue to finish, then use the fresh server snapshot.
             const latest = await fetchFreshCurrentJobData();
@@ -3305,7 +3408,7 @@
             fetch(employeeApiUrl).then(res => res.json()).then(data => {
                 if (data.success && data.employees) { employeeDB = data.employees; localStorage.setItem('proScannerEmpDB', JSON.stringify(employeeDB)); }
             }).catch(e => console.log(""));
-            if (syncQueue.length > 0) { updateSyncStatusUI(); processQueue(); }
+            if (syncQueue.length > 0) { updateSyncStatusUI('waking'); ensureBackendReady(true).then(processQueue).catch(updateSyncStatusUI); }
         };
 
         function showLoading(message = 'กำลังประมวลผล...') {
@@ -5230,6 +5333,7 @@
             function closeConfirm() { document.getElementById('confirmModal').classList.add('hidden'); document.getElementById('lpnInput').focus(); }
 
             async function prepareBranchClose(timeoutMs = 120000) {
+                await ensureBackendReady(true);
                 // ต้องส่งยอด LPN ให้ถึง Server ก่อนจึงค่อย Stamp ปิดสาขา
                 // ล้าง error ชั่วคราวและลองส่งซ้ำระหว่างที่ popup ปิดงานแสดงอยู่
                 const deadline = Date.now() + timeoutMs;
@@ -5250,6 +5354,7 @@
                 }
                 if (getCurrentJobQueueError()) syncQueueError = null;
                 updateSyncStatusUI();
+                await assertNoOtherDevicePending();
                 return true;
             }
 
@@ -5663,7 +5768,7 @@
             <button onclick="palletModalBack()" class="mt-2.5 w-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm">← กลับไปเลือกสาขา</button>
         </div>
     </div>
-    <div class="fixed bottom-1 left-1.5 z-[1400] text-[9px] leading-none text-slate-400 font-bold pointer-events-none select-none">Pro LPN Scanner · v1.3.3 (2026-08-03)</div>
+    <div class="fixed bottom-1 left-1.5 z-[1400] text-[9px] leading-none text-slate-400 font-bold pointer-events-none select-none">Pro LPN Scanner · v1.3.4 (2026-08-11)</div>
     <div id="quickTools" class="fixed z-[1500] flex flex-col gap-2" style="bottom:16px;right:12px">
         <button onclick="openHelp()" title="วิธีใช้งาน / คำอธิบาย" class="w-11 h-11 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-black shadow-lg text-lg opacity-90">?</button>
         <button onclick="toggleBigText()" id="bigTextBtn" title="ปรับตัวอักษรใหญ่" class="w-11 h-11 rounded-full bg-slate-700 hover:bg-slate-800 text-white font-black shadow-lg text-base opacity-90">ก+</button>
