@@ -1933,19 +1933,63 @@
         let shippingDocumentVerifiedAt = 0;
         function pushToQueue(payload) { if (typeof noSaveMode !== 'undefined' && noSaveMode) { return; } shippingDocumentVerifiedAt = 0; syncQueue.push(payload); localStorage.setItem('proScannerQueue', JSON.stringify(syncQueue)); updateSyncStatusUI(); processQueue(); }
 
+        function getQueuePayloadWaves(payload) {
+            const values = Array.isArray(payload && payload.waves)
+                ? payload.waves
+                : [payload && (payload.wave_no || payload.wave)];
+            return values.map(value => String(value || '').replace(/\D/g, '')).filter(Boolean);
+        }
+
+        function getCurrentJobWaves() {
+            const values = activeWavesList && activeWavesList.length
+                ? activeWavesList
+                : String(currentWave || '').split(',');
+            return new Set(values.map(value => String(value || '').replace(/\D/g, '')).filter(Boolean));
+        }
+
+        function isQueuePayloadForCurrentJob(payload) {
+            const currentWaves = getCurrentJobWaves();
+            if (currentWaves.size === 0) return false;
+            return getQueuePayloadWaves(payload).some(wave => currentWaves.has(wave));
+        }
+
+        function getCurrentJobQueue() {
+            return syncQueue.filter(isQueuePayloadForCurrentJob);
+        }
+
+        function getCurrentJobQueueError() {
+            return syncQueueError && isQueuePayloadForCurrentJob(syncQueueError) ? syncQueueError : null;
+        }
+
+        function saveSyncQueue() {
+            localStorage.setItem('proScannerQueue', JSON.stringify(syncQueue));
+        }
+
         async function processQueue() {
             if (isSyncing || syncQueue.length === 0) return;
             isSyncing = true; updateSyncStatusUI();
 
-            while (syncQueue.length > 0) {
-                const payload = syncQueue[0];
+            // Process a bounded batch. Current Wave gets priority and one bad/stale
+            // item is rotated to the back instead of blocking every later scan.
+            const maxAttempts = Math.min(syncQueue.length, 20);
+            let attempts = 0;
+            while (syncQueue.length > 0 && attempts < maxAttempts) {
+                const now = Date.now();
+                let nextIndex = syncQueue.findIndex(item => isQueuePayloadForCurrentJob(item) && Number(item._retryAfter || 0) <= now);
+                if (nextIndex < 0) nextIndex = syncQueue.findIndex(item => Number(item._retryAfter || 0) <= now);
+                if (nextIndex < 0) break;
+                const payload = syncQueue.splice(nextIndex, 1)[0];
+                attempts += 1;
                 try {
-                    syncQueueError = null;
+                    if (isQueuePayloadForCurrentJob(payload)) syncQueueError = null;
                     updateSyncStatusUI();
                     // ✅ ใช้ fetchWithTimeout ป้องกัน request ค้างนานโดยไม่มีกำหนด
                     const queueEndpoint = payload._endpoint || '/api/scan';
                     const requestPayload = { ...payload };
                     delete requestPayload._endpoint;
+                    delete requestPayload._retryCount;
+                    delete requestPayload._retryAfter;
+                    delete requestPayload._lastError;
                     const res = await fetchWithTimeout(backendApiUrl + queueEndpoint, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -1953,10 +1997,9 @@
                     }, 20000);
 
                     if (res.ok) {
-                        syncQueue.shift();
-                        localStorage.setItem('proScannerQueue', JSON.stringify(syncQueue));
+                        saveSyncQueue();
                         updateSyncStatusUI();
-                        await new Promise(resolve => setTimeout(resolve, 150));
+                        await new Promise(resolve => setTimeout(resolve, 50));
                     } else {
                         let detail = '';
                         try {
@@ -1968,14 +2011,13 @@
                         if (res.status === 409) {
                             const conflictMessage = detail || 'ข้อมูล LPN ถูกอีกเครื่องอัปเดตก่อนแล้ว';
                             // รายการนี้ห้าม retry เพราะเป็นยอดสะสมจากฐานเก่า การส่งซ้ำจะเขียนทับงานของอีกเครื่อง
-                            syncQueue.shift();
                             syncQueue = syncQueue.filter(queued => !(
                                 String(queued.lpn || '').toUpperCase() === String(payload.lpn || '').toUpperCase()
                                 && String(queued.branch_code || '').toUpperCase() === String(payload.branch_code || '').toUpperCase()
                                 && String(queued.wave_no || '') === String(payload.wave_no || '')
                             ));
-                            localStorage.setItem('proScannerQueue', JSON.stringify(syncQueue));
-                            syncQueueError = { status: 409, lpn: payload.lpn || '-', message: conflictMessage };
+                            saveSyncQueue();
+                            syncQueueError = { ...payload, status: 409, lpn: payload.lpn || '-', message: conflictMessage };
                             updateSyncStatusUI();
                             try {
                                 const latest = await fetchFreshCurrentJobData();
@@ -1987,35 +2029,48 @@
                             updateSyncStatusUI();
                             break;
                         }
+                        payload._retryCount = Number(payload._retryCount || 0) + 1;
+                        payload._retryAfter = Date.now() + Math.min(30000, 1500 * Math.pow(2, Math.min(payload._retryCount, 4)));
+                        payload._lastError = detail || `HTTP ${res.status}`;
+                        syncQueue.push(payload);
+                        saveSyncQueue();
                         syncQueueError = {
+                            ...payload,
                             status: res.status,
                             lpn: payload.lpn || '-',
                             message: detail || `HTTP ${res.status}`
                         };
-                        break;
                     }
                 } catch (e) {
+                    payload._retryCount = Number(payload._retryCount || 0) + 1;
+                    payload._retryAfter = Date.now() + Math.min(30000, 1500 * Math.pow(2, Math.min(payload._retryCount, 4)));
+                    payload._lastError = e && e.name === 'AbortError' ? 'หมดเวลารอ Server' : 'เชื่อมต่อ Server ไม่สำเร็จ';
+                    syncQueue.push(payload);
+                    saveSyncQueue();
                     syncQueueError = {
+                        ...payload,
                         status: 0,
                         lpn: payload.lpn || '-',
                         message: e && e.name === 'AbortError' ? 'หมดเวลารอ Server' : 'เชื่อมต่อ Server ไม่สำเร็จ'
                     };
-                    break;
                 }
             }
             isSyncing = false; updateSyncStatusUI();
         }
         async function waitForSyncQueue(timeoutMs = 60000) {
             const deadline = Date.now() + timeoutMs;
-            while (syncQueue.length > 0 && Date.now() < deadline) {
-                if (!navigator.onLine) throw new Error(`อินเทอร์เน็ตออฟไลน์ — ยังมี ${syncQueue.length} รายการที่ยังไม่ส่ง`);
+            while (getCurrentJobQueue().length > 0 && Date.now() < deadline) {
+                const currentPending = getCurrentJobQueue().length;
+                if (!navigator.onLine) throw new Error(`อินเทอร์เน็ตออฟไลน์ — งานนี้ยังมี ${currentPending} รายการที่ยังไม่ส่ง`);
                 await processQueue();
-                if (syncQueueError) {
-                    throw new Error(`LPN ${syncQueueError.lpn} ส่งไม่สำเร็จ (${syncQueueError.status || 'Network'}): ${syncQueueError.message}`);
+                const currentError = getCurrentJobQueueError();
+                if (currentError) {
+                    throw new Error(`LPN ${currentError.lpn} ส่งไม่สำเร็จ (${currentError.status || 'Network'}): ${currentError.message}`);
                 }
-                if (syncQueue.length > 0) await new Promise(resolve => setTimeout(resolve, 250));
+                if (getCurrentJobQueue().length > 0) await new Promise(resolve => setTimeout(resolve, 250));
             }
-            if (syncQueue.length > 0) throw new Error(`ยังมี ${syncQueue.length} รายการที่ส่งไม่สำเร็จภายในเวลาที่กำหนด`);
+            const remaining = getCurrentJobQueue().length;
+            if (remaining > 0) throw new Error(`งานนี้ยังมี ${remaining} รายการที่ส่งไม่สำเร็จภายในเวลาที่กำหนด`);
             return true;
         }
         setInterval(processQueue, 5000);
@@ -2061,14 +2116,20 @@
         function updateSyncStatusUI() {
             const statusEl = document.getElementById('syncStatus');
             if (!navigator.onLine) { statusEl.innerHTML = `<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636L5.636 18.364M5.636 5.636l12.728 12.728"></path></svg> ⚠ ออฟไลน์ (เน็ตหลุด)`; statusEl.className = "text-[10px] text-red-300 font-black flex items-center gap-1 animate-pulse"; return; }
-            if (syncQueueError) {
-                statusEl.innerHTML = `⚠ ส่งไม่สำเร็จ: ${escapeDocumentText(syncQueueError.lpn)} (${syncQueue.length})`;
+            const currentPending = getCurrentJobQueue().length;
+            const oldPending = Math.max(0, syncQueue.length - currentPending);
+            const currentError = getCurrentJobQueueError();
+            if (currentError) {
+                statusEl.innerHTML = `⚠ งานนี้ส่งไม่สำเร็จ: ${escapeDocumentText(currentError.lpn)} (ค้าง ${currentPending})`;
                 statusEl.className = "text-[10px] text-red-300 font-black flex items-center gap-1 animate-pulse";
                 return;
             }
-            if (syncQueue.length > 0) {
-                statusEl.innerHTML = `<svg class="w-3 h-3 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg> กำลังส่ง (${syncQueue.length})...`;
+            if (currentPending > 0) {
+                statusEl.innerHTML = `<svg class="w-3 h-3 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg> กำลังส่งงานนี้ (${currentPending})...`;
                 statusEl.className = "text-[10px] text-yellow-300 font-bold animate-pulse flex items-center gap-1";
+            } else if (oldPending > 0) {
+                statusEl.innerHTML = `⏳ งานนี้ส่งครบแล้ว • กำลังเคลียร์คิวงานเดิม ${oldPending}`;
+                statusEl.className = "text-[10px] text-yellow-200 font-bold flex items-center gap-1";
             } else {
                 statusEl.innerHTML = `<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> อัปเดตแล้ว`;
                 statusEl.className = "text-[10px] text-green-300 font-bold flex items-center gap-1";
@@ -3212,7 +3273,7 @@
         function printShippingDocument() {
             const content = document.getElementById('shippingDocumentContent');
             if (!content) return;
-            if (syncQueue.length > 0 || syncQueueError || !shippingDocumentVerifiedAt || Date.now() - shippingDocumentVerifiedAt > 120000) {
+            if (getCurrentJobQueue().length > 0 || getCurrentJobQueueError() || !shippingDocumentVerifiedAt || Date.now() - shippingDocumentVerifiedAt > 120000) {
                 showAlert('ข้อมูลเอกสารยังไม่พร้อมพิมพ์', 'กรุณาปิดเอกสารแล้วเปิดใหม่ ระบบจะส่งคิวและตรวจข้อมูลส่วนกลางอีกครั้งก่อนพิมพ์');
                 return;
             }
@@ -5172,19 +5233,22 @@
                 // ต้องส่งยอด LPN ให้ถึง Server ก่อนจึงค่อย Stamp ปิดสาขา
                 // ล้าง error ชั่วคราวและลองส่งซ้ำระหว่างที่ popup ปิดงานแสดงอยู่
                 const deadline = Date.now() + timeoutMs;
-                while (syncQueue.length > 0 && Date.now() < deadline) {
-                    if (!navigator.onLine) throw new Error(`อินเทอร์เน็ตออฟไลน์ — ยังมียอด LPN ค้างส่ง ${syncQueue.length} รายการ`);
-                    syncQueueError = null;
+                while (getCurrentJobQueue().length > 0 && Date.now() < deadline) {
+                    const currentPending = getCurrentJobQueue().length;
+                    if (!navigator.onLine) throw new Error(`อินเทอร์เน็ตออฟไลน์ — งานนี้ยังมียอด LPN ค้างส่ง ${currentPending} รายการ`);
+                    if (getCurrentJobQueueError()) syncQueueError = null;
                     updateSyncStatusUI();
                     await processQueue();
-                    if (syncQueue.length === 0) break;
+                    if (getCurrentJobQueue().length === 0) break;
                     await new Promise(resolve => setTimeout(resolve, 1000));
                 }
-                if (syncQueue.length > 0) {
-                    const failedLpn = syncQueueError && syncQueueError.lpn ? ` (ล่าสุด: ${syncQueueError.lpn})` : '';
-                    throw new Error(`ยังมียอด LPN ค้างส่ง ${syncQueue.length} รายการ${failedLpn}`);
+                const remaining = getCurrentJobQueue().length;
+                if (remaining > 0) {
+                    const currentError = getCurrentJobQueueError();
+                    const failedLpn = currentError && currentError.lpn ? ` (ล่าสุด: ${currentError.lpn})` : '';
+                    throw new Error(`งานนี้ยังมียอด LPN ค้างส่ง ${remaining} รายการ${failedLpn}`);
                 }
-                syncQueueError = null;
+                if (getCurrentJobQueueError()) syncQueueError = null;
                 updateSyncStatusUI();
                 return true;
             }
