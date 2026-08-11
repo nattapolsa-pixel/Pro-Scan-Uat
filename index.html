@@ -2048,7 +2048,8 @@
                 isSharedStateRefreshing = false;
             }
         }
-        setInterval(refreshSharedBranchState, 4000);
+        // ลดภาระ API เมื่อมีหลาย Handheld: overlay ทำให้ยอดสแกนเห็นทันทีอยู่แล้ว
+        setInterval(refreshSharedBranchState, 30000);
 
         window.addEventListener('beforeunload', function (e) {
             if (syncQueue.length > 0 || backgroundTasks > 0) {
@@ -2541,8 +2542,8 @@
         async function fetchFreshCurrentJobData() {
             const isBookingMode = activeWavesList.length > 1 || String(currentWave || '').includes(',');
             const url = isBookingMode
-                ? backendApiUrl + `/api/check-booking?booking_no=${encodeURIComponent(currentBookingNo)}&force=true&_ts=${Date.now()}`
-                : backendApiUrl + `/api/check-wave?wave_no=${encodeURIComponent(activeWavesList[0] || currentWave)}&force=true&_ts=${Date.now()}`;
+                ? backendApiUrl + `/api/check-booking?booking_no=${encodeURIComponent(currentBookingNo)}&_ts=${Date.now()}`
+                : backendApiUrl + `/api/check-wave?wave_no=${encodeURIComponent(activeWavesList[0] || currentWave)}&_ts=${Date.now()}`;
             const res = await fetchWithTimeout(url, { cache: 'no-store' }, 60000);
             if (!res.ok) throw new Error(`โหลดข้อมูลส่วนกลางไม่สำเร็จ (HTTP ${res.status})`);
             return { data: await res.json(), isWaveOnly: !isBookingMode };
