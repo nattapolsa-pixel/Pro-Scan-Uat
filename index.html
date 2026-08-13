@@ -802,9 +802,12 @@
     <div id="toastMsg" class="toast-msg bg-green-600 z-[100] flex items-center gap-2"></div>
 
     <div id="loadingOverlay"
-        class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 flex flex-col items-center justify-center z-[90]">
-        <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-400 mb-4"></div>
-        <h2 id="loadingOverlayText" class="text-white text-xl font-bold tracking-widest animate-pulse">กำลังประมวลผล...</h2>
+        class="hidden fixed inset-0 bg-slate-950/85 backdrop-blur-sm flex flex-col items-center justify-center z-[12000] p-5">
+        <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm text-center border-t-8 border-blue-500">
+            <div class="animate-spin rounded-full h-16 w-16 border-4 border-blue-100 border-t-blue-600 mx-auto mb-4"></div>
+            <h2 id="loadingOverlayText" class="text-slate-900 text-xl font-black">กำลังประมวลผล...</h2>
+            <p class="text-sm text-slate-500 font-bold mt-2">ระบบกำลังทำงาน กรุณารอและไม่ต้องกดซ้ำ</p>
+        </div>
     </div>
 
     <div id="scannerModal"
@@ -837,7 +840,7 @@
     </div>
 
     <div id="alertModal"
-        class="hidden fixed inset-0 bg-gray-900 bg-opacity-80 flex items-center justify-center p-4 z-[80]">
+        class="hidden fixed inset-0 bg-gray-900 bg-opacity-80 flex items-center justify-center p-4 z-[12010]">
         <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm text-center border-t-8 border-red-600"
             id="alertModalContent">
             <div id="alertIconContainer" class="mx-auto mb-2 w-12 h-12">
@@ -2795,7 +2798,7 @@
                 return;
             }
 
-            showLoading();
+            showLoading('กำลังตรวจสอบข้อมูลล่าสุดก่อนเปิดเอกสาร...');
             try {
                 await verifyDocumentAgainstServer();
             } catch (e) {
@@ -3708,7 +3711,7 @@
             const empId = document.getElementById('empInput').value.trim();
             if (!empId) return showAlert('การแจ้งเตือน', 'กรุณาระบุรหัสพนักงานก่อนดำเนินการ');
             if (employeeDB[empId]) return executeLoginSuccess(empId, employeeDB[empId]);
-            showLoading();
+            showLoading('กำลังตรวจสอบรหัสพนักงาน...');
             try {
                 const res = await fetch(`${employeeApiUrl}?emp_id=${encodeURIComponent(empId)}`);
                 const data = await res.json();
@@ -3976,7 +3979,7 @@
                 applyWaveDataToScreen(cachedData, isWaveOnly);
                 showToast('โหลดข้อมูลจากเครื่องแล้ว กำลังอัปเดตล่าสุด...');
             } else {
-                showLoading();
+                showLoading(isWaveOnly ? 'กำลังค้นหาและโหลดข้อมูล Wave...' : 'กำลังค้นหาและโหลดข้อมูล Booking...');
             }
 
             try {
@@ -5135,7 +5138,7 @@
                 const correctionPayload = buildCorrectionPayload(item, newQty, reason, note, correctionId);
                 const submitBtn = document.getElementById('correctionSubmitBtn');
                 if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'กำลังบันทึกหลักฐาน...'; submitBtn.classList.add('opacity-60'); }
-                showLoading();
+                showLoading('กำลังบันทึกยอดแก้ไขและหลักฐาน...');
                 try {
                     await waitForSyncQueue(120000);
                     const res = await fetchWithTimeout(backendApiUrl + '/api/correct-lpn', {
@@ -5885,7 +5888,7 @@
             <button onclick="palletModalBack()" class="mt-2.5 w-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm">← กลับไปเลือกสาขา</button>
         </div>
     </div>
-    <div class="fixed bottom-1 left-1.5 z-[1400] text-[9px] leading-none text-slate-400 font-bold pointer-events-none select-none">Pro LPN Scanner · v1.4.3 (2026-08-13)</div>
+    <div class="fixed bottom-1 left-1.5 z-[1400] text-[9px] leading-none text-slate-400 font-bold pointer-events-none select-none">Pro LPN Scanner · v1.4.4 (2026-08-13)</div>
     <div id="quickTools" class="fixed z-[1500] flex flex-col gap-2" style="bottom:16px;right:12px">
         <button onclick="openHelp()" title="วิธีใช้งาน / คำอธิบาย" class="w-11 h-11 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-black shadow-lg text-lg opacity-90">?</button>
         <button onclick="toggleBigText()" id="bigTextBtn" title="ปรับตัวอักษรใหญ่" class="w-11 h-11 rounded-full bg-slate-700 hover:bg-slate-800 text-white font-black shadow-lg text-base opacity-90">ก+</button>
