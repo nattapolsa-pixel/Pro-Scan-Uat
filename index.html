@@ -1721,7 +1721,7 @@
                         await new Promise(r => setTimeout(r, attempt * 1500));
                         if (!usedCache && showRetryToast) showToast(`กำลังลองเชื่อมต่อใหม่ (${attempt}/2)...`);
                     }
-                    res = await fetchWithTimeout(url, { cache: 'no-store' }, 25000);
+                    res = await fetchWithTimeout(url, { cache: 'no-store' }, 45000);
                     lastError = null;
                     break;
                 } catch (err) {
@@ -2082,7 +2082,7 @@
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(requestPayload)
-                    }, 20000);
+                    }, 45000);
 
                     if (res.ok) {
                         saveSyncQueue();
@@ -2158,10 +2158,10 @@
                 if (!navigator.onLine) throw new Error(`อินเทอร์เน็ตออฟไลน์ — งานนี้ยังมี ${currentPending} รายการที่ยังไม่ส่ง`);
                 await processQueue();
                 const currentError = getCurrentJobQueueError();
-                if (currentError) {
+                if (currentError && currentError._deadLetter) {
                     throw new Error(`LPN ${currentError.lpn} ส่งไม่สำเร็จ (${currentError.status || 'Network'}): ${currentError.message}`);
                 }
-                if (getCurrentJobQueue().length > 0) await new Promise(resolve => setTimeout(resolve, 250));
+                if (getCurrentJobQueue().length > 0) await new Promise(resolve => setTimeout(resolve, 1000));
             }
             const remaining = getCurrentJobQueue().length;
             if (remaining > 0) throw new Error(`งานนี้ยังมี ${remaining} รายการที่ส่งไม่สำเร็จภายในเวลาที่กำหนด`);
@@ -2220,8 +2220,13 @@
             const deadCount = syncQueue.filter(item => item._deadLetter).length;
             const currentError = getCurrentJobQueueError();
             if (currentError) {
-                statusEl.innerHTML = `⚠ งานนี้มีคิวต้องตรวจ: ${escapeDocumentText(currentError.lpn || '-')} (ค้าง ${currentPending}) — กดดู`;
-                statusEl.className = "text-[10px] text-red-300 font-black flex items-center gap-1 animate-pulse";
+                if (currentError._deadLetter) {
+                    statusEl.innerHTML = `⚠ งานนี้มีคิวต้องตรวจ: ${escapeDocumentText(currentError.lpn || '-')} (ค้าง ${currentPending}) — กดดู`;
+                    statusEl.className = "text-[10px] text-red-300 font-black flex items-center gap-1 animate-pulse";
+                } else {
+                    statusEl.innerHTML = `⏳ เน็ตตอบช้า ระบบกำลังส่งใหม่เอง (ค้าง ${currentPending})`;
+                    statusEl.className = "text-[10px] text-yellow-200 font-bold flex items-center gap-1 animate-pulse";
+                }
                 return;
             }
             if (currentPending > 0) {
@@ -5361,16 +5366,19 @@
             async function closeBranchWaves(waves, branchCode, completedAtIso) {
                 if (noSaveMode) return true;
                 const results = await Promise.all(waves.map(async waveNo => {
-                    try {
-                        const res = await fetchWithTimeout(backendApiUrl + '/api/close-job', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ wave: waveNo, branch: branchCode, emp_id: loggedInEmpId, completed_at: completedAtIso })
-                        }, 25000);
-                        return res.ok;
-                    } catch (e) {
-                        return false;
+                    for (let attempt = 0; attempt < 3; attempt++) {
+                        try {
+                            const res = await fetchWithTimeout(backendApiUrl + '/api/close-job', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ wave: waveNo, branch: branchCode, emp_id: loggedInEmpId, completed_at: completedAtIso })
+                            }, 60000);
+                            if (res.ok) return true;
+                            if (res.status >= 400 && res.status < 500) return false;
+                        } catch (e) { }
+                        if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 2000 * (attempt + 1)));
                     }
+                    return false;
                 }));
                 return results.every(Boolean);
             }
@@ -5387,7 +5395,7 @@
                     await prepareBranchClose();
                 } catch (e) {
                     hideLoading();
-                    showAlert('ยังไม่ Stamp ปิดสาขา', `${e && e.message ? e.message : 'ยังส่งยอด LPN ไม่ครบ'}\n\nระบบเก็บงานไว้แล้ว กรุณาตรวจอินเทอร์เน็ตและกดปิดสาขาอีกครั้ง เพื่อป้องกัน Timestamp ขึ้นแต่ยอดไม่ขึ้น`);
+                    showAlert('ยังไม่ Stamp ปิดสาขา', `${e && e.message ? e.message : 'ยังส่งยอด LPN ไม่ครบ'}\n\nระบบเก็บงานไว้แล้ว หากเครื่องยังออนไลน์ให้รอสักครู่แล้วกดปิดสาขาอีกครั้ง ไม่ต้องสแกนใหม่`);
                     return;
                 }
 
@@ -5450,7 +5458,7 @@
                     await prepareBranchClose();
                 } catch (e) {
                     hideLoading();
-                    showAlert('ยังไม่ Stamp ปิดสาขา', `${e && e.message ? e.message : 'ยังส่งยอด LPN ไม่ครบ'}\n\nระบบเก็บงานไว้แล้ว กรุณาตรวจอินเทอร์เน็ตและกดปิดสาขาอีกครั้ง เพื่อป้องกัน Timestamp ขึ้นแต่ยอดไม่ขึ้น`);
+                    showAlert('ยังไม่ Stamp ปิดสาขา', `${e && e.message ? e.message : 'ยังส่งยอด LPN ไม่ครบ'}\n\nระบบเก็บงานไว้แล้ว หากเครื่องยังออนไลน์ให้รอสักครู่แล้วกดปิดสาขาอีกครั้ง ไม่ต้องสแกนใหม่`);
                     return;
                 }
 
@@ -5768,7 +5776,7 @@
             <button onclick="palletModalBack()" class="mt-2.5 w-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm">← กลับไปเลือกสาขา</button>
         </div>
     </div>
-    <div class="fixed bottom-1 left-1.5 z-[1400] text-[9px] leading-none text-slate-400 font-bold pointer-events-none select-none">Pro LPN Scanner · v1.3.4 (2026-08-11)</div>
+    <div class="fixed bottom-1 left-1.5 z-[1400] text-[9px] leading-none text-slate-400 font-bold pointer-events-none select-none">Pro LPN Scanner · v1.3.5 (2026-08-13)</div>
     <div id="quickTools" class="fixed z-[1500] flex flex-col gap-2" style="bottom:16px;right:12px">
         <button onclick="openHelp()" title="วิธีใช้งาน / คำอธิบาย" class="w-11 h-11 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-black shadow-lg text-lg opacity-90">?</button>
         <button onclick="toggleBigText()" id="bigTextBtn" title="ปรับตัวอักษรใหญ่" class="w-11 h-11 rounded-full bg-slate-700 hover:bg-slate-800 text-white font-black shadow-lg text-base opacity-90">ก+</button>
