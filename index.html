@@ -923,7 +923,7 @@
                         class="group min-h-[58px] bg-gradient-to-br from-slate-600 to-slate-700 hover:from-slate-500 hover:to-slate-600 text-white font-black px-3 py-2.5 rounded-xl text-xs md:text-sm transition active:scale-95 shadow-lg border border-slate-400/60 flex items-center justify-center gap-2">
                         <span class="text-xl group-hover:-rotate-45 transition">↩️</span><span class="leading-tight">คืนยอดเดิม<br><small class="font-bold text-slate-300">จากระบบสแกน</small></span>
                     </button>
-                    <button onclick="saveDocumentOverridesUI()" title="บันทึกยอดที่แก้ไขลงเครื่อง"
+                    <button id="saveDocumentOverridesBtn" onclick="saveDocumentOverridesUI()" title="บันทึกยอดที่แก้ไขลงเครื่อง"
                         class="group min-h-[58px] bg-gradient-to-br from-emerald-500 to-green-700 hover:from-emerald-400 hover:to-green-600 text-white font-black px-3 py-2.5 rounded-xl text-xs md:text-sm transition active:scale-95 shadow-lg shadow-green-950/30 border border-emerald-300/60 flex items-center justify-center gap-2">
                         <span class="text-xl group-hover:scale-110 transition">💾</span><span class="leading-tight">บันทึกยอดแก้ไข<br><small class="font-bold text-emerald-100">เก็บค่าที่ปรับแล้ว</small></span>
                     </button>
@@ -2300,7 +2300,10 @@
         function saveDocumentOverrides() {
             try {
                 localStorage.setItem(getDocumentOverridesStorageKey(), JSON.stringify(documentOverrides));
-            } catch (e) { }
+                return true;
+            } catch (e) {
+                return false;
+            }
         }
         function updateDocumentFieldValue(branchCode, field, value) {
             if (!branchCode || !field) return;
@@ -2371,10 +2374,37 @@
         function updateDocumentPalletCount(branchCode, value) {
             updateDocumentFieldValue(branchCode, 'pallet', value);
         }
-        function saveDocumentOverridesUI() {
-            saveDocumentOverrides();
-            renderShippingDocument();
-            showToast('💾 บันทึกยอดที่แก้ไขในเอกสารเรียบร้อยแล้ว');
+        let isSavingDocumentOverrides = false;
+        async function saveDocumentOverridesUI() {
+            if (isSavingDocumentOverrides) return;
+            isSavingDocumentOverrides = true;
+            const button = document.getElementById('saveDocumentOverridesBtn');
+            const originalHtml = button ? button.innerHTML : '';
+            if (button) {
+                button.disabled = true;
+                button.classList.add('opacity-70', 'cursor-wait');
+                button.innerHTML = '<span class="text-xl animate-spin">⏳</span><span class="leading-tight">กำลังบันทึก...<br><small class="font-bold text-emerald-100">กรุณารอสักครู่</small></span>';
+            }
+            await new Promise(resolve => setTimeout(resolve, 250));
+            try {
+                const saved = saveDocumentOverrides();
+                if (!saved) throw new Error('พื้นที่จัดเก็บของเครื่องไม่พร้อมใช้งาน');
+                renderShippingDocument();
+                const branchCount = Object.keys(documentOverrides).filter(branch => Object.keys(documentOverrides[branch] || {}).length > 0).length;
+                const fieldCount = Object.values(documentOverrides).reduce((sum, fields) => sum + Object.keys(fields || {}).length, 0);
+                const savedAt = new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date());
+                showAlert('✅ บันทึกยอดแก้ไขสำเร็จ', `บันทึกแล้ว ${fieldCount} ช่อง จาก ${branchCount} สาขา\nเวลา ${savedAt} น.\n\nสามารถพิมพ์เอกสารต่อได้เลย`, 'border-green-600', true);
+            } catch (e) {
+                showAlert('บันทึกยอดไม่สำเร็จ', `${e && e.message ? e.message : e}\n\nกรุณาลองกดบันทึกอีกครั้ง`, 'border-red-600', false);
+            } finally {
+                isSavingDocumentOverrides = false;
+                const refreshedButton = document.getElementById('saveDocumentOverridesBtn');
+                if (refreshedButton) {
+                    refreshedButton.disabled = false;
+                    refreshedButton.classList.remove('opacity-70', 'cursor-wait');
+                    refreshedButton.innerHTML = originalHtml;
+                }
+            }
         }
         function resetDocumentOverrides() {
             showGenericConfirm(
@@ -5855,7 +5885,7 @@
             <button onclick="palletModalBack()" class="mt-2.5 w-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm">← กลับไปเลือกสาขา</button>
         </div>
     </div>
-    <div class="fixed bottom-1 left-1.5 z-[1400] text-[9px] leading-none text-slate-400 font-bold pointer-events-none select-none">Pro LPN Scanner · v1.4.2 (2026-08-13)</div>
+    <div class="fixed bottom-1 left-1.5 z-[1400] text-[9px] leading-none text-slate-400 font-bold pointer-events-none select-none">Pro LPN Scanner · v1.4.3 (2026-08-13)</div>
     <div id="quickTools" class="fixed z-[1500] flex flex-col gap-2" style="bottom:16px;right:12px">
         <button onclick="openHelp()" title="วิธีใช้งาน / คำอธิบาย" class="w-11 h-11 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-black shadow-lg text-lg opacity-90">?</button>
         <button onclick="toggleBigText()" id="bigTextBtn" title="ปรับตัวอักษรใหญ่" class="w-11 h-11 rounded-full bg-slate-700 hover:bg-slate-800 text-white font-black shadow-lg text-base opacity-90">ก+</button>
