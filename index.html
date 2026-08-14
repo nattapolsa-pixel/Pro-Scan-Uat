@@ -1969,7 +1969,6 @@
         let isSyncing = false;
         let syncQueueError = null;
         let shippingDocumentVerifiedAt = 0;
-        const MAX_QUEUE_RETRIES = 6;
         const scannerDeviceId = localStorage.getItem('proScannerDeviceId') || (crypto.randomUUID ? crypto.randomUUID() : `device-${Date.now()}-${Math.random()}`);
         localStorage.setItem('proScannerDeviceId', scannerDeviceId);
         function pushToQueue(payload) {
@@ -2143,7 +2142,9 @@
                         payload._retryCount = Number(payload._retryCount || 0) + 1;
                         payload._retryAfter = Date.now() + Math.min(30000, 1500 * Math.pow(2, Math.min(payload._retryCount, 4)));
                         payload._lastError = detail || `HTTP ${res.status}`;
-                        if ([400, 404, 422].includes(res.status) || payload._retryCount >= MAX_QUEUE_RETRIES) {
+                        // 4xx กลุ่มนี้เป็นข้อมูลที่ต้องให้คนแก้ จึงหยุดส่งได้
+                        // ส่วน 5xx/timeout เป็นอาการชั่วคราว ห้ามเปลี่ยนเป็นรายการเสียเพราะข้อมูลยังส่งซ้ำได้
+                        if ([400, 404, 422].includes(res.status)) {
                             payload._deadLetter = true; payload._deadReason = payload._lastError; payload._failedAt = new Date().toISOString();
                         }
                         syncQueue.push(payload);
@@ -2159,9 +2160,6 @@
                     payload._retryCount = Number(payload._retryCount || 0) + 1;
                     payload._retryAfter = Date.now() + Math.min(30000, 1500 * Math.pow(2, Math.min(payload._retryCount, 4)));
                     payload._lastError = e && e.name === 'AbortError' ? 'หมดเวลารอ Server' : 'เชื่อมต่อ Server ไม่สำเร็จ';
-                    if (payload._retryCount >= MAX_QUEUE_RETRIES) {
-                        payload._deadLetter = true; payload._deadReason = payload._lastError; payload._failedAt = new Date().toISOString();
-                    }
                     syncQueue.push(payload);
                     saveSyncQueue();
                     syncQueueError = {
@@ -2182,7 +2180,8 @@
                 await processQueue();
                 const currentError = getCurrentJobQueueError();
                 if (currentError && currentError._deadLetter) {
-                    throw new Error(`LPN ${currentError.lpn} ส่งไม่สำเร็จ (${currentError.status || 'Network'}): ${currentError.message}`);
+                    const reason = currentError.message || currentError._deadReason || currentError._lastError || 'ข้อมูลรายการนี้ไม่ถูกต้อง';
+                    throw new Error(`LPN ${currentError.lpn || '-'} ส่งไม่สำเร็จ (${currentError.status || 'Network'}): ${reason}`);
                 }
                 if (getCurrentJobQueue().length > 0) await new Promise(resolve => setTimeout(resolve, 1000));
             }
@@ -2771,7 +2770,9 @@
 
         async function verifyDocumentAgainstServer() {
             await ensureBackendReady(true);
-            await waitForSyncQueue(60000);
+            // หลังยิงเสร็จให้รอคิวส่งต่อเองได้นานพอบน Wi-Fi หน้างาน
+            // โดยไม่ตัดเป็น Error ทั้งที่ Server เพียงตอบช้าชั่วคราว
+            await waitForSyncQueue(180000);
             await assertNoOtherDevicePending();
             // A local/server LPN difference can be a valid Short Pick.
             // Only require the local sync queue to finish, then use the fresh server snapshot.
@@ -4915,7 +4916,7 @@
                 const scannedPalletNo = activePalletNo;
                 entries.forEach((entry, entryIndex) => {
                     const payload = { wave_no: lpnWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: lpn, type: entry.type, color: entry.color, qty: entry.qty, emp_id: loggedInEmpId, pallet_no: scannedPalletNo };
-                    if (entryIndex === 0) payload.expected_previous_qty = previousQty;
+                    if (isContinuation && entryIndex === 0) payload.expected_previous_qty = previousQty;
                     pushToQueue(payload);
                 });
                 finishCorrectionAfterScan();
@@ -4937,7 +4938,6 @@
                 const lpnWave = target ? (target.wave_no || currentWave) : currentWave;
                 const scanPayload = { wave_no: lpnWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: lpn, type: type, color: color, qty: qty, emp_id: loggedInEmpId, pallet_no: scannedPalletNo };
                 if (expectedPreviousQty !== null && expectedPreviousQty !== undefined) scanPayload.expected_previous_qty = parseInt(expectedPreviousQty) || 0;
-                else if (!isDirectQtyLpn(lpn)) scanPayload.expected_previous_qty = 0;
                 pushToQueue(scanPayload);
                 finishCorrectionAfterScan();
             }
@@ -5925,7 +5925,7 @@
             <button onclick="palletModalBack()" class="mt-2.5 w-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm">← กลับไปเลือกสาขา</button>
         </div>
     </div>
-    <div class="fixed bottom-1 left-1.5 z-[1400] text-[9px] leading-none text-slate-400 font-bold pointer-events-none select-none">Pro LPN Scanner · v1.4.5 (2026-08-14)</div>
+    <div class="fixed bottom-1 left-1.5 z-[1400] text-[9px] leading-none text-slate-400 font-bold pointer-events-none select-none">Pro LPN Scanner · v1.4.6 (2026-08-14)</div>
     <div id="quickTools" class="fixed z-[1500] flex flex-col gap-2" style="bottom:16px;right:12px">
         <button onclick="openHelp()" title="วิธีใช้งาน / คำอธิบาย" class="w-11 h-11 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-black shadow-lg text-lg opacity-90">?</button>
         <button onclick="toggleBigText()" id="bigTextBtn" title="ปรับตัวอักษรใหญ่" class="w-11 h-11 rounded-full bg-slate-700 hover:bg-slate-800 text-white font-black shadow-lg text-base opacity-90">ก+</button>
