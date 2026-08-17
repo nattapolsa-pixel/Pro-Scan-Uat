@@ -1622,6 +1622,10 @@
             allLpnsInWave
                 .filter(item => normalizeBranchLookupCode(item.branch) === key)
                 .forEach(item => {
+                    (item.branch_pallet_nos || []).forEach(value => {
+                        const sharedNo = parseInt(value) || 0;
+                        if (sharedNo > 0) palletNos.add(sharedNo);
+                    });
                     if (item.status === 'Scanned') {
                         const no = parseInt(item.palletNo) || parseInt(item.pallet_no) || 0;
                         if (no > 0) palletNos.add(no);
@@ -3324,7 +3328,11 @@
                 const itemRows = branchItems.map((item, index) => {
                     const lpnPrefix = item.lpn.substring(0, 2);
                     let typeBadge = '';
-                    if (lpnPrefix === 'PR') {
+                    if (item.historical_summary) {
+                        const historyColor = ({ Red: 'แดง', Blue: 'น้ำเงิน', Green: 'เขียว', Black: 'ดำ' })[item.color] || item.color || '-';
+                        const historyType = String(item.scan_type || '').toUpperCase() === 'CARTON' ? 'กล่อง M' : `TOTE ${historyColor}`;
+                        typeBadge = `<span class="px-2 py-0.5 rounded bg-purple-50 text-purple-700 font-bold border border-purple-200 text-xs">${escapeDocumentText(historyType)}</span>`;
+                    } else if (lpnPrefix === 'PR') {
                         typeBadge = '<span class="px-2 py-0.5 rounded bg-red-50 text-red-700 font-bold border border-red-200 text-xs">PR (Carton)</span>';
                     } else if (isDirectQtyPrefix(lpnPrefix)) {
                         typeBadge = `<span class="px-2 py-0.5 rounded bg-orange-50 text-orange-700 font-bold border border-orange-200 text-xs">${lpnPrefix} (Pallet)</span>`;
@@ -3335,7 +3343,7 @@
                     return `
                         <tr class="hover:bg-slate-50 transition-colors text-center text-slate-700 text-xs">
                             <td class="p-2 border-r border-slate-100 font-sans">${index + 1}</td>
-                            <td class="p-2 border-r border-slate-100 font-black text-slate-900 font-sans tracking-wider">${escapeDocumentText(item.lpn)}</td>
+                            <td class="p-2 border-r border-slate-100 font-black text-slate-900 font-sans tracking-wider">${item.historical_summary ? '<span class="text-purple-700">ยอดย้อนหลังจาก Member Data</span>' : escapeDocumentText(item.lpn)}</td>
                             <td class="p-2 border-r border-slate-100 font-sans">${escapeDocumentText(item.zone)}</td>
                             <td class="p-2 border-r border-slate-100 font-sans">${typeBadge}</td>
                             <td class="p-2 border-r border-slate-100 font-sans">${getStatusBadge(item)}</td>
@@ -5925,7 +5933,7 @@
             <button onclick="palletModalBack()" class="mt-2.5 w-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm">← กลับไปเลือกสาขา</button>
         </div>
     </div>
-    <div class="fixed bottom-1 left-1.5 z-[1400] text-[9px] leading-none text-slate-400 font-bold pointer-events-none select-none">Pro LPN Scanner · v1.4.6 (2026-08-14)</div>
+    <div class="fixed bottom-1 left-1.5 z-[1400] text-[9px] leading-none text-slate-400 font-bold pointer-events-none select-none">Pro LPN Scanner · v1.4.7 (2026-08-17)</div>
     <div id="quickTools" class="fixed z-[1500] flex flex-col gap-2" style="bottom:16px;right:12px">
         <button onclick="openHelp()" title="วิธีใช้งาน / คำอธิบาย" class="w-11 h-11 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-black shadow-lg text-lg opacity-90">?</button>
         <button onclick="toggleBigText()" id="bigTextBtn" title="ปรับตัวอักษรใหญ่" class="w-11 h-11 rounded-full bg-slate-700 hover:bg-slate-800 text-white font-black shadow-lg text-base opacity-90">ก+</button>
