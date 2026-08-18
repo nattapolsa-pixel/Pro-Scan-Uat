@@ -1084,7 +1084,20 @@
             </div>
         </header>
         <div class="p-3 md:p-4 flex-1 overflow-y-auto" style="-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain;">
-            <h2 class="text-lg font-bold text-gray-800 mb-3 text-center">กรุณาเลือกสาขาที่ต้องการปฏิบัติงาน</h2>
+            <div class="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm">
+                <div>
+                    <h2 class="text-base md:text-lg font-black text-gray-800">เลือกสาขาที่ต้องการปฏิบัติงาน</h2>
+                    <div class="mt-1 flex flex-wrap gap-1.5 text-[10px] md:text-xs font-black">
+                        <span class="rounded-full bg-slate-100 px-2 py-1 text-slate-700">⚪ ยังไม่เริ่ม</span>
+                        <span class="rounded-full bg-amber-100 px-2 py-1 text-amber-800">🟠 กำลังทำ</span>
+                        <span class="rounded-full bg-emerald-100 px-2 py-1 text-emerald-800">✅ เสร็จแล้ว</span>
+                    </div>
+                </div>
+                <button id="refreshBranchStatusBtn" onclick="refreshBranchSelectorData()"
+                    class="min-h-[44px] rounded-xl border-2 border-blue-300 bg-blue-600 px-3 py-2 text-sm font-black text-white shadow hover:bg-blue-700 active:scale-95 disabled:cursor-wait disabled:opacity-60">
+                    ↻ รีเฟรชข้อมูล
+                </button>
+            </div>
             
             <!-- 📄 Banner เอกสารใบคุมส่งสินค้า สำหรับผู้ทำเอกสารและผู้ปฏิบัติงานที่สแกนเสร็จแล้ว -->
             <div id="branchDocumentBanner" class="mb-4 p-4 bg-amber-500 hover:bg-amber-600 text-gray-900 rounded-xl shadow-md border-b-4 border-amber-700 flex items-center justify-between cursor-pointer active:scale-95 transition" onclick="openShippingDocument()">
@@ -1573,6 +1586,8 @@
         let branchProvinceLoaded = false;
         let branchProvinceLoadPromise = null;
         let latestWaveLoadRequestId = 0;
+        let currentLookupIsWaveOnly = true;
+        let branchRefreshInProgress = false;
         let currentWaveDataCacheKey = '';
         let pendingWavesFetchPromise = null;
 
@@ -3877,6 +3892,7 @@
         function loadTestWave56245() { try { applyWaveDataToScreen(TEST_WAVE_56245, true); showToast('โหลด Wave 56245 (ข้อมูลจริง) แล้ว'); } catch (e) { showAlert('ผิดพลาด', String(e)); } }
 
         function applyWaveDataToScreen(data, isWaveOnly) {
+            currentLookupIsWaveOnly = Boolean(isWaveOnly);
             const previousLocalState = new Map((allLpnsInWave || []).map(item => [
                 `${String(item.branch || '').toUpperCase()}|${String(item.lpn || '').toUpperCase()}`,
                 { palletNo: parseInt(item.palletNo) || 0, palletColor: item.palletColor || null, correctionCount: parseInt(item.correctionCount) || 0 }
@@ -4076,23 +4092,29 @@
                 let totalBoxes = 0; let scannedBoxes = 0;
                 branchLpns.forEach(i => {
                     let expectedQty = parseInt(i.Total_Qty || i.total_qty) || 1;
-                    let actualQty = i.qty ? parseInt(i.qty) : expectedQty;
+                    // ยอดจริงต้องมาจาก Qty ที่สแกนเท่านั้น; ForceClosed/Short Pick มี Qty 0
+                    // ห้ามแทน 0 ด้วยยอดเป้าหมาย เพราะจะทำให้ดูเหมือนนับครบทั้งที่ปิดจบแบบ Short Pick
+                    let actualQty = Math.max(0, parseInt(i.qty) || 0);
                     totalBoxes += expectedQty;
                     if (i.status === 'Scanned' || i.status === 'ForceClosed') scannedBoxes += actualQty;
                 });
 
-                const isDone = branchLpns.every(i => i.status === 'Scanned' || i.status === 'ForceClosed');
-                const inProgress = !isDone && scannedBoxes > 0;
-
-                let btnStyle = isDone ? 'border-green-400 bg-green-50 text-green-900' :
-                    inProgress ? 'border-orange-400 bg-orange-50 text-orange-900' :
-                        'border-blue-400 bg-white text-blue-900';
-
-                let badgeCls = isDone ? 'bg-green-200 text-green-800' : inProgress ? 'bg-orange-200 text-orange-800' : 'bg-blue-100 text-blue-800';
-                let statusBadge = `<div class="font-black text-xl ml-2 whitespace-nowrap px-3 py-1 rounded-full ${badgeCls}">${scannedBoxes}/${totalBoxes}</div>`;
                 const completionRecord = getBranchCompletionRecord(bCode);
+                const isClosed = Boolean(completionRecord);
+                const allLpnsResolved = branchLpns.length > 0 && branchLpns.every(i => i.status === 'Scanned' || i.status === 'ForceClosed');
+                const inProgress = !isClosed && (scannedBoxes > 0 || allLpnsResolved);
+                const btnStyle = isClosed ? 'border-emerald-500 bg-emerald-50 text-emerald-950' :
+                    inProgress ? 'border-orange-400 bg-orange-50 text-orange-950' :
+                        'border-slate-300 bg-white text-slate-900';
+                const statusText = isClosed ? '✅ เสร็จแล้ว' :
+                    allLpnsResolved ? '🟠 ยิงครบ • รอปิดจบ' :
+                        inProgress ? '🟠 กำลังทำ' : '⚪ ยังไม่เริ่ม';
+                const badgeCls = isClosed ? 'bg-emerald-200 text-emerald-900 border-emerald-300' :
+                    inProgress ? 'bg-orange-200 text-orange-900 border-orange-300' :
+                        'bg-slate-100 text-slate-700 border-slate-200';
+                const statusBadge = `<div class="ml-2 shrink-0 text-right"><div class="whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-black ${badgeCls}">${statusText}</div><div class="mt-1 whitespace-nowrap text-sm font-black">ยอดจริง ${scannedBoxes} <span class="text-[10px] opacity-60">/ เป้า ${totalBoxes}</span></div></div>`;
                 const completionMeta = completionRecord
-                    ? `<div class="mt-1 text-[11px] font-black text-green-700 truncate">บันทึกจบ: ${escapeDocumentText(formatBangkokDateTime(completionRecord.completed_at))}</div>`
+                    ? `<div class="mt-1 text-[11px] font-black text-emerald-700 truncate">ปิดจบ: ${escapeDocumentText(formatBangkokDateTime(completionRecord.completed_at))}</div>`
                     : '';
                 const palletState = readPalletWorkflowState(bCode);
                 const activeBranchPalletNos = new Set(getCurrentBranchPalletNos(bCode));
@@ -4101,11 +4123,9 @@
                     palletState.submitted_nos.map(Number).filter(no => activeBranchPalletNos.has(no)).forEach(no => submittedForBranch.add(no));
                 }
                 const submittedCount = submittedForBranch.size;
-                const hasPendingPallet = !!(palletState && parseInt(palletState.active_no) > 0 && palletState.active_color);
-                if (hasPendingPallet) {
-                    btnStyle = 'border-orange-400 bg-orange-50 text-orange-900';
-                    statusBadge = `<div class="font-black text-xl ml-2 whitespace-nowrap px-3 py-1 rounded-full bg-orange-200 text-orange-800">${scannedBoxes}/${totalBoxes}</div>`;
-                }
+                // เมื่อมี Stamp ปิดจบ ให้สถานะเสร็จแล้วเป็นหลัก แม้ยอดจริงน้อยกว่าเป้าหมาย
+                // และไม่ให้พาเลทค้างเก่าในเครื่องทำการ์ดกลับเป็นสีส้ม
+                const hasPendingPallet = !isClosed && !!(palletState && parseInt(palletState.active_no) > 0 && palletState.active_color);
                 const palletMeta = hasPendingPallet
                     ? `<div class="mt-1 text-[11px] font-black text-orange-700 truncate">🟠 ส่งแล้ว ${submittedCount} • พาเลทใบที่ ${getPalletDisplayNo(palletState.active_no, bCode)} ยังไม่ส่ง</div>`
                     : submittedCount > 0
@@ -4127,6 +4147,36 @@
                 `);
             });
             branchGrid.innerHTML = htmlParts.join('');
+        }
+
+        async function refreshBranchSelectorData() {
+            if (branchRefreshInProgress || !currentWave) return;
+            branchRefreshInProgress = true;
+            const button = document.getElementById('refreshBranchStatusBtn');
+            const originalHtml = button ? button.innerHTML : '';
+            if (button) { button.disabled = true; button.innerHTML = '↻ กำลังรีเฟรช...'; }
+            showLoading('กำลังดึงสถานะล่าสุดของทุกสาขา...');
+            try {
+                await ensureBackendReady(true);
+                const lookupValue = currentLookupIsWaveOnly ? (activeWavesList[0] || currentWave) : currentBookingNo;
+                const url = currentLookupIsWaveOnly
+                    ? backendApiUrl + `/api/check-wave?wave_no=${encodeURIComponent(lookupValue)}&force=true&_ts=${Date.now()}`
+                    : backendApiUrl + `/api/check-booking?booking_no=${encodeURIComponent(lookupValue)}&force=true&_ts=${Date.now()}`;
+                const res = await fetchWithTimeout(url, { cache: 'no-store' }, 90000);
+                if (!res.ok) throw new Error(`Server ตอบกลับ HTTP ${res.status}`);
+                const data = await res.json();
+                const cacheKey = getWaveDataCacheKey(lookupValue, currentLookupIsWaveOnly);
+                currentWaveDataCacheKey = cacheKey;
+                saveWaveDataCache(cacheKey, data);
+                applyWaveDataToScreen(data, currentLookupIsWaveOnly);
+                showToast('✅ อัปเดตสถานะทุกสาขาแล้ว');
+            } catch (error) {
+                showAlert('รีเฟรชไม่สำเร็จ', error && error.message ? error.message : 'กรุณาตรวจอินเทอร์เน็ตแล้วลองใหม่');
+            } finally {
+                hideLoading();
+                branchRefreshInProgress = false;
+                if (button) { button.disabled = false; button.innerHTML = originalHtml; }
+            }
         }
 
             document.getElementById('waveInput').addEventListener('keypress', (e) => { if (e.key === 'Enter') checkAndLoadWave(); });
@@ -5933,7 +5983,7 @@
             <button onclick="palletModalBack()" class="mt-2.5 w-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm">← กลับไปเลือกสาขา</button>
         </div>
     </div>
-    <div class="fixed bottom-1 left-1.5 z-[1400] text-[9px] leading-none text-slate-400 font-bold pointer-events-none select-none">Pro LPN Scanner · v1.4.8 (2026-08-17)</div>
+    <div class="fixed bottom-1 left-1.5 z-[1400] text-[9px] leading-none text-slate-400 font-bold pointer-events-none select-none">Pro LPN Scanner · v1.4.9 (2026-08-18)</div>
     <div id="quickTools" class="fixed z-[1500] flex flex-col gap-2" style="bottom:16px;right:12px">
         <button onclick="openHelp()" title="วิธีใช้งาน / คำอธิบาย" class="w-11 h-11 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-black shadow-lg text-lg opacity-90">?</button>
         <button onclick="toggleBigText()" id="bigTextBtn" title="ปรับตัวอักษรใหญ่" class="w-11 h-11 rounded-full bg-slate-700 hover:bg-slate-800 text-white font-black shadow-lg text-base opacity-90">ก+</button>
