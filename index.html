@@ -852,6 +852,8 @@
             </div>
             <h2 id="alertTitle" class="text-xl md:text-2xl font-bold mb-2">แจ้งเตือน</h2>
             <p id="alertMessage" class="text-base md:text-lg text-gray-700 mb-6 whitespace-pre-line">ข้อความ</p>
+            <a id="qcActionLink" href="#" target="_blank" rel="noopener noreferrer"
+                class="hidden w-full mb-3 bg-red-600 hover:bg-red-700 text-white font-black py-3 rounded-lg text-lg shadow">เปิดหน้าตรวจ QC</a>
             <button onclick="closeAlert()"
                 class="w-full bg-gray-800 text-white font-bold py-3 rounded-lg text-lg shadow">ตกลง (Enter /
                 Esc)</button>
@@ -1558,6 +1560,8 @@
 
     <script>
         const backendApiUrl = 'https://dc-scanner-api-nattapol.onrender.com';
+        // ใส่ URL หน้าตรวจ QC ที่นี่เมื่อได้รับลิงก์จากหน้างาน (เว้นว่างไว้จะซ่อนปุ่มลิงก์)
+        const QC_ACTION_URL = '';
         // 💡 เพิ่มบรรทัดนี้กลับมา เพื่อให้ระบบ Login ตรวจรหัสพนักงานได้
         const employeeApiUrl = 'https://script.google.com/macros/s/AKfycbybmW6N7TxfsHqEa-Fx6ayy8M8xfjKGmTYO27izmbEoLJmQRrFD3i9c0XogP0fG6tlG/exec';
         const branchProvinceSheetId = '1-qmS7WmLjkbrDxcdo_Ep_FBRWMDpuQQoetKgJ9CQYMY';
@@ -3579,6 +3583,9 @@
         function showAlert(title, message, borderColor = 'border-red-600', isSuccess = false, callback = null) {
             alertCallback = callback;
             hideLoading();
+            const qcActionLink = document.getElementById('qcActionLink');
+            qcActionLink.classList.add('hidden');
+            qcActionLink.removeAttribute('href');
             document.getElementById('alertTitle').innerText = title;
             document.getElementById('alertMessage').innerText = message;
             document.getElementById('alertModalContent').className = `bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm text-center border-t-8 ${borderColor}`;
@@ -3591,6 +3598,23 @@
             }
 
             document.getElementById('alertModal').classList.remove('hidden'); isAlertOpen = true; document.activeElement.blur();
+        }
+
+        function showQcRequiredPopup(item, callback = null) {
+            const lpn = String(item && item.lpn || '').trim().toUpperCase();
+            showAlert(
+                '⚠️ LPN นี้ต้อง QC',
+                `${lpn}\nรายการนี้เข้าเงื่อนไข ต้อง QC\nกรุณาแยกไว้ตรวจสอบตามขั้นตอน QC`,
+                'border-red-700',
+                false,
+                callback
+            );
+            if (QC_ACTION_URL) {
+                const qcActionLink = document.getElementById('qcActionLink');
+                qcActionLink.href = QC_ACTION_URL;
+                qcActionLink.classList.remove('hidden');
+            }
+            try { if (navigator.vibrate) navigator.vibrate([180, 80, 180]); } catch (e) { }
         }
 
         function closeAlert() {
@@ -3996,6 +4020,39 @@
             } else {
                 updateDashboardUI();
             }
+            refreshQcStatusesForLoadedLpns();
+        }
+
+        let qcLookupRequestId = 0;
+        async function refreshQcStatusesForLoadedLpns() {
+            const requestId = ++qcLookupRequestId;
+            const lpns = Array.from(new Set((allLpnsInWave || [])
+                .map(item => String(item && item.lpn || '').trim().toUpperCase())
+                .filter(Boolean)));
+            if (!lpns.length) return;
+            try {
+                const response = await fetchWithTimeout(backendApiUrl + '/api/qc-status', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ lpns })
+                }, 60000);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const data = await response.json();
+                if (requestId !== qcLookupRequestId) return;
+                const qcItems = data && data.items && typeof data.items === 'object' ? data.items : {};
+                (allLpnsInWave || []).forEach(item => {
+                    const detail = qcItems[String(item.lpn || '').trim().toUpperCase()];
+                    item.qc_required = Boolean(detail && detail.qc_required);
+                    item.qc_status = item.qc_required ? 'ต้อง QC' : '';
+                    item.qc_risk = detail ? (detail.qc_risk || '') : '';
+                    item.qc_source = detail ? (detail.qc_source || '') : '';
+                });
+                saveCurrentWaveDataCache();
+                if (selectedBranchCode) updateDashboardUI(); else renderBranchGrid();
+            } catch (error) {
+                // QC เป็นข้อมูลประกอบ: โหลดไม่ได้ต้องไม่ขัดขวางการสแกนหรือการปิดงาน
+                console.warn('QC status unavailable (non-critical)', error);
+            }
         }
 
         async function checkAndLoadWave() {
@@ -4332,8 +4389,10 @@
                         if (lpnPrefix === 'PR') typeColor = 'text-red-900 border-red-400 bg-red-50';
                         else if (isDirectQtyPrefix(lpnPrefix)) typeColor = 'text-orange-900 border-orange-400 bg-orange-50';
                         else if (lpnPrefix === 'PT' || lpnPrefix === 'PN') typeColor = 'text-blue-900 border-blue-400 bg-blue-50';
+                        if (item.qc_required) typeColor = 'text-red-950 border-red-600 bg-red-100 ring-2 ring-red-300';
+                        const qcBadge = item.qc_required ? '<span class="ml-2 inline-flex items-center rounded-full bg-red-700 px-2 py-0.5 text-[10px] font-black text-white">⚠ ต้อง QC</span>' : '';
                         const qtyInfo = isDirectQtyPrefix(lpnPrefix) ? `<div class="text-[10px] text-gray-500 font-bold">(เป้าหมาย ${expectedQty})</div>` : '';
-                        unscannedParts.push(`<div class="p-2 border-l-4 rounded shadow-sm flex items-center justify-between gap-2 ${typeColor}"><div class="font-black text-sm md:text-base tracking-wider">${item.lpn}</div><div class="text-right">${qtyInfo}<div class="text-[10px] font-bold opacity-70">Zone: ${item.zone}</div></div></div>`);
+                        unscannedParts.push(`<div class="p-2 border-l-4 rounded shadow-sm flex items-center justify-between gap-2 ${typeColor}"><div class="font-black text-sm md:text-base tracking-wider flex items-center flex-wrap">${item.lpn}${qcBadge}</div><div class="text-right">${qtyInfo}<div class="text-[10px] font-bold opacity-70">Zone: ${item.zone}</div></div></div>`);
                     }
                     else if (isScanned) {
                         scannedCount += actualQty;
@@ -4352,6 +4411,11 @@
                         const checkIcon = isPPIncomplete
                             ? `<svg class="w-4 h-4 text-amber-500 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`
                             : `<svg class="w-4 h-4 text-green-600 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>`;
+                        const qcBadge = item.qc_required ? '<span class="ml-2 inline-flex items-center rounded-full bg-red-700 px-2 py-0.5 text-[10px] font-black text-white">⚠ ต้อง QC</span>' : '';
+                        const scannedCardClass = item.qc_required
+                            ? 'border-red-600 bg-red-50 ring-2 ring-red-200'
+                            : (isPPIncomplete ? 'border-amber-500 bg-amber-50' : 'border-green-500 bg-white');
+                        const scannedTextClass = item.qc_required ? 'text-red-950' : (isPPIncomplete ? 'text-amber-900' : 'text-green-900');
 
                         let combineDetails = '';
                         if (item.isMaster) {
@@ -4376,11 +4440,12 @@
                             </div>`;
                         }
 
-                        scannedParts.push(`<div class="p-2 border-l-4 ${isPPIncomplete ? 'border-amber-500 bg-amber-50' : 'border-green-500 bg-white'} rounded shadow-sm flex flex-col"><div class="flex items-center justify-between gap-2"><div class="font-black text-sm md:text-base ${isPPIncomplete ? 'text-amber-900' : 'text-green-900'} tracking-wider flex items-center flex-wrap">${checkIcon} ${item.lpn}</div><div class="text-right shrink-0">${qtyText}${colorText}<div class="text-[10px] ${isPPIncomplete ? 'text-amber-600' : 'text-green-600'} font-bold">Zone: ${item.zone}</div></div></div>${incompleteNote}${combineDetails}</div>`);
+                        scannedParts.push(`<div class="p-2 border-l-4 ${scannedCardClass} rounded shadow-sm flex flex-col"><div class="flex items-center justify-between gap-2"><div class="font-black text-sm md:text-base ${scannedTextClass} tracking-wider flex items-center flex-wrap">${checkIcon} ${item.lpn}${qcBadge}</div><div class="text-right shrink-0">${qtyText}${colorText}<div class="text-[10px] ${item.qc_required ? 'text-red-700' : (isPPIncomplete ? 'text-amber-600' : 'text-green-600')} font-bold">Zone: ${item.zone}</div></div></div>${incompleteNote}${combineDetails}</div>`);
                     }
                     else if (isForceClosed) {
                         unscannedCount += expectedQty; const crossIcon = `<svg class="w-4 h-4 text-gray-500 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>`;
-                        unscannedParts.push(`<div class="p-2 border-l-4 border-gray-400 bg-gray-200 rounded shadow-sm flex items-center justify-between gap-2 opacity-70"><div class="font-black text-sm md:text-base text-gray-600 tracking-wider line-through flex items-center">${item.lpn}</div><div class="text-right"><div class="text-[10px] text-gray-500 font-bold flex items-center">${crossIcon} หาไม่พบ</div></div></div>`);
+                        const qcBadge = item.qc_required ? '<span class="ml-2 inline-flex items-center rounded-full bg-red-700 px-2 py-0.5 text-[10px] font-black text-white no-underline">⚠ ต้อง QC</span>' : '';
+                        unscannedParts.push(`<div class="p-2 border-l-4 ${item.qc_required ? 'border-red-600 bg-red-100' : 'border-gray-400 bg-gray-200'} rounded shadow-sm flex items-center justify-between gap-2 opacity-70"><div class="font-black text-sm md:text-base text-gray-600 tracking-wider line-through flex items-center flex-wrap">${item.lpn}${qcBadge}</div><div class="text-right"><div class="text-[10px] text-gray-500 font-bold flex items-center">${crossIcon} หาไม่พบ</div></div></div>`);
                     }
                 });
 
@@ -4461,6 +4526,19 @@
                     const lpn = e.target.value.trim().toUpperCase(); const found = allLpnsInWave.find(item => item.lpn === lpn);
                     if (!found) { flashScreen(false); showAlert('ข้อผิดพลาด', `ไม่มีข้อมูล LPN รหัส\n[${lpn}]\nในรอบ Wave นี้`); lpnInput.value = ''; return; }
                     if (found.branch !== selectedBranchCode) { showAlert('รหัสสาขาไม่ตรงกัน', `บาร์โค้ด ${lpn} เป็นของสาขา [${found.branch}]\nกรุณาตรวจสอบและเลือกสาขาให้ถูกต้อง`); lpnInput.value = ''; return; }
+                    const skipQcPopupOnce = Boolean(found._skipQcPopupOnce);
+                    if (skipQcPopupOnce) delete found._skipQcPopupOnce;
+                    if (found.qc_required && !skipQcPopupOnce) {
+                        lpnInput.value = '';
+                        flashScreen(false);
+                        showQcRequiredPopup(found, () => {
+                            // ปิด Popup แล้วทำรายการเดิมต่อทันที ไม่ต้องยิงบาร์โค้ดซ้ำ
+                            found._skipQcPopupOnce = true;
+                            lpnInput.value = lpn;
+                            lpnInput.dispatchEvent(new KeyboardEvent('keypress', { key: 'Enter', bubbles: true }));
+                        });
+                        return;
+                    }
                     if (found.status === 'Scanned') {
                         lpnInput.value = '';
                         // ✅ ยิงซ้ำ LPN: เปิดหน้าต่างระบุจำนวน/เลือกสีทันทีโดยไม่ต้องผ่านกล่องข้อความเตือน
@@ -5983,7 +6061,7 @@
             <button onclick="palletModalBack()" class="mt-2.5 w-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm">← กลับไปเลือกสาขา</button>
         </div>
     </div>
-    <div class="fixed bottom-1 left-1.5 z-[1400] text-[9px] leading-none text-slate-400 font-bold pointer-events-none select-none">Pro LPN Scanner · v1.4.9 (2026-08-18)</div>
+    <div class="fixed bottom-1 left-1.5 z-[1400] text-[9px] leading-none text-slate-400 font-bold pointer-events-none select-none">Pro LPN Scanner · v1.5.0 (2026-08-18)</div>
     <div id="quickTools" class="fixed z-[1500] flex flex-col gap-2" style="bottom:16px;right:12px">
         <button onclick="openHelp()" title="วิธีใช้งาน / คำอธิบาย" class="w-11 h-11 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-black shadow-lg text-lg opacity-90">?</button>
         <button onclick="toggleBigText()" id="bigTextBtn" title="ปรับตัวอักษรใหญ่" class="w-11 h-11 rounded-full bg-slate-700 hover:bg-slate-800 text-white font-black shadow-lg text-base opacity-90">ก+</button>
