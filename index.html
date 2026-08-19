@@ -765,29 +765,6 @@
         /* แอนิเมชันโผล่นุ่มสำหรับการ์ดพาเลท/แบนเนอร์ */
         @keyframes popIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
         #palletGroupsContainer > div, #reopenBanner:not(.hidden) { animation: popIn .28s ease both; }
-
-        /* ==================== 🔴 QC ALERT MODAL ==================== */
-        @keyframes qcModalIn {
-            from { opacity: 0; transform: scale(0.88) translateY(24px); }
-            to   { opacity: 1; transform: scale(1) translateY(0); }
-        }
-        @keyframes qcPulse {
-            0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.4); }
-            50% { box-shadow: 0 0 0 14px rgba(239,68,68,0); }
-        }
-        @keyframes qcShake {
-            0%,100% { transform: translateX(0); }
-            20%,60% { transform: translateX(-5px); }
-            40%,80% { transform: translateX(5px); }
-        }
-        @keyframes qcBgFade {
-            from { opacity: 0; }
-            to   { opacity: 1; }
-        }
-        #qcAlertModal { animation: qcBgFade .25s ease both; }
-        #qcAlertModal > div { animation: qcModalIn .32s cubic-bezier(.34,1.56,.64,1) both; }
-        #qcIconRing { animation: qcPulse 2s ease-in-out infinite; }
-        #qcAlertModal .qc-shake { animation: qcShake .4s ease; }
         /* ปุ่มลอย: เงาลอยเด่น */
         #quickTools button { box-shadow: 0 10px 24px -6px rgba(15, 23, 42, .4); }
         /* หัวเว็บ: ไฮไลต์บนสุดบางๆ + เงาใต้ ให้ดูมีมิติ */
@@ -825,9 +802,12 @@
     <div id="toastMsg" class="toast-msg bg-green-600 z-[100] flex items-center gap-2"></div>
 
     <div id="loadingOverlay"
-        class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 flex flex-col items-center justify-center z-[90]">
-        <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-400 mb-4"></div>
-        <h2 id="loadingOverlayText" class="text-white text-xl font-bold tracking-widest animate-pulse">กำลังประมวลผล...</h2>
+        class="hidden fixed inset-0 bg-slate-950/85 backdrop-blur-sm flex flex-col items-center justify-center z-[12000] p-5">
+        <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm text-center border-t-8 border-blue-500">
+            <div class="animate-spin rounded-full h-16 w-16 border-4 border-blue-100 border-t-blue-600 mx-auto mb-4"></div>
+            <h2 id="loadingOverlayText" class="text-slate-900 text-xl font-black">กำลังประมวลผล...</h2>
+            <p class="text-sm text-slate-500 font-bold mt-2">ระบบกำลังทำงาน กรุณารอและไม่ต้องกดซ้ำ</p>
+        </div>
     </div>
 
     <div id="scannerModal"
@@ -860,7 +840,7 @@
     </div>
 
     <div id="alertModal"
-        class="hidden fixed inset-0 bg-gray-900 bg-opacity-80 flex items-center justify-center p-4 z-[80]">
+        class="hidden fixed inset-0 bg-gray-900 bg-opacity-80 flex items-center justify-center p-4 z-[12010]">
         <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm text-center border-t-8 border-red-600"
             id="alertModalContent">
             <div id="alertIconContainer" class="mx-auto mb-2 w-12 h-12">
@@ -872,91 +852,13 @@
             </div>
             <h2 id="alertTitle" class="text-xl md:text-2xl font-bold mb-2">แจ้งเตือน</h2>
             <p id="alertMessage" class="text-base md:text-lg text-gray-700 mb-6 whitespace-pre-line">ข้อความ</p>
+            <a id="qcActionLink" href="#" target="_blank" rel="noopener noreferrer"
+                class="hidden w-full mb-3 bg-red-600 hover:bg-red-700 text-white font-black py-3 rounded-lg text-lg shadow">เปิดหน้าตรวจ QC</a>
             <button onclick="closeAlert()"
                 class="w-full bg-gray-800 text-white font-bold py-3 rounded-lg text-lg shadow">ตกลง (Enter /
                 Esc)</button>
         </div>
     </div>
-
-    <!-- ============================================================ -->
-    <!-- 🔴 QC ALERT MODAL — สวยงาม ชัดเจน ทันสมัย                    -->
-    <!-- ============================================================ -->
-    <div id="qcAlertModal"
-         class="hidden fixed inset-0 flex items-center justify-center p-4 z-[95]"
-         style="background: rgba(15,23,42,0.82); backdrop-filter: blur(6px);">
-        <div class="relative w-full max-w-sm overflow-hidden"
-             style="border-radius:24px; background:#fff; box-shadow:0 32px 80px -12px rgba(15,23,42,0.55);">
-
-            <!-- แถบสีด้านบน gradient -->
-            <div style="background: linear-gradient(135deg,#0f766e 0%,#0d9488 45%,#115e59 100%); padding:28px 24px 20px; text-align:center; position:relative; overflow:hidden;">
-                <!-- วงแสงพื้นหลัง -->
-                <div style="position:absolute;top:-30px;right:-30px;width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,0.07);"></div>
-                <div style="position:absolute;bottom:-20px;left:-20px;width:80px;height:80px;border-radius:50%;background:rgba(255,255,255,0.05);"></div>
-
-                <!-- ไอคอน QC -->
-                <div id="qcIconRing" style="width:68px;height:68px;border-radius:50%;background:rgba(255,255,255,0.18);border:3px solid rgba(255,255,255,0.4);display:flex;align-items:center;justify-content:center;margin:0 auto 14px; position:relative;z-index:1;">
-                    <svg width="34" height="34" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
-                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                        <line x1="12" y1="9" x2="12" y2="13"/>
-                        <line x1="12" y1="17" x2="12.01" y2="17"/>
-                    </svg>
-                </div>
-
-                <div style="color:#fff;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;opacity:0.75;margin-bottom:4px;">⚠ ต้องตรวจสอบ QC</div>
-                <div style="color:#fff;font-size:22px;font-weight:900;letter-spacing:0.5px;line-height:1.2;">LPN ที่ต้อง QC</div>
-            </div>
-
-            <!-- เนื้อหา -->
-            <div style="padding:20px 22px 22px;">
-
-                <!-- LPN Badge -->
-                <div style="background:#f0fdf4;border:2px solid #86efac;border-radius:12px;padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;gap:12px;">
-                    <div style="flex-shrink:0;width:38px;height:38px;border-radius:10px;background:#16a34a;display:flex;align-items:center;justify-content:center;">
-                        <svg width="20" height="20" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24">
-                            <rect x="1" y="4" width="22" height="16" rx="2"/>
-                            <line x1="1" y1="10" x2="23" y2="10"/>
-                        </svg>
-                    </div>
-                    <div style="min-width:0;">
-                        <div style="font-size:10px;font-weight:700;color:#166534;letter-spacing:1px;text-transform:uppercase;">LPN</div>
-                        <div id="qcAlertLpn" style="font-size:18px;font-weight:900;color:#1f2937;letter-spacing:0.5px;">-</div>
-                    </div>
-                </div>
-
-                <!-- ข้อความอธิบาย -->
-                <div style="background:#fffbeb;border-left:4px solid #f59e0b;border-radius:0 10px 10px 0;padding:10px 14px;margin-bottom:18px;">
-                    <div style="font-size:13px;font-weight:700;color:#92400e;margin-bottom:3px;">📋 รายการนี้ต้องผ่านการตรวจ QC</div>
-                    <div id="qcAlertDesc" style="font-size:12px;color:#78350f;line-height:1.5;">กรุณาแยกไว้รอตรวจ — อย่าส่งร่วมกับสินค้าปกติ</div>
-                </div>
-
-                <!-- ปุ่ม Actions -->
-                <div style="display:flex;flex-direction:column;gap:10px;">
-                    <!-- ปุ่มหลัก: ไปหน้า QC — สีเขียว -->
-                    <button id="qcOpenPageBtn" onclick="openQcPage()"
-                        style="width:100%;padding:15px 16px;border-radius:14px;border:none;cursor:pointer;font-size:15px;font-weight:800;color:#fff;letter-spacing:0.3px;display:flex;align-items:center;justify-content:center;gap:10px;transition:filter 0.2s, transform 0.15s;background:linear-gradient(135deg,#16a34a 0%,#15803d 100%);box-shadow:0 8px 20px -6px rgba(21,128,61,0.55);"
-                        onmouseover="this.style.filter='brightness(1.08)';this.style.transform='translateY(-1px)'"
-                        onmouseout="this.style.filter='';this.style.transform=''">
-                        <svg width="20" height="20" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
-                            <path d="M20 6L9 17l-5-5"/>
-                        </svg>
-                        เปิดหน้าตรวจ QC
-                    </button>
-
-                    <!-- ปุ่มรอง: ปิด — สีแดง -->
-                    <button onclick="closeQcAlert()"
-                        style="width:100%;padding:13px 16px;border-radius:14px;border:none;cursor:pointer;font-size:14px;font-weight:700;color:#fff;background:linear-gradient(135deg,#dc2626 0%,#b91c1c 100%);box-shadow:0 6px 16px -6px rgba(185,28,28,0.45);display:flex;align-items:center;justify-content:center;gap:8px;transition:filter 0.2s,transform 0.15s;"
-                        onmouseover="this.style.filter='brightness(1.08)';this.style.transform='translateY(-1px)'"
-                        onmouseout="this.style.filter='';this.style.transform=''">
-                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24">
-                            <path d="M18 6 6 18M6 6l12 12"/>
-                        </svg>
-                        ทราบแล้ว ปิด  <span style="font-size:11px;opacity:0.6;margin-left:2px;">(Enter / Esc)</span>
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-    <!-- ============================================================ -->
 
     <div id="confirmModal"
         class="hidden fixed inset-0 bg-gray-900 bg-opacity-80 flex items-center justify-center p-4 z-[60]">
@@ -998,14 +900,14 @@
     </div>
 
     <div id="shippingDocumentModal" class="hidden fixed inset-0 bg-gray-100 z-[120] flex-col">
-        <header class="no-print bg-gray-900 text-white p-3 shadow-md shrink-0">
+        <header class="no-print bg-gradient-to-r from-slate-950 via-slate-900 to-blue-950 text-white p-3 md:p-4 shadow-xl shrink-0 border-b border-blue-700/50">
             <div class="flex items-center justify-between gap-2">
                 <div class="min-w-0">
                     <div class="text-[10px] text-gray-300 font-bold">เมนูเอกสาร</div>
                     <h2 class="text-lg font-black truncate">เอกสารใบคุมส่งสินค้า</h2>
                 </div>
                 <button onclick="closeShippingDocument()"
-                    class="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg font-bold text-sm shadow flex items-center gap-1 shrink-0">
+                    class="bg-red-600 hover:bg-red-500 text-white px-4 py-2.5 rounded-xl font-black text-sm shadow-lg shadow-red-950/30 flex items-center gap-1 shrink-0 border border-red-400/40 transition active:scale-95">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12">
                         </path>
@@ -1013,27 +915,31 @@
                     ปิด
                 </button>
             </div>
-            <div class="flex flex-wrap items-center justify-between gap-3 mt-3 bg-gray-800 p-2.5 rounded-lg border border-gray-700">
-                <span class="font-bold text-yellow-300 text-xs md:text-sm flex items-center gap-1">
+            <div class="mt-3 bg-white/5 p-3 rounded-2xl border border-white/10 shadow-inner">
+                <span class="font-bold text-blue-100 text-xs md:text-sm flex items-center gap-2 mb-3">
                     📄 เอกสารใบคุมส่งสินค้า (สามารถแก้ไขตัวเลขในตารางได้ทุกช่อง)
                 </span>
-                <div class="flex items-center gap-2">
-                    <button onclick="resetDocumentOverrides()" title="คืนค่าเป็นยอดสแกนจริงในระบบ"
-                        class="bg-slate-700 hover:bg-slate-600 text-slate-200 font-bold px-3 py-2 rounded-lg text-xs transition flex items-center gap-1 active:scale-95">
-                        🔄 คืนค่ายอดสแกนจริง
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+                    <button onclick="openBookingBranchMove()" title="เพิ่มสาขาที่นับแล้วเข้ารถคันนี้"
+                        class="group min-h-[58px] bg-gradient-to-br from-amber-400 to-orange-500 hover:from-amber-300 hover:to-orange-400 text-slate-950 font-black px-3 py-2.5 rounded-xl text-xs md:text-sm transition active:scale-95 shadow-lg shadow-orange-950/30 border border-amber-200 flex items-center justify-center gap-2">
+                        <span class="text-xl group-hover:scale-110 transition">🚚</span><span class="leading-tight">เพิ่ม/ย้ายสาขา<br><small class="font-bold opacity-75">เข้ารถคันนี้</small></span>
                     </button>
-                    <button onclick="saveDocumentOverridesUI()" title="บันทึกยอดที่แก้ไขลงเครื่อง"
-                        class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-2 rounded-lg text-xs md:text-sm transition flex items-center gap-1 shadow active:scale-95">
-                        💾 บันทึกยอดแก้ไข
+                    <button onclick="resetDocumentOverrides()" title="คืนค่าเป็นยอดสแกนจริงในระบบ"
+                        class="group min-h-[58px] bg-gradient-to-br from-slate-600 to-slate-700 hover:from-slate-500 hover:to-slate-600 text-white font-black px-3 py-2.5 rounded-xl text-xs md:text-sm transition active:scale-95 shadow-lg border border-slate-400/60 flex items-center justify-center gap-2">
+                        <span class="text-xl group-hover:-rotate-45 transition">↩️</span><span class="leading-tight">คืนยอดเดิม<br><small class="font-bold text-slate-300">จากระบบสแกน</small></span>
+                    </button>
+                    <button id="saveDocumentOverridesBtn" onclick="saveDocumentOverridesUI()" title="บันทึกยอดที่แก้ไขลงเครื่อง"
+                        class="group min-h-[58px] bg-gradient-to-br from-emerald-500 to-green-700 hover:from-emerald-400 hover:to-green-600 text-white font-black px-3 py-2.5 rounded-xl text-xs md:text-sm transition active:scale-95 shadow-lg shadow-green-950/30 border border-emerald-300/60 flex items-center justify-center gap-2">
+                        <span class="text-xl group-hover:scale-110 transition">💾</span><span class="leading-tight">บันทึกยอดแก้ไข<br><small class="font-bold text-emerald-100">เก็บค่าที่ปรับแล้ว</small></span>
                     </button>
                     <button onclick="printShippingDocument()" title="สั่งพิมพ์เอกสารใบคุมส่งสินค้า"
-                        class="bg-blue-600 hover:bg-blue-700 text-white font-black px-4 py-2 rounded-lg shadow flex items-center justify-center gap-2 text-sm transition active:scale-95">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        class="group min-h-[58px] bg-gradient-to-br from-blue-500 to-indigo-700 hover:from-blue-400 hover:to-indigo-600 text-white font-black px-3 py-2.5 rounded-xl shadow-lg shadow-blue-950/40 flex items-center justify-center gap-2 text-xs md:text-sm transition active:scale-95 border border-blue-300/60 ring-2 ring-blue-400/20">
+                        <svg class="w-6 h-6 group-hover:scale-110 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                 d="M6 9V2h12v7m-9 8h6m-7 4h8a2 2 0 002-2v-5H6v5a2 2 0 002 2zm12-12H4a2 2 0 00-2 2v4h4v-3h12v3h4v-4a2 2 0 00-2-2z">
                             </path>
                         </svg>
-                        🖨️ พิมพ์เอกสาร
+                        <span class="leading-tight">พิมพ์เอกสาร<br><small class="font-bold text-blue-100">ใบคุมส่งสินค้า</small></span>
                     </button>
                 </div>
             </div>
@@ -1041,6 +947,22 @@
         <div class="flex-1 overflow-y-auto p-3 md:p-6 bg-gray-200">
             <div id="shippingDocumentContent"
                 class="max-w-5xl mx-auto min-h-full flex flex-col gap-6"></div>
+        </div>
+    </div>
+
+    <div id="bookingBranchMoveModal" class="hidden fixed inset-0 z-[160] bg-slate-950/70 p-3 items-center justify-center">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[92vh] overflow-auto">
+            <div class="bg-amber-500 p-4 flex justify-between items-center"><div><div class="text-xs font-bold">เปลี่ยนแผนขนส่ง</div><h2 class="text-xl font-black">🚚 เพิ่ม/ย้ายสาขาเข้ารถคันนี้</h2></div><button onclick="closeBookingBranchMove()" class="text-3xl font-black">×</button></div>
+            <div class="p-4 space-y-3">
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm"><b>Booking ปลายทาง:</b> <span id="moveTargetBooking" class="font-black text-blue-700"></span><br><span class="text-xs">ยอดสแกนและพาเลทเดิมจะถูกย้ายมาแสดง ไม่ต้องยิงใหม่</span></div>
+                <label class="block text-sm font-bold">Wave ของสาขาที่จะเพิ่ม<input id="moveWaveInput" inputmode="numeric" class="mt-1 w-full border-2 rounded-lg p-3 text-lg font-black" placeholder="เช่น 59078"></label>
+                <button onclick="loadWaveBranchesForMove()" class="w-full bg-slate-800 text-white rounded-lg p-3 font-black">🔎 ค้นหาสาขาใน Wave นี้</button>
+                <div id="moveBranchChoices" class="hidden space-y-2 max-h-64 overflow-auto border rounded-xl p-2 bg-slate-50"></div>
+                <div id="moveBranchPreview" class="hidden border-2 border-amber-300 bg-amber-50 rounded-xl p-3 text-sm"></div>
+                <label class="block text-sm font-bold">เหตุผล<select id="moveReasonInput" class="mt-1 w-full border-2 rounded-lg p-3"><option value="">-- เลือกเหตุผล --</option><option>เพิ่มจุดส่ง</option><option>เปลี่ยนรถ</option><option>รถเดิมเต็ม</option><option>จัดเส้นทางใหม่</option><option>อื่นๆ</option></select></label>
+                <label class="block text-sm font-bold">หมายเหตุ (ถ้ามี)<input id="moveNoteInput" class="mt-1 w-full border-2 rounded-lg p-3" placeholder="รายละเอียดเพิ่มเติม"></label>
+                <button id="confirmMoveBranchBtn" disabled onclick="confirmBookingBranchMove()" class="w-full bg-emerald-600 disabled:bg-slate-300 text-white rounded-lg p-3 font-black">ยืนยันเพิ่มสาขาเข้า Booking นี้</button>
+            </div>
         </div>
     </div>
 
@@ -1164,7 +1086,20 @@
             </div>
         </header>
         <div class="p-3 md:p-4 flex-1 overflow-y-auto" style="-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain;">
-            <h2 class="text-lg font-bold text-gray-800 mb-3 text-center">กรุณาเลือกสาขาที่ต้องการปฏิบัติงาน</h2>
+            <div class="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm">
+                <div>
+                    <h2 class="text-base md:text-lg font-black text-gray-800">เลือกสาขาที่ต้องการปฏิบัติงาน</h2>
+                    <div class="mt-1 flex flex-wrap gap-1.5 text-[10px] md:text-xs font-black">
+                        <span class="rounded-full bg-slate-100 px-2 py-1 text-slate-700">⚪ ยังไม่เริ่ม</span>
+                        <span class="rounded-full bg-amber-100 px-2 py-1 text-amber-800">🟠 กำลังทำ</span>
+                        <span class="rounded-full bg-emerald-100 px-2 py-1 text-emerald-800">✅ เสร็จแล้ว</span>
+                    </div>
+                </div>
+                <button id="refreshBranchStatusBtn" onclick="refreshBranchSelectorData()"
+                    class="min-h-[44px] rounded-xl border-2 border-blue-300 bg-blue-600 px-3 py-2 text-sm font-black text-white shadow hover:bg-blue-700 active:scale-95 disabled:cursor-wait disabled:opacity-60">
+                    ↻ รีเฟรชข้อมูล
+                </button>
+            </div>
             
             <!-- 📄 Banner เอกสารใบคุมส่งสินค้า สำหรับผู้ทำเอกสารและผู้ปฏิบัติงานที่สแกนเสร็จแล้ว -->
             <div id="branchDocumentBanner" class="mb-4 p-4 bg-amber-500 hover:bg-amber-600 text-gray-900 rounded-xl shadow-md border-b-4 border-amber-700 flex items-center justify-between cursor-pointer active:scale-95 transition" onclick="openShippingDocument()">
@@ -1625,6 +1560,8 @@
 
     <script>
         const backendApiUrl = 'https://dc-scanner-api-nattapol.onrender.com';
+        // ใส่ URL หน้าตรวจ QC ที่นี่เมื่อได้รับลิงก์จากหน้างาน (เว้นว่างไว้จะซ่อนปุ่มลิงก์)
+        const QC_ACTION_URL = 'https://sce-wms.ptgenterprise.com/addon_rf/QC_V2';
         // 💡 เพิ่มบรรทัดนี้กลับมา เพื่อให้ระบบ Login ตรวจรหัสพนักงานได้
         const employeeApiUrl = 'https://script.google.com/macros/s/AKfycbybmW6N7TxfsHqEa-Fx6ayy8M8xfjKGmTYO27izmbEoLJmQRrFD3i9c0XogP0fG6tlG/exec';
         const branchProvinceSheetId = '1-qmS7WmLjkbrDxcdo_Ep_FBRWMDpuQQoetKgJ9CQYMY';
@@ -1653,6 +1590,8 @@
         let branchProvinceLoaded = false;
         let branchProvinceLoadPromise = null;
         let latestWaveLoadRequestId = 0;
+        let currentLookupIsWaveOnly = true;
+        let branchRefreshInProgress = false;
         let currentWaveDataCacheKey = '';
         let pendingWavesFetchPromise = null;
 
@@ -1702,6 +1641,10 @@
             allLpnsInWave
                 .filter(item => normalizeBranchLookupCode(item.branch) === key)
                 .forEach(item => {
+                    (item.branch_pallet_nos || []).forEach(value => {
+                        const sharedNo = parseInt(value) || 0;
+                        if (sharedNo > 0) palletNos.add(sharedNo);
+                    });
                     if (item.status === 'Scanned') {
                         const no = parseInt(item.palletNo) || parseInt(item.pallet_no) || 0;
                         if (no > 0) palletNos.add(no);
@@ -1780,16 +1723,31 @@
             updateDocumentPalletCount(selectedBranchCode, input.value);
         }
 
+        let backendReadyAt = 0;
+        let backendReadyPromise = null;
+        async function ensureBackendReady(showStatus = false) {
+            if (Date.now() - backendReadyAt < 240000) return true;
+            if (backendReadyPromise) return backendReadyPromise;
+            if (showStatus) updateSyncStatusUI('waking');
+            backendReadyPromise = (async () => {
+                let lastError = null;
+                for (let attempt = 0; attempt < 3; attempt++) {
+                    try {
+                        const res = await fetchWithTimeout(backendApiUrl + '/api/health', { cache: 'no-store' }, 65000);
+                        if (res.ok) { backendReadyAt = Date.now(); return true; }
+                    } catch (e) { lastError = e; }
+                    await new Promise(resolve => setTimeout(resolve, 1500));
+                }
+                throw lastError || new Error('Server ยังไม่พร้อม');
+            })().finally(() => { backendReadyPromise = null; updateSyncStatusUI(); });
+            return backendReadyPromise;
+        }
+
         function keepAliveHeartbeat() {
-            // ✅ Ping /api/health ทุก 10 นาที เพื่อป้องกัน Render.com free-tier cold start
-            const ping = () => {
-                fetch(backendApiUrl + '/api/health', { cache: 'no-store' })
-                    .catch(() => { });
-            };
+            const ping = () => ensureBackendReady(false).catch(() => { });
             ping();
             prefetchPendingWaves();
-            // ตั้ง heartbeat ทุก 10 นาที (600,000ms)
-            setInterval(ping, 600000);
+            setInterval(ping, 240000);
         }
 
         // ✅ fetchWithTimeout: fetch พร้อม AbortController เพื่อไม่ให้ request ค้างนานโดยไม่จำกัด
@@ -1809,7 +1767,7 @@
                         await new Promise(r => setTimeout(r, attempt * 1500));
                         if (!usedCache && showRetryToast) showToast(`กำลังลองเชื่อมต่อใหม่ (${attempt}/2)...`);
                     }
-                    res = await fetchWithTimeout(url, { cache: 'no-store' }, 25000);
+                    res = await fetchWithTimeout(url, { cache: 'no-store' }, 45000);
                     lastError = null;
                     break;
                 } catch (err) {
@@ -2034,32 +1992,147 @@
         let isSyncing = false;
         let syncQueueError = null;
         let shippingDocumentVerifiedAt = 0;
-        function pushToQueue(payload) { if (typeof noSaveMode !== 'undefined' && noSaveMode) { return; } shippingDocumentVerifiedAt = 0; syncQueue.push(payload); localStorage.setItem('proScannerQueue', JSON.stringify(syncQueue)); updateSyncStatusUI(); processQueue(); }
+        const scannerDeviceId = localStorage.getItem('proScannerDeviceId') || (crypto.randomUUID ? crypto.randomUUID() : `device-${Date.now()}-${Math.random()}`);
+        localStorage.setItem('proScannerDeviceId', scannerDeviceId);
+        function pushToQueue(payload) {
+            if (typeof noSaveMode !== 'undefined' && noSaveMode) return;
+            shippingDocumentVerifiedAt = 0;
+            if (!payload.transaction_id) payload.transaction_id = crypto.randomUUID ? crypto.randomUUID() : `${scannerDeviceId}-${Date.now()}-${Math.random()}`;
+            payload._queuedAt = payload._queuedAt || new Date().toISOString();
+            syncQueue.push(payload); saveSyncQueue(); updateSyncStatusUI(); processQueue();
+        }
+
+        function getQueuePayloadWaves(payload) {
+            const values = Array.isArray(payload && payload.waves)
+                ? payload.waves
+                : [payload && (payload.wave_no || payload.wave)];
+            return values.map(value => String(value || '').replace(/\D/g, '')).filter(Boolean);
+        }
+
+        function getCurrentJobWaves() {
+            const values = activeWavesList && activeWavesList.length
+                ? activeWavesList
+                : String(currentWave || '').split(',');
+            return new Set(values.map(value => String(value || '').replace(/\D/g, '')).filter(Boolean));
+        }
+
+        function isQueuePayloadForCurrentJob(payload) {
+            const currentWaves = getCurrentJobWaves();
+            if (currentWaves.size === 0) return false;
+            return getQueuePayloadWaves(payload).some(wave => currentWaves.has(wave));
+        }
+
+        function getCurrentJobQueue() {
+            return syncQueue.filter(isQueuePayloadForCurrentJob);
+        }
+
+        function getCurrentJobQueueError() {
+            const dead = getCurrentJobQueue().find(item => item._deadLetter);
+            return dead || (syncQueueError && isQueuePayloadForCurrentJob(syncQueueError) ? syncQueueError : null);
+        }
+
+        function saveSyncQueue() {
+            localStorage.setItem('proScannerQueue', JSON.stringify(syncQueue));
+            reportDeviceState();
+        }
+
+        let deviceStateTimer = null;
+        function reportDeviceState() {
+            clearTimeout(deviceStateTimer);
+            deviceStateTimer = setTimeout(async () => {
+                if (!navigator.onLine) return;
+                const pending = getCurrentJobQueue();
+                try {
+                    await fetchWithTimeout(backendApiUrl + '/api/device-state', {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ device_id: scannerDeviceId, waves: [...getCurrentJobWaves()], branch_code: selectedBranchCode || '', pending_count: pending.length, pending_lpns: pending.slice(0, 10).map(item => item.lpn || '-'), emp_id: loggedInEmpId || '' })
+                    }, 8000);
+                } catch (e) { }
+            }, 250);
+        }
+
+        async function assertNoOtherDevicePending() {
+            const waves = [...getCurrentJobWaves()];
+            if (!waves.length) return true;
+            const res = await fetchWithTimeout(backendApiUrl + `/api/device-states?waves=${encodeURIComponent(waves.join(','))}&branch_code=${encodeURIComponent(selectedBranchCode || '')}&exclude_device_id=${encodeURIComponent(scannerDeviceId)}`, { cache: 'no-store' }, 12000);
+            if (!res.ok) throw new Error('ตรวจคิวจากเครื่องอื่นไม่สำเร็จ');
+            const data = await res.json();
+            const devices = data.devices || [];
+            if (devices.length) {
+                const total = devices.reduce((sum, item) => sum + Number(item.pending_count || 0), 0);
+                const lpns = devices.flatMap(item => item.pending_lpns || []).slice(0, 5).join(', ');
+                throw new Error(`ยังมีอีก ${devices.length} เครื่องกำลังส่งงานค้างรวม ${total} รายการ${lpns ? ` (LPN: ${lpns})` : ''} กรุณารอให้เครื่องนั้นขึ้นคำว่า อัปเดตแล้ว`);
+            }
+            return true;
+        }
+
+        function archiveQueueItem(index) {
+            const item = syncQueue[index]; if (!item) return;
+            if (!confirm(`เก็บรายการ ${item.lpn || '-'} ออกจากคิวใช่หรือไม่? รายการจะถูกเก็บเป็นหลักฐานและยอดนี้จะไม่ถูกส่ง`)) return;
+            const archive = JSON.parse(localStorage.getItem('proScannerQueueArchive') || '[]');
+            archive.unshift({ ...item, _archivedAt: new Date().toISOString(), _archivedBy: loggedInEmpId || '' });
+            localStorage.setItem('proScannerQueueArchive', JSON.stringify(archive.slice(0, 500)));
+            syncQueue.splice(index, 1); saveSyncQueue(); renderQueueManager(); updateSyncStatusUI();
+        }
+
+        function retryQueueItem(index) {
+            const item = syncQueue[index]; if (!item) return;
+            delete item._deadLetter; delete item._deadReason; delete item._failedAt; delete item._retryAfter; item._retryCount = 0;
+            saveSyncQueue(); renderQueueManager(); processQueue();
+        }
+
+        function renderQueueManager() {
+            let modal = document.getElementById('queueManagerModal');
+            if (!modal) {
+                modal = document.createElement('div'); modal.id = 'queueManagerModal'; modal.className = 'fixed inset-0 z-[9999] bg-slate-950/70 p-3 flex items-center justify-center';
+                document.body.appendChild(modal);
+            }
+            const rows = syncQueue.map((item, index) => `<div class="border rounded-lg p-3 ${item._deadLetter ? 'border-red-400 bg-red-50' : 'border-amber-300 bg-amber-50'}"><div class="font-black">${escapeDocumentText(item.lpn || '-')} • Wave ${escapeDocumentText(getQueuePayloadWaves(item).join(',') || '-')}</div><div class="text-xs mt-1">${item._deadLetter ? 'หยุดส่งอัตโนมัติ' : 'รอส่ง'} • ลองแล้ว ${Number(item._retryCount || 0)} ครั้ง<br>${escapeDocumentText(item._deadReason || item._lastError || '')}</div><div class="flex gap-2 mt-2"><button onclick="retryQueueItem(${index})" class="bg-blue-600 text-white px-3 py-2 rounded font-bold">ส่งใหม่</button><button onclick="archiveQueueItem(${index})" class="bg-red-600 text-white px-3 py-2 rounded font-bold">เก็บออกจากคิว</button></div></div>`).join('');
+            modal.innerHTML = `<div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[85vh] overflow-auto p-4 text-slate-800"><div class="flex justify-between items-center mb-3"><div><h2 class="text-xl font-black">คิวส่งข้อมูล</h2><p class="text-xs">รายการเสียจะไม่วนยิงจนระบบช้า และจะไม่ถูกลบเอง</p></div><button onclick="document.getElementById('queueManagerModal').classList.add('hidden')" class="text-2xl font-black">×</button></div><div class="space-y-2">${rows || '<div class="text-center py-8 text-green-700 font-bold">ไม่มีรายการค้าง</div>'}</div></div>`;
+            modal.classList.remove('hidden');
+        }
 
         async function processQueue() {
             if (isSyncing || syncQueue.length === 0) return;
             isSyncing = true; updateSyncStatusUI();
+            try { await ensureBackendReady(false); }
+            catch (e) { isSyncing = false; syncQueueError = { ...getCurrentJobQueue()[0], status: 0, message: 'กำลังรอ Server พร้อมใช้งาน' }; updateSyncStatusUI(); return; }
 
-            while (syncQueue.length > 0) {
-                const payload = syncQueue[0];
+            // Process a bounded batch. Current Wave gets priority and one bad/stale
+            // item is rotated to the back instead of blocking every later scan.
+            const maxAttempts = Math.min(syncQueue.length, 20);
+            let attempts = 0;
+            while (syncQueue.length > 0 && attempts < maxAttempts) {
+                const now = Date.now();
+                let nextIndex = syncQueue.findIndex(item => !item._deadLetter && isQueuePayloadForCurrentJob(item) && Number(item._retryAfter || 0) <= now);
+                if (nextIndex < 0) nextIndex = syncQueue.findIndex(item => !item._deadLetter && Number(item._retryAfter || 0) <= now);
+                if (nextIndex < 0) break;
+                const payload = syncQueue.splice(nextIndex, 1)[0];
+                attempts += 1;
                 try {
-                    syncQueueError = null;
+                    if (isQueuePayloadForCurrentJob(payload)) syncQueueError = null;
                     updateSyncStatusUI();
                     // ✅ ใช้ fetchWithTimeout ป้องกัน request ค้างนานโดยไม่มีกำหนด
                     const queueEndpoint = payload._endpoint || '/api/scan';
                     const requestPayload = { ...payload };
                     delete requestPayload._endpoint;
+                    delete requestPayload._retryCount;
+                    delete requestPayload._retryAfter;
+                    delete requestPayload._lastError;
+                    delete requestPayload._deadLetter;
+                    delete requestPayload._deadReason;
+                    delete requestPayload._failedAt;
+                    delete requestPayload._queuedAt;
                     const res = await fetchWithTimeout(backendApiUrl + queueEndpoint, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(requestPayload)
-                    }, 20000);
+                    }, 45000);
 
                     if (res.ok) {
-                        syncQueue.shift();
-                        localStorage.setItem('proScannerQueue', JSON.stringify(syncQueue));
+                        saveSyncQueue();
                         updateSyncStatusUI();
-                        await new Promise(resolve => setTimeout(resolve, 150));
+                        await new Promise(resolve => setTimeout(resolve, 50));
                     } else {
                         let detail = '';
                         try {
@@ -2071,14 +2144,13 @@
                         if (res.status === 409) {
                             const conflictMessage = detail || 'ข้อมูล LPN ถูกอีกเครื่องอัปเดตก่อนแล้ว';
                             // รายการนี้ห้าม retry เพราะเป็นยอดสะสมจากฐานเก่า การส่งซ้ำจะเขียนทับงานของอีกเครื่อง
-                            syncQueue.shift();
                             syncQueue = syncQueue.filter(queued => !(
                                 String(queued.lpn || '').toUpperCase() === String(payload.lpn || '').toUpperCase()
                                 && String(queued.branch_code || '').toUpperCase() === String(payload.branch_code || '').toUpperCase()
                                 && String(queued.wave_no || '') === String(payload.wave_no || '')
                             ));
-                            localStorage.setItem('proScannerQueue', JSON.stringify(syncQueue));
-                            syncQueueError = { status: 409, lpn: payload.lpn || '-', message: conflictMessage };
+                            saveSyncQueue();
+                            syncQueueError = { ...payload, status: 409, lpn: payload.lpn || '-', message: conflictMessage };
                             updateSyncStatusUI();
                             try {
                                 const latest = await fetchFreshCurrentJobData();
@@ -2090,35 +2162,54 @@
                             updateSyncStatusUI();
                             break;
                         }
+                        payload._retryCount = Number(payload._retryCount || 0) + 1;
+                        payload._retryAfter = Date.now() + Math.min(30000, 1500 * Math.pow(2, Math.min(payload._retryCount, 4)));
+                        payload._lastError = detail || `HTTP ${res.status}`;
+                        // 4xx กลุ่มนี้เป็นข้อมูลที่ต้องให้คนแก้ จึงหยุดส่งได้
+                        // ส่วน 5xx/timeout เป็นอาการชั่วคราว ห้ามเปลี่ยนเป็นรายการเสียเพราะข้อมูลยังส่งซ้ำได้
+                        if ([400, 404, 422].includes(res.status)) {
+                            payload._deadLetter = true; payload._deadReason = payload._lastError; payload._failedAt = new Date().toISOString();
+                        }
+                        syncQueue.push(payload);
+                        saveSyncQueue();
                         syncQueueError = {
+                            ...payload,
                             status: res.status,
                             lpn: payload.lpn || '-',
                             message: detail || `HTTP ${res.status}`
                         };
-                        break;
                     }
                 } catch (e) {
+                    payload._retryCount = Number(payload._retryCount || 0) + 1;
+                    payload._retryAfter = Date.now() + Math.min(30000, 1500 * Math.pow(2, Math.min(payload._retryCount, 4)));
+                    payload._lastError = e && e.name === 'AbortError' ? 'หมดเวลารอ Server' : 'เชื่อมต่อ Server ไม่สำเร็จ';
+                    syncQueue.push(payload);
+                    saveSyncQueue();
                     syncQueueError = {
+                        ...payload,
                         status: 0,
                         lpn: payload.lpn || '-',
                         message: e && e.name === 'AbortError' ? 'หมดเวลารอ Server' : 'เชื่อมต่อ Server ไม่สำเร็จ'
                     };
-                    break;
                 }
             }
             isSyncing = false; updateSyncStatusUI();
         }
         async function waitForSyncQueue(timeoutMs = 60000) {
             const deadline = Date.now() + timeoutMs;
-            while (syncQueue.length > 0 && Date.now() < deadline) {
-                if (!navigator.onLine) throw new Error(`อินเทอร์เน็ตออฟไลน์ — ยังมี ${syncQueue.length} รายการที่ยังไม่ส่ง`);
+            while (getCurrentJobQueue().length > 0 && Date.now() < deadline) {
+                const currentPending = getCurrentJobQueue().length;
+                if (!navigator.onLine) throw new Error(`อินเทอร์เน็ตออฟไลน์ — งานนี้ยังมี ${currentPending} รายการที่ยังไม่ส่ง`);
                 await processQueue();
-                if (syncQueueError) {
-                    throw new Error(`LPN ${syncQueueError.lpn} ส่งไม่สำเร็จ (${syncQueueError.status || 'Network'}): ${syncQueueError.message}`);
+                const currentError = getCurrentJobQueueError();
+                if (currentError && currentError._deadLetter) {
+                    const reason = currentError.message || currentError._deadReason || currentError._lastError || 'ข้อมูลรายการนี้ไม่ถูกต้อง';
+                    throw new Error(`LPN ${currentError.lpn || '-'} ส่งไม่สำเร็จ (${currentError.status || 'Network'}): ${reason}`);
                 }
-                if (syncQueue.length > 0) await new Promise(resolve => setTimeout(resolve, 250));
+                if (getCurrentJobQueue().length > 0) await new Promise(resolve => setTimeout(resolve, 1000));
             }
-            if (syncQueue.length > 0) throw new Error(`ยังมี ${syncQueue.length} รายการที่ส่งไม่สำเร็จภายในเวลาที่กำหนด`);
+            const remaining = getCurrentJobQueue().length;
+            if (remaining > 0) throw new Error(`งานนี้ยังมี ${remaining} รายการที่ส่งไม่สำเร็จภายในเวลาที่กำหนด`);
             return true;
         }
         setInterval(processQueue, 5000);
@@ -2161,17 +2252,34 @@
             }
         });
 
-        function updateSyncStatusUI() {
+        function updateSyncStatusUI(forcedState = '') {
             const statusEl = document.getElementById('syncStatus');
+            if (!statusEl) return;
+            statusEl.onclick = renderQueueManager;
+            statusEl.title = 'กดเพื่อดูและจัดการคิวส่งข้อมูล';
+            statusEl.style.cursor = 'pointer';
+            if (forcedState === 'waking') { statusEl.innerHTML = '⏳ กำลังปลุก Server กรุณารอสักครู่...'; statusEl.className = "text-[10px] text-yellow-200 font-black flex items-center gap-1 animate-pulse"; return; }
             if (!navigator.onLine) { statusEl.innerHTML = `<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636L5.636 18.364M5.636 5.636l12.728 12.728"></path></svg> ⚠ ออฟไลน์ (เน็ตหลุด)`; statusEl.className = "text-[10px] text-red-300 font-black flex items-center gap-1 animate-pulse"; return; }
-            if (syncQueueError) {
-                statusEl.innerHTML = `⚠ ส่งไม่สำเร็จ: ${escapeDocumentText(syncQueueError.lpn)} (${syncQueue.length})`;
-                statusEl.className = "text-[10px] text-red-300 font-black flex items-center gap-1 animate-pulse";
+            const currentPending = getCurrentJobQueue().length;
+            const oldPending = Math.max(0, syncQueue.length - currentPending);
+            const deadCount = syncQueue.filter(item => item._deadLetter).length;
+            const currentError = getCurrentJobQueueError();
+            if (currentError) {
+                if (currentError._deadLetter) {
+                    statusEl.innerHTML = `⚠ งานนี้มีคิวต้องตรวจ: ${escapeDocumentText(currentError.lpn || '-')} (ค้าง ${currentPending}) — กดดู`;
+                    statusEl.className = "text-[10px] text-red-300 font-black flex items-center gap-1 animate-pulse";
+                } else {
+                    statusEl.innerHTML = `⏳ เน็ตตอบช้า ระบบกำลังส่งใหม่เอง (ค้าง ${currentPending})`;
+                    statusEl.className = "text-[10px] text-yellow-200 font-bold flex items-center gap-1 animate-pulse";
+                }
                 return;
             }
-            if (syncQueue.length > 0) {
-                statusEl.innerHTML = `<svg class="w-3 h-3 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg> กำลังส่ง (${syncQueue.length})...`;
+            if (currentPending > 0) {
+                statusEl.innerHTML = `<svg class="w-3 h-3 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg> กำลังส่งงานนี้ (${currentPending})...`;
                 statusEl.className = "text-[10px] text-yellow-300 font-bold animate-pulse flex items-center gap-1";
+            } else if (oldPending > 0 || deadCount > 0) {
+                statusEl.innerHTML = `⏳ งานนี้ส่งครบแล้ว • คิวงานเดิม ${oldPending}${deadCount ? ` / ต้องตรวจ ${deadCount}` : ''} — กดดู`;
+                statusEl.className = "text-[10px] text-yellow-200 font-bold flex items-center gap-1";
             } else {
                 statusEl.innerHTML = `<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> อัปเดตแล้ว`;
                 statusEl.className = "text-[10px] text-green-300 font-bold flex items-center gap-1";
@@ -2179,6 +2287,7 @@
         }
         window.addEventListener('online', updateSyncStatusUI);
         window.addEventListener('offline', updateSyncStatusUI);
+        setInterval(reportDeviceState, 15000);
 
         // ==================== SHIPPING CONTROL DOCUMENT ====================
         function escapeDocumentText(value) {
@@ -2203,6 +2312,7 @@
         }
 
         let documentOverrides = {};
+        let latestDocumentSummaries = [];
         function getDocumentOverridesStorageKey() {
             return 'proScannerDocOverrides_' + (currentBookingNo || currentWave || 'default');
         }
@@ -2216,7 +2326,10 @@
         function saveDocumentOverrides() {
             try {
                 localStorage.setItem(getDocumentOverridesStorageKey(), JSON.stringify(documentOverrides));
-            } catch (e) { }
+                return true;
+            } catch (e) {
+                return false;
+            }
         }
         function updateDocumentFieldValue(branchCode, field, value) {
             if (!branchCode || !field) return;
@@ -2287,10 +2400,48 @@
         function updateDocumentPalletCount(branchCode, value) {
             updateDocumentFieldValue(branchCode, 'pallet', value);
         }
-        function saveDocumentOverridesUI() {
-            saveDocumentOverrides();
-            renderShippingDocument();
-            showToast('💾 บันทึกยอดที่แก้ไขในเอกสารเรียบร้อยแล้ว');
+        let isSavingDocumentOverrides = false;
+        async function saveDocumentOverridesUI() {
+            if (isSavingDocumentOverrides) return;
+            isSavingDocumentOverrides = true;
+            const button = document.getElementById('saveDocumentOverridesBtn');
+            const originalHtml = button ? button.innerHTML : '';
+            if (button) {
+                button.disabled = true;
+                button.classList.add('opacity-70', 'cursor-wait');
+                button.innerHTML = '<span class="text-xl animate-spin">⏳</span><span class="leading-tight">กำลังบันทึก...<br><small class="font-bold text-emerald-100">กรุณารอสักครู่</small></span>';
+            }
+            await new Promise(resolve => setTimeout(resolve, 250));
+            try {
+                const saved = saveDocumentOverrides();
+                if (!saved) throw new Error('พื้นที่จัดเก็บของเครื่องไม่พร้อมใช้งาน');
+                renderShippingDocument();
+                if (!latestDocumentSummaries.length) throw new Error('ไม่พบยอดสาขาที่จะบันทึก');
+                const response = await fetchWithTimeout(backendApiUrl + '/api/document-summary', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ summaries: latestDocumentSummaries, emp_id: loggedInEmpId || '' })
+                }, 120000);
+                if (!response.ok) {
+                    let detail = '';
+                    try { detail = (await response.json()).detail || ''; } catch (ignore) { }
+                    throw new Error(detail || 'ส่งยอดเข้า Member Data ไม่สำเร็จ');
+                }
+                const branchCount = Object.keys(documentOverrides).filter(branch => Object.keys(documentOverrides[branch] || {}).length > 0).length;
+                const fieldCount = Object.values(documentOverrides).reduce((sum, fields) => sum + Object.keys(fields || {}).length, 0);
+                const savedAt = new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date());
+                showAlert('✅ บันทึกยอดแก้ไขสำเร็จ', `บันทึกแล้ว ${fieldCount} ช่อง จาก ${branchCount} สาขา\nเวลา ${savedAt} น.\n\nสามารถพิมพ์เอกสารต่อได้เลย`, 'border-green-600', true);
+            } catch (e) {
+                showAlert('บันทึกยอดไม่สำเร็จ', `${e && e.message ? e.message : e}\n\nกรุณาลองกดบันทึกอีกครั้ง`, 'border-red-600', false);
+            } finally {
+                isSavingDocumentOverrides = false;
+                const refreshedButton = document.getElementById('saveDocumentOverridesBtn');
+                if (refreshedButton) {
+                    refreshedButton.disabled = false;
+                    refreshedButton.classList.remove('opacity-70', 'cursor-wait');
+                    refreshedButton.innerHTML = originalHtml;
+                }
+            }
         }
         function resetDocumentOverrides() {
             showGenericConfirm(
@@ -2653,7 +2804,11 @@
         }
 
         async function verifyDocumentAgainstServer() {
-            await waitForSyncQueue(60000);
+            await ensureBackendReady(true);
+            // หลังยิงเสร็จให้รอคิวส่งต่อเองได้นานพอบน Wi-Fi หน้างาน
+            // โดยไม่ตัดเป็น Error ทั้งที่ Server เพียงตอบช้าชั่วคราว
+            await waitForSyncQueue(180000);
+            await assertNoOtherDevicePending();
             // A local/server LPN difference can be a valid Short Pick.
             // Only require the local sync queue to finish, then use the fresh server snapshot.
             const latest = await fetchFreshCurrentJobData();
@@ -2679,7 +2834,7 @@
                 return;
             }
 
-            showLoading();
+            showLoading('กำลังตรวจสอบข้อมูลล่าสุดก่อนเปิดเอกสาร...');
             try {
                 await verifyDocumentAgainstServer();
             } catch (e) {
@@ -2707,6 +2862,65 @@
             }
         }
 
+        let bookingBranchMovePreview = null;
+        function openBookingBranchMove() {
+            if (!currentBookingNo) return showAlert('ไม่พบ Booking ปลายทาง', 'ฟังก์ชันนี้ใช้เมื่อเปิดงานด้วย Booking เท่านั้น');
+            bookingBranchMovePreview = null;
+            document.getElementById('moveTargetBooking').textContent = currentBookingNo;
+            document.getElementById('moveWaveInput').value = '';
+            document.getElementById('moveReasonInput').value = '';
+            document.getElementById('moveNoteInput').value = '';
+            document.getElementById('moveBranchChoices').classList.add('hidden');
+            document.getElementById('moveBranchChoices').innerHTML = '';
+            document.getElementById('moveBranchPreview').classList.add('hidden');
+            document.getElementById('confirmMoveBranchBtn').disabled = true;
+            const modal = document.getElementById('bookingBranchMoveModal'); modal.classList.remove('hidden'); modal.classList.add('flex');
+        }
+        function closeBookingBranchMove() {
+            const modal = document.getElementById('bookingBranchMoveModal'); modal.classList.add('hidden'); modal.classList.remove('flex');
+        }
+        async function loadWaveBranchesForMove() {
+            const wave = document.getElementById('moveWaveInput').value.replace(/\D/g, '');
+            if (!wave) return showAlert('ยังไม่ได้กรอก Wave', 'กรุณากรอกเลข Wave ก่อนค้นหา');
+            showLoading('กำลังโหลดสาขาและยอดนับ...');
+            try {
+                const res = await fetchWithTimeout(backendApiUrl + `/api/wave-branch-options?wave_no=${encodeURIComponent(wave)}`, { cache: 'no-store' }, 60000);
+                const data = await res.json();
+                if (!res.ok) throw new Error(typeof data.detail === 'string' ? data.detail : `HTTP ${res.status}`);
+                bookingBranchMovePreview = null;
+                const choices = document.getElementById('moveBranchChoices');
+                choices.innerHTML = (data.branches || []).map((item, index) => `<button onclick="selectBranchForMove(${index})" class="move-branch-choice w-full text-left border-2 border-slate-200 hover:border-blue-500 bg-white rounded-xl p-3"><div class="flex justify-between gap-2"><div class="font-black text-base">${escapeDocumentText(item.branch_code)} — ${escapeDocumentText(item.branch_name)}</div><span class="text-xs font-black ${item.is_closed ? 'text-green-700' : 'text-amber-700'}">${item.is_closed ? '✅ ปิดจบแล้ว' : '🟡 ยังไม่ปิดจบ'}</span></div><div class="grid grid-cols-2 gap-1 mt-2 text-xs"><span>Booking: <b>${escapeDocumentText(item.current_booking || '-')}</b></span><span>LPN ยิงแล้ว: <b>${item.lpn_scanned}/${item.lpn_total}</b></span><span>ยอด: <b>${item.box_qty} กล่อง</b></span><span>พาเลท: <b>${item.pallet_count}</b></span></div></button>`).join('') || '<div class="text-center p-4">ไม่พบสาขาใน Wave นี้</div>';
+                window.bookingBranchMoveOptions = data.branches || [];
+                choices.classList.remove('hidden');
+                document.getElementById('moveBranchPreview').classList.add('hidden');
+                document.getElementById('confirmMoveBranchBtn').disabled = true;
+            } catch (e) { bookingBranchMovePreview = null; showAlert('ตรวจสอบไม่สำเร็จ', e.message || String(e)); }
+            finally { hideLoading(); }
+        }
+        function selectBranchForMove(index) {
+            const item = (window.bookingBranchMoveOptions || [])[index]; if (!item) return;
+            bookingBranchMovePreview = { ...item, wave_no: document.getElementById('moveWaveInput').value.replace(/\D/g, '') };
+            document.querySelectorAll('.move-branch-choice').forEach((button, buttonIndex) => button.classList.toggle('border-blue-600', buttonIndex === index));
+            const closed = item.is_closed ? '✅ ปิดจบแล้ว' : '🟡 ยังไม่ Stamp ปิดสาขา';
+            document.getElementById('moveBranchPreview').innerHTML = `<div class="font-black text-lg">เลือก: ${escapeDocumentText(item.branch_code)} — ${escapeDocumentText(item.branch_name)}</div><div class="grid grid-cols-2 gap-2 mt-2"><div><b>Booking ปัจจุบัน</b><br>${escapeDocumentText(item.current_booking || '-')}</div><div><b>สถานะ</b><br>${closed}</div><div><b>LPN ยิงแล้ว</b><br>${item.lpn_scanned}/${item.lpn_total}</div><div><b>ยอดนับ</b><br>${item.box_qty} กล่อง / ${item.pallet_count} พาเลท</div></div><div class="mt-2 text-xs text-red-700 font-bold">ยืนยันแล้ว Booking ${escapeDocumentText(currentBookingNo)} จะรวมยอดเดิมทันที ไม่ต้องยิงใหม่</div>`;
+            document.getElementById('moveBranchPreview').classList.remove('hidden');
+            document.getElementById('confirmMoveBranchBtn').disabled = String(item.current_booking || '').toUpperCase() === String(currentBookingNo || '').toUpperCase();
+        }
+        async function confirmBookingBranchMove() {
+            const reason = document.getElementById('moveReasonInput').value;
+            if (!bookingBranchMovePreview || !reason) return showAlert('ข้อมูลไม่ครบ', 'กรุณาตรวจสอบสาขาและเลือกเหตุผล');
+            showLoading('กำลังย้ายสาขาและบันทึกหลักฐาน...');
+            try {
+                const res = await fetchWithTimeout(backendApiUrl + '/api/move-booking-branch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ target_booking: currentBookingNo, wave_no: bookingBranchMovePreview.wave_no, branch_code: bookingBranchMovePreview.branch_code, reason, note: document.getElementById('moveNoteInput').value.trim(), emp_id: loggedInEmpId }) }, 120000);
+                const data = await res.json();
+                if (!res.ok) throw new Error(typeof data.detail === 'string' ? data.detail : `HTTP ${res.status}`);
+                closeBookingBranchMove();
+                const latest = await fetchFreshCurrentJobData(); applyWaveDataToScreen(latest.data, latest.isWaveOnly); saveCurrentWaveDataCache(); renderShippingDocument(); shippingDocumentVerifiedAt = Date.now();
+                showAlert('เพิ่มสาขาเข้ารถเรียบร้อย', `${bookingBranchMovePreview.branch_code}\n${data.previous_booking || '-'} → ${data.target_booking}\nยอดเดิมถูกนำมาใช้ ไม่ต้องสแกนใหม่`, 'border-green-600', true);
+            } catch (e) { showAlert('ย้ายสาขาไม่สำเร็จ', e.message || String(e)); }
+            finally { hideLoading(); }
+        }
+
         function getProvinceFromBranchName(name) {
             if (!name) return '-';
             const match = name.match(/\(([^)]+)\)/);
@@ -2732,6 +2946,7 @@
 
         function renderShippingDocument() {
             loadDocumentOverrides();
+            latestDocumentSummaries = [];
             const content = document.getElementById('shippingDocumentContent');
             const branches = getDocumentBranches();
             if (branches.length === 0) {
@@ -2880,6 +3095,24 @@
                 const cleanBranchName = getBranchNameOrFallback(branch.name, bCode).replace(/\s*\([^)]+\)\s*/g, '').trim();
                 const province = getProvinceForBranch(bCode, branch.name);
                 const ownerDisplay = getOwnerDisplayName(owner);
+
+                const summaryWave = String((branchItems.find(item => item.wave_no) || {}).wave_no || currentWave || '').replace(/\D/g, '');
+                if (summaryWave) {
+                    latestDocumentSummaries.push({
+                        wave: summaryWave,
+                        branch: bCode,
+                        branch_name: cleanBranchName,
+                        bu: owner,
+                        label_count: new Set(branchItems.filter(item => item.lpn).map(item => String(item.lpn).trim().toUpperCase())).size,
+                        m: mCount,
+                        red: redCount,
+                        blue: blueCount,
+                        green: greenCount,
+                        black: blackCount,
+                        total: branchTotalBoxes,
+                        pallet: branchPallets
+                    });
+                }
 
                 printRows.push(`
                     <tr>
@@ -3145,7 +3378,11 @@
                 const itemRows = branchItems.map((item, index) => {
                     const lpnPrefix = item.lpn.substring(0, 2);
                     let typeBadge = '';
-                    if (lpnPrefix === 'PR') {
+                    if (item.historical_summary) {
+                        const historyColor = ({ Red: 'แดง', Blue: 'น้ำเงิน', Green: 'เขียว', Black: 'ดำ' })[item.color] || item.color || '-';
+                        const historyType = String(item.scan_type || '').toUpperCase() === 'CARTON' ? 'กล่อง M' : `TOTE ${historyColor}`;
+                        typeBadge = `<span class="px-2 py-0.5 rounded bg-purple-50 text-purple-700 font-bold border border-purple-200 text-xs">${escapeDocumentText(historyType)}</span>`;
+                    } else if (lpnPrefix === 'PR') {
                         typeBadge = '<span class="px-2 py-0.5 rounded bg-red-50 text-red-700 font-bold border border-red-200 text-xs">PR (Carton)</span>';
                     } else if (isDirectQtyPrefix(lpnPrefix)) {
                         typeBadge = `<span class="px-2 py-0.5 rounded bg-orange-50 text-orange-700 font-bold border border-orange-200 text-xs">${lpnPrefix} (Pallet)</span>`;
@@ -3156,7 +3393,7 @@
                     return `
                         <tr class="hover:bg-slate-50 transition-colors text-center text-slate-700 text-xs">
                             <td class="p-2 border-r border-slate-100 font-sans">${index + 1}</td>
-                            <td class="p-2 border-r border-slate-100 font-black text-slate-900 font-sans tracking-wider">${escapeDocumentText(item.lpn)}</td>
+                            <td class="p-2 border-r border-slate-100 font-black text-slate-900 font-sans tracking-wider">${item.historical_summary ? '<span class="text-purple-700">ยอดย้อนหลังจาก Member Data</span>' : escapeDocumentText(item.lpn)}</td>
                             <td class="p-2 border-r border-slate-100 font-sans">${escapeDocumentText(item.zone)}</td>
                             <td class="p-2 border-r border-slate-100 font-sans">${typeBadge}</td>
                             <td class="p-2 border-r border-slate-100 font-sans">${getStatusBadge(item)}</td>
@@ -3315,7 +3552,7 @@
         function printShippingDocument() {
             const content = document.getElementById('shippingDocumentContent');
             if (!content) return;
-            if (syncQueue.length > 0 || syncQueueError || !shippingDocumentVerifiedAt || Date.now() - shippingDocumentVerifiedAt > 120000) {
+            if (getCurrentJobQueue().length > 0 || getCurrentJobQueueError() || !shippingDocumentVerifiedAt || Date.now() - shippingDocumentVerifiedAt > 120000) {
                 showAlert('ข้อมูลเอกสารยังไม่พร้อมพิมพ์', 'กรุณาปิดเอกสารแล้วเปิดใหม่ ระบบจะส่งคิวและตรวจข้อมูลส่วนกลางอีกครั้งก่อนพิมพ์');
                 return;
             }
@@ -3347,7 +3584,7 @@
             fetch(employeeApiUrl).then(res => res.json()).then(data => {
                 if (data.success && data.employees) { employeeDB = data.employees; localStorage.setItem('proScannerEmpDB', JSON.stringify(employeeDB)); }
             }).catch(e => console.log(""));
-            if (syncQueue.length > 0) { updateSyncStatusUI(); processQueue(); }
+            if (syncQueue.length > 0) { updateSyncStatusUI('waking'); ensureBackendReady(true).then(processQueue).catch(updateSyncStatusUI); }
         };
 
         function showLoading(message = 'กำลังประมวลผล...') {
@@ -3377,6 +3614,9 @@
         function showAlert(title, message, borderColor = 'border-red-600', isSuccess = false, callback = null) {
             alertCallback = callback;
             hideLoading();
+            const qcActionLink = document.getElementById('qcActionLink');
+            qcActionLink.classList.add('hidden');
+            qcActionLink.removeAttribute('href');
             document.getElementById('alertTitle').innerText = title;
             document.getElementById('alertMessage').innerText = message;
             document.getElementById('alertModalContent').className = `bg-white p-6 rounded-xl shadow-2xl w-full max-w-sm text-center border-t-8 ${borderColor}`;
@@ -3389,6 +3629,23 @@
             }
 
             document.getElementById('alertModal').classList.remove('hidden'); isAlertOpen = true; document.activeElement.blur();
+        }
+
+        function showQcRequiredPopup(item, callback = null) {
+            const lpn = String(item && item.lpn || '').trim().toUpperCase();
+            showAlert(
+                '⚠️ LPN นี้ต้อง QC',
+                `${lpn}\nรายการนี้เข้าเงื่อนไข ต้อง QC\nกรุณาแยกไว้ตรวจสอบตามขั้นตอน QC`,
+                'border-red-700',
+                false,
+                callback
+            );
+            if (QC_ACTION_URL) {
+                const qcActionLink = document.getElementById('qcActionLink');
+                qcActionLink.href = QC_ACTION_URL;
+                qcActionLink.classList.remove('hidden');
+            }
+            try { if (navigator.vibrate) navigator.vibrate([180, 80, 180]); } catch (e) { }
         }
 
         function closeAlert() {
@@ -3404,48 +3661,9 @@
             else if (selectedBranchCode !== "") document.getElementById('lpnInput').focus();
         }
 
-        // ==================== 🔴 QC ALERT MODAL FUNCTIONS ====================
-        let isQcAlertOpen = false;
-        let _qcPageUrl = '';
-
-        function showQcAlert(lpn, qcSource, waveNo) {
-            isQcAlertOpen = true;
-            document.getElementById('qcAlertLpn').innerText = lpn || '-';
-            const descEl = document.getElementById('qcAlertDesc');
-            let desc = 'กรุณาแยกไว้รอตรวจ — อย่าส่งร่วมกับสินค้าปกติ';
-            if (qcSource) desc = `แหล่งที่มา QC: ${qcSource}\nกรุณาแยกกล่องนี้ออกก่อน แล้วรอทีม QC ตรวจสอบ`;
-            descEl.innerText = desc;
-            // สร้าง URL ไปยังหน้า QC (สามารถปรับ URL ได้)
-            _qcPageUrl = `https://pro-warehouse.github.io/pro-scanner/#qc-check?lpn=${encodeURIComponent(lpn)}&wave=${encodeURIComponent(waveNo || '')}`;
-            const modal = document.getElementById('qcAlertModal');
-            modal.classList.remove('hidden');
-            // Shake icon เพื่อดึงความสนใจ
-            const ring = document.getElementById('qcIconRing');
-            if (ring) { ring.classList.add('qc-shake'); setTimeout(() => ring.classList.remove('qc-shake'), 500); }
-            if (document.activeElement) document.activeElement.blur();
-        }
-
-        function closeQcAlert() {
-            document.getElementById('qcAlertModal').classList.add('hidden');
-            isQcAlertOpen = false;
-            _qcPageUrl = '';
-            if (selectedBranchCode !== '') document.getElementById('lpnInput').focus();
-        }
-
-        function openQcPage() {
-            if (_qcPageUrl) window.open(_qcPageUrl, '_blank');
-            closeQcAlert();
-        }
-
         // ==================== 🎯 ควบคุมการกดคีย์บอร์ดทั้งหมด (เพิ่ม Shortcut 1-6) ====================
         document.addEventListener('keydown', (e) => {
             // ✅ ระหว่างเปิดกล่องยืนยัน ใช่/ไม่ : Enter=ยืนยัน, Esc=ยกเลิก, ปุ่มอื่นบล็อกไว้
-            // ✅ QC Alert Modal: Enter/Esc = ปิด
-            if (isQcAlertOpen) {
-                if (e.key === 'Escape' || e.key === 'Esc' || e.key === 'Enter') { e.preventDefault(); closeQcAlert(); }
-                else { e.preventDefault(); }
-                return;
-            }
             if (isConfirmOpen) {
                 if (e.key === 'Escape' || e.key === 'Esc') { e.preventDefault(); closeGenericConfirm(); }
                 else if (e.key === 'Enter') { e.preventDefault(); acceptGenericConfirm(); }
@@ -3549,6 +3767,7 @@
 
         // ==================== ❌ ปุ่มยกเลิกการสแกน ====================
         function cancelColorSelection() {
+            toteContinuationLpn = null;
             document.getElementById('colorSelectionArea').classList.add('hidden');
             document.getElementById('colorQtyArea').classList.add('hidden');
             resetScanColorButtons();
@@ -3572,7 +3791,7 @@
             const empId = document.getElementById('empInput').value.trim();
             if (!empId) return showAlert('การแจ้งเตือน', 'กรุณาระบุรหัสพนักงานก่อนดำเนินการ');
             if (employeeDB[empId]) return executeLoginSuccess(empId, employeeDB[empId]);
-            showLoading();
+            showLoading('กำลังตรวจสอบรหัสพนักงาน...');
             try {
                 const res = await fetch(`${employeeApiUrl}?emp_id=${encodeURIComponent(empId)}`);
                 const data = await res.json();
@@ -3728,6 +3947,7 @@
         function loadTestWave56245() { try { applyWaveDataToScreen(TEST_WAVE_56245, true); showToast('โหลด Wave 56245 (ข้อมูลจริง) แล้ว'); } catch (e) { showAlert('ผิดพลาด', String(e)); } }
 
         function applyWaveDataToScreen(data, isWaveOnly) {
+            currentLookupIsWaveOnly = Boolean(isWaveOnly);
             const previousLocalState = new Map((allLpnsInWave || []).map(item => [
                 `${String(item.branch || '').toUpperCase()}|${String(item.lpn || '').toUpperCase()}`,
                 { palletNo: parseInt(item.palletNo) || 0, palletColor: item.palletColor || null, correctionCount: parseInt(item.correctionCount) || 0 }
@@ -3750,6 +3970,16 @@
             });
             // เลขพาเลทจากส่วนกลางเป็นค่าหลัก เพื่อให้หลายเครื่องเห็นตรงกันและรองรับการแก้ไขย้อนหลัง
             (allLpnsInWave || []).forEach(it => {
+                if (Array.isArray(it.pallet_breakdown)) {
+                    it.pallet_breakdown = it.pallet_breakdown.map(part => ({
+                        pallet_no: parseInt(part && (part.pallet_no || part.palletNo)) || 0,
+                        qty: parseInt(part && part.qty) || 0,
+                        color: String(part && part.color || 'None'),
+                        type: String(part && (part.type || part.scan_type) || it.scan_type || 'TOTE')
+                    })).filter(part => part.qty > 0);
+                } else {
+                    it.pallet_breakdown = [];
+                }
                 if (it && Object.prototype.hasOwnProperty.call(it, 'pallet_no')) {
                     it.palletNo = (parseInt(it.pallet_no) || 0) > 0 ? parseInt(it.pallet_no) : null;
                 }
@@ -3840,7 +4070,7 @@
                 applyWaveDataToScreen(cachedData, isWaveOnly);
                 showToast('โหลดข้อมูลจากเครื่องแล้ว กำลังอัปเดตล่าสุด...');
             } else {
-                showLoading();
+                showLoading(isWaveOnly ? 'กำลังค้นหาและโหลดข้อมูล Wave...' : 'กำลังค้นหาและโหลดข้อมูล Booking...');
             }
 
             try {
@@ -3917,23 +4147,29 @@
                 let totalBoxes = 0; let scannedBoxes = 0;
                 branchLpns.forEach(i => {
                     let expectedQty = parseInt(i.Total_Qty || i.total_qty) || 1;
-                    let actualQty = i.qty ? parseInt(i.qty) : expectedQty;
+                    // ยอดจริงต้องมาจาก Qty ที่สแกนเท่านั้น; ForceClosed/Short Pick มี Qty 0
+                    // ห้ามแทน 0 ด้วยยอดเป้าหมาย เพราะจะทำให้ดูเหมือนนับครบทั้งที่ปิดจบแบบ Short Pick
+                    let actualQty = Math.max(0, parseInt(i.qty) || 0);
                     totalBoxes += expectedQty;
                     if (i.status === 'Scanned' || i.status === 'ForceClosed') scannedBoxes += actualQty;
                 });
 
-                const isDone = branchLpns.every(i => i.status === 'Scanned' || i.status === 'ForceClosed');
-                const inProgress = !isDone && scannedBoxes > 0;
-
-                let btnStyle = isDone ? 'border-green-400 bg-green-50 text-green-900' :
-                    inProgress ? 'border-orange-400 bg-orange-50 text-orange-900' :
-                        'border-blue-400 bg-white text-blue-900';
-
-                let badgeCls = isDone ? 'bg-green-200 text-green-800' : inProgress ? 'bg-orange-200 text-orange-800' : 'bg-blue-100 text-blue-800';
-                let statusBadge = `<div class="font-black text-xl ml-2 whitespace-nowrap px-3 py-1 rounded-full ${badgeCls}">${scannedBoxes}/${totalBoxes}</div>`;
                 const completionRecord = getBranchCompletionRecord(bCode);
+                const isClosed = Boolean(completionRecord);
+                const allLpnsResolved = branchLpns.length > 0 && branchLpns.every(i => i.status === 'Scanned' || i.status === 'ForceClosed');
+                const inProgress = !isClosed && (scannedBoxes > 0 || allLpnsResolved);
+                const btnStyle = isClosed ? 'border-emerald-500 bg-emerald-50 text-emerald-950' :
+                    inProgress ? 'border-orange-400 bg-orange-50 text-orange-950' :
+                        'border-slate-300 bg-white text-slate-900';
+                const statusText = isClosed ? '✅ เสร็จแล้ว' :
+                    allLpnsResolved ? '🟠 ยิงครบ • รอปิดจบ' :
+                        inProgress ? '🟠 กำลังทำ' : '⚪ ยังไม่เริ่ม';
+                const badgeCls = isClosed ? 'bg-emerald-200 text-emerald-900 border-emerald-300' :
+                    inProgress ? 'bg-orange-200 text-orange-900 border-orange-300' :
+                        'bg-slate-100 text-slate-700 border-slate-200';
+                const statusBadge = `<div class="ml-2 shrink-0 text-right"><div class="whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-black ${badgeCls}">${statusText}</div><div class="mt-1 whitespace-nowrap text-sm font-black">ยอดจริง ${scannedBoxes} <span class="text-[10px] opacity-60">/ เป้า ${totalBoxes}</span></div></div>`;
                 const completionMeta = completionRecord
-                    ? `<div class="mt-1 text-[11px] font-black text-green-700 truncate">บันทึกจบ: ${escapeDocumentText(formatBangkokDateTime(completionRecord.completed_at))}</div>`
+                    ? `<div class="mt-1 text-[11px] font-black text-emerald-700 truncate">ปิดจบ: ${escapeDocumentText(formatBangkokDateTime(completionRecord.completed_at))}</div>`
                     : '';
                 const palletState = readPalletWorkflowState(bCode);
                 const activeBranchPalletNos = new Set(getCurrentBranchPalletNos(bCode));
@@ -3942,11 +4178,9 @@
                     palletState.submitted_nos.map(Number).filter(no => activeBranchPalletNos.has(no)).forEach(no => submittedForBranch.add(no));
                 }
                 const submittedCount = submittedForBranch.size;
-                const hasPendingPallet = !!(palletState && parseInt(palletState.active_no) > 0 && palletState.active_color);
-                if (hasPendingPallet) {
-                    btnStyle = 'border-orange-400 bg-orange-50 text-orange-900';
-                    statusBadge = `<div class="font-black text-xl ml-2 whitespace-nowrap px-3 py-1 rounded-full bg-orange-200 text-orange-800">${scannedBoxes}/${totalBoxes}</div>`;
-                }
+                // เมื่อมี Stamp ปิดจบ ให้สถานะเสร็จแล้วเป็นหลัก แม้ยอดจริงน้อยกว่าเป้าหมาย
+                // และไม่ให้พาเลทค้างเก่าในเครื่องทำการ์ดกลับเป็นสีส้ม
+                const hasPendingPallet = !isClosed && !!(palletState && parseInt(palletState.active_no) > 0 && palletState.active_color);
                 const palletMeta = hasPendingPallet
                     ? `<div class="mt-1 text-[11px] font-black text-orange-700 truncate">🟠 ส่งแล้ว ${submittedCount} • พาเลทใบที่ ${getPalletDisplayNo(palletState.active_no, bCode)} ยังไม่ส่ง</div>`
                     : submittedCount > 0
@@ -3968,6 +4202,36 @@
                 `);
             });
             branchGrid.innerHTML = htmlParts.join('');
+        }
+
+        async function refreshBranchSelectorData() {
+            if (branchRefreshInProgress || !currentWave) return;
+            branchRefreshInProgress = true;
+            const button = document.getElementById('refreshBranchStatusBtn');
+            const originalHtml = button ? button.innerHTML : '';
+            if (button) { button.disabled = true; button.innerHTML = '↻ กำลังรีเฟรช...'; }
+            showLoading('กำลังดึงสถานะล่าสุดของทุกสาขา...');
+            try {
+                await ensureBackendReady(true);
+                const lookupValue = currentLookupIsWaveOnly ? (activeWavesList[0] || currentWave) : currentBookingNo;
+                const url = currentLookupIsWaveOnly
+                    ? backendApiUrl + `/api/check-wave?wave_no=${encodeURIComponent(lookupValue)}&force=true&_ts=${Date.now()}`
+                    : backendApiUrl + `/api/check-booking?booking_no=${encodeURIComponent(lookupValue)}&force=true&_ts=${Date.now()}`;
+                const res = await fetchWithTimeout(url, { cache: 'no-store' }, 90000);
+                if (!res.ok) throw new Error(`Server ตอบกลับ HTTP ${res.status}`);
+                const data = await res.json();
+                const cacheKey = getWaveDataCacheKey(lookupValue, currentLookupIsWaveOnly);
+                currentWaveDataCacheKey = cacheKey;
+                saveWaveDataCache(cacheKey, data);
+                applyWaveDataToScreen(data, currentLookupIsWaveOnly);
+                showToast('✅ อัปเดตสถานะทุกสาขาแล้ว');
+            } catch (error) {
+                showAlert('รีเฟรชไม่สำเร็จ', error && error.message ? error.message : 'กรุณาตรวจอินเทอร์เน็ตแล้วลองใหม่');
+            } finally {
+                hideLoading();
+                branchRefreshInProgress = false;
+                if (button) { button.disabled = false; button.innerHTML = originalHtml; }
+            }
         }
 
             document.getElementById('waveInput').addEventListener('keypress', (e) => { if (e.key === 'Enter') checkAndLoadWave(); });
@@ -4123,8 +4387,10 @@
                         if (lpnPrefix === 'PR') typeColor = 'text-red-900 border-red-400 bg-red-50';
                         else if (isDirectQtyPrefix(lpnPrefix)) typeColor = 'text-orange-900 border-orange-400 bg-orange-50';
                         else if (lpnPrefix === 'PT' || lpnPrefix === 'PN') typeColor = 'text-blue-900 border-blue-400 bg-blue-50';
+                        if (item.qc_required) typeColor = 'text-red-950 border-red-600 bg-red-100 ring-2 ring-red-300';
+                        const qcBadge = item.qc_required ? '<span class="ml-2 inline-flex items-center rounded-full bg-red-700 px-2 py-0.5 text-[10px] font-black text-white">⚠ ต้อง QC</span>' : '';
                         const qtyInfo = isDirectQtyPrefix(lpnPrefix) ? `<div class="text-[10px] text-gray-500 font-bold">(เป้าหมาย ${expectedQty})</div>` : '';
-                        unscannedParts.push(`<div class="p-2 border-l-4 rounded shadow-sm flex items-center justify-between gap-2 ${typeColor}"><div class="font-black text-sm md:text-base tracking-wider">${item.lpn}</div><div class="text-right">${qtyInfo}<div class="text-[10px] font-bold opacity-70">Zone: ${item.zone}</div></div></div>`);
+                        unscannedParts.push(`<div class="p-2 border-l-4 rounded shadow-sm flex items-center justify-between gap-2 ${typeColor}"><div class="font-black text-sm md:text-base tracking-wider flex items-center flex-wrap">${item.lpn}${qcBadge}</div><div class="text-right">${qtyInfo}<div class="text-[10px] font-bold opacity-70">Zone: ${item.zone}</div></div></div>`);
                     }
                     else if (isScanned) {
                         scannedCount += actualQty;
@@ -4143,6 +4409,11 @@
                         const checkIcon = isPPIncomplete
                             ? `<svg class="w-4 h-4 text-amber-500 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`
                             : `<svg class="w-4 h-4 text-green-600 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>`;
+                        const qcBadge = item.qc_required ? '<span class="ml-2 inline-flex items-center rounded-full bg-red-700 px-2 py-0.5 text-[10px] font-black text-white">⚠ ต้อง QC</span>' : '';
+                        const scannedCardClass = item.qc_required
+                            ? 'border-red-600 bg-red-50 ring-2 ring-red-200'
+                            : (isPPIncomplete ? 'border-amber-500 bg-amber-50' : 'border-green-500 bg-white');
+                        const scannedTextClass = item.qc_required ? 'text-red-950' : (isPPIncomplete ? 'text-amber-900' : 'text-green-900');
 
                         let combineDetails = '';
                         if (item.isMaster) {
@@ -4167,11 +4438,12 @@
                             </div>`;
                         }
 
-                        scannedParts.push(`<div class="p-2 border-l-4 ${isPPIncomplete ? 'border-amber-500 bg-amber-50' : 'border-green-500 bg-white'} rounded shadow-sm flex flex-col"><div class="flex items-center justify-between gap-2"><div class="font-black text-sm md:text-base ${isPPIncomplete ? 'text-amber-900' : 'text-green-900'} tracking-wider flex items-center flex-wrap">${checkIcon} ${item.lpn}</div><div class="text-right shrink-0">${qtyText}${colorText}<div class="text-[10px] ${isPPIncomplete ? 'text-amber-600' : 'text-green-600'} font-bold">Zone: ${item.zone}</div></div></div>${incompleteNote}${combineDetails}</div>`);
+                        scannedParts.push(`<div class="p-2 border-l-4 ${scannedCardClass} rounded shadow-sm flex flex-col"><div class="flex items-center justify-between gap-2"><div class="font-black text-sm md:text-base ${scannedTextClass} tracking-wider flex items-center flex-wrap">${checkIcon} ${item.lpn}${qcBadge}</div><div class="text-right shrink-0">${qtyText}${colorText}<div class="text-[10px] ${item.qc_required ? 'text-red-700' : (isPPIncomplete ? 'text-amber-600' : 'text-green-600')} font-bold">Zone: ${item.zone}</div></div></div>${incompleteNote}${combineDetails}</div>`);
                     }
                     else if (isForceClosed) {
                         unscannedCount += expectedQty; const crossIcon = `<svg class="w-4 h-4 text-gray-500 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>`;
-                        unscannedParts.push(`<div class="p-2 border-l-4 border-gray-400 bg-gray-200 rounded shadow-sm flex items-center justify-between gap-2 opacity-70"><div class="font-black text-sm md:text-base text-gray-600 tracking-wider line-through flex items-center">${item.lpn}</div><div class="text-right"><div class="text-[10px] text-gray-500 font-bold flex items-center">${crossIcon} หาไม่พบ</div></div></div>`);
+                        const qcBadge = item.qc_required ? '<span class="ml-2 inline-flex items-center rounded-full bg-red-700 px-2 py-0.5 text-[10px] font-black text-white no-underline">⚠ ต้อง QC</span>' : '';
+                        unscannedParts.push(`<div class="p-2 border-l-4 ${item.qc_required ? 'border-red-600 bg-red-100' : 'border-gray-400 bg-gray-200'} rounded shadow-sm flex items-center justify-between gap-2 opacity-70"><div class="font-black text-sm md:text-base text-gray-600 tracking-wider line-through flex items-center flex-wrap">${item.lpn}${qcBadge}</div><div class="text-right"><div class="text-[10px] text-gray-500 font-bold flex items-center">${crossIcon} หาไม่พบ</div></div></div>`);
                     }
                 });
 
@@ -4248,12 +4520,23 @@
             // ==================== SCAN LOGIC ====================
             const lpnInput = document.getElementById('lpnInput'); const colorSection = document.getElementById('colorSelectionArea'); const qtySection = document.getElementById('qtySelectionArea'); const qtyInput = document.getElementById('qtyInput'); const colorQtyArea = document.getElementById('colorQtyArea'); const colorQtyInput = document.getElementById('colorQtyInput');
             lpnInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter' && e.target.value.trim() !== "" && !isAlertOpen && !isQcAlertOpen) {
+                if (e.key === 'Enter' && e.target.value.trim() !== "" && !isAlertOpen) {
                     const lpn = e.target.value.trim().toUpperCase(); const found = allLpnsInWave.find(item => item.lpn === lpn);
                     if (!found) { flashScreen(false); showAlert('ข้อผิดพลาด', `ไม่มีข้อมูล LPN รหัส\n[${lpn}]\nในรอบ Wave นี้`); lpnInput.value = ''; return; }
                     if (found.branch !== selectedBranchCode) { showAlert('รหัสสาขาไม่ตรงกัน', `บาร์โค้ด ${lpn} เป็นของสาขา [${found.branch}]\nกรุณาตรวจสอบและเลือกสาขาให้ถูกต้อง`); lpnInput.value = ''; return; }
-                    // ✅ ตรวจสอบ QC Required ก่อน scan
-                    if (found.qc_required && found.status !== 'Scanned') { lpnInput.value = ''; flashScreen(false); showQcAlert(lpn, found.qc_source || '', found.wave_no || currentWave); return; }
+                    const skipQcPopupOnce = Boolean(found._skipQcPopupOnce);
+                    if (skipQcPopupOnce) delete found._skipQcPopupOnce;
+                    if (found.qc_required && !skipQcPopupOnce) {
+                        lpnInput.value = '';
+                        flashScreen(false);
+                        showQcRequiredPopup(found, () => {
+                            // ปิด Popup แล้วทำรายการเดิมต่อทันที ไม่ต้องยิงบาร์โค้ดซ้ำ
+                            found._skipQcPopupOnce = true;
+                            lpnInput.value = lpn;
+                            lpnInput.dispatchEvent(new KeyboardEvent('keypress', { key: 'Enter', bubbles: true }));
+                        });
+                        return;
+                    }
                     if (found.status === 'Scanned') {
                         lpnInput.value = '';
                         // ✅ ยิงซ้ำ LPN: เปิดหน้าต่างระบุจำนวน/เลือกสีทันทีโดยไม่ต้องผ่านกล่องข้อความเตือน
@@ -4309,16 +4592,15 @@
                 directQtyContinuationLpn = null;
 
                 if (isContinuation) {
-                    // ✅ ยิงซ้ำ PP: บวกสะสมยอดจากพาเลทก่อนหน้า แล้วส่งเป็น "ยอดรวมสะสม"
-                    // (backend ใช้ MAX(Qty) ต่อ LPN → ยอดรวมสะสมจะถูกต้องเมื่อโหลดใหม่/พิมพ์เอกสาร)
+                    // ยิงซ้ำ PP/SP: เก็บยอดของพาเลทนี้แยกจากพาเลทก่อนหน้า แล้วรวมเฉพาะตอนแสดงผล
                     const prevQty = parseInt(target.qty) || 0;
                     const cumulative = prevQty + qtyVal;
                     const expectedTotal = getExpectedQty(target);
                     const prevBreakdown = Array.isArray(target.pallet_breakdown) && target.pallet_breakdown.length
-                        ? target.pallet_breakdown
-                        : (prevQty > 0 ? [prevQty] : []);
-                    target.pallet_breakdown = [...prevBreakdown, qtyVal];
-                    executeScanSave('None', 'Carton', cumulative, lpn, prevQty);
+                        ? target.pallet_breakdown.filter(part => part && typeof part === 'object')
+                        : (prevQty > 0 ? [{ pallet_no: parseInt(target.palletNo) || parseInt(target.pallet_no) || 0, qty: prevQty, color: 'None', type: 'Carton' }] : []);
+                    target.pallet_breakdown = [...prevBreakdown.filter(part => parseInt(part.pallet_no) !== parseInt(activePalletNo)), { pallet_no: parseInt(activePalletNo) || 0, qty: qtyVal, color: 'None', type: 'Carton' }];
+                    executeScanSave('None', 'Carton', qtyVal, lpn, prevQty, cumulative);
                     if (cumulative > expectedTotal) {
                         showToast(`บันทึกแล้ว รวม ${cumulative}/${expectedTotal} — เกินเป้า ${cumulative - expectedTotal} กล่อง`, true);
                     } else if (cumulative < expectedTotal) {
@@ -4327,7 +4609,7 @@
                         showToast(`นับครบแล้ว ${cumulative}/${expectedTotal} กล่อง`);
                     }
                 } else {
-                    if (target) target.pallet_breakdown = [qtyVal];
+                    if (target) target.pallet_breakdown = [{ pallet_no: parseInt(activePalletNo) || 0, qty: qtyVal, color: 'None', type: 'Carton' }];
                     executeScanSave('None', 'Carton', qtyVal, lpn, 0);
                 }
             }
@@ -4336,6 +4618,7 @@
 
             // ==================== 📦 PP หลายพาเลทต่อ 1 LPN: ยิงซ้ำสะสมยอด ====================
             let directQtyContinuationLpn = null;
+            let toteContinuationLpn = null;
             let rescanPromptLpn = null;
             function isMultiPalletLpn(lpn) { return isDirectQtyLpn(lpn); }
             // ✅ ช่วยเหลือ + ออกจากระบบ
@@ -4485,6 +4768,7 @@
             function openToteColorSelectionForContinuation(item) {
                 if (!item) return;
                 resetScanColorButtons();
+                toteContinuationLpn = item.lpn;
                 if (!activePalletColor) {
                     showToast('เลือกสีพาเลทก่อน', true);
                     startPalletColorPrompt();
@@ -4732,30 +5016,46 @@
                 colorQtyArea.classList.add('hidden');
                 const target = allLpnsInWave.find(item => item.lpn === lpn);
                 const totalQty = entries.reduce((sum, entry) => sum + entry.qty, 0);
+                const isContinuation = toteContinuationLpn === lpn;
+                const previousQty = isContinuation && target ? (parseInt(target.qty) || 0) : 0;
+                toteContinuationLpn = null;
                 if (target) {
                     target.status = 'Scanned';
-                    target.qty = totalQty;
+                    target.qty = previousQty + totalQty;
                     target.color = entries.length === 1 ? entries[0].color : 'Multiple';
                     target.scan_type = entries.length === 1 ? entries[0].type : 'TOTE_MULTI';
                     target.color_breakdown = entries.map(entry => ({ color: entry.color, type: entry.type, qty: entry.qty }));
                     target.palletNo = activePalletNo; target.palletColor = activePalletColor;
+                    const previousParts = isContinuation && Array.isArray(target.pallet_breakdown) ? target.pallet_breakdown : [];
+                    const currentKeys = new Set(entries.map(entry => `${parseInt(activePalletNo) || 0}|${String(entry.color).toUpperCase()}`));
+                    target.pallet_breakdown = [...previousParts.filter(part => !currentKeys.has(`${parseInt(part.pallet_no) || 0}|${String(part.color).toUpperCase()}`)), ...entries.map(entry => ({ pallet_no: parseInt(activePalletNo) || 0, qty: entry.qty, color: entry.color, type: entry.type }))];
+                    const totalsByColor = new Map();
+                    target.pallet_breakdown.forEach(part => {
+                        const key = String(part.color || 'None');
+                        const current = totalsByColor.get(key) || { color: key, type: part.type || 'TOTE', qty: 0 };
+                        current.qty += parseInt(part.qty) || 0;
+                        totalsByColor.set(key, current);
+                    });
+                    target.color_breakdown = Array.from(totalsByColor.values());
+                    target.color = target.color_breakdown.length === 1 ? target.color_breakdown[0].color : 'Multiple';
+                    target.scan_type = target.color_breakdown.length === 1 ? target.color_breakdown[0].type : 'TOTE_MULTI';
                 }
                 resetScanColorButtons();
                 updateDashboardUI();
                 saveCurrentWaveDataCache();
                 persistPalletWorkflowState();
-                showToast(`บันทึกข้อมูล ${lpn} สำเร็จ (${totalQty} กล่อง / ${entries.length} สี)`);
+                showToast(`บันทึกข้อมูล ${lpn} สำเร็จ (รวม ${target ? target.qty : totalQty} กล่อง)`);
                 lpnInput.focus();
                 const lpnWave = target ? (target.wave_no || currentWave) : currentWave;
                 const scannedPalletNo = activePalletNo;
                 entries.forEach((entry, entryIndex) => {
                     const payload = { wave_no: lpnWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: lpn, type: entry.type, color: entry.color, qty: entry.qty, emp_id: loggedInEmpId, pallet_no: scannedPalletNo };
-                    if (entryIndex === 0) payload.expected_previous_qty = 0;
+                    if (isContinuation && entryIndex === 0) payload.expected_previous_qty = previousQty;
                     pushToQueue(payload);
                 });
                 finishCorrectionAfterScan();
             }
-            async function executeScanSave(color, type = 'TOTE', qty = 1, forceLpn = null, expectedPreviousQty = null) {
+            async function executeScanSave(color, type = 'TOTE', qty = 1, forceLpn = null, expectedPreviousQty = null, localTotalQty = null) {
                 if (!(await ensurePalletAllocationReady())) return;
                 const lpn = forceLpn || document.getElementById('displayLpn').innerText;
                 const scannedPalletNo = activePalletNo;
@@ -4763,15 +5063,15 @@
                 resetScanColorButtons(); lastScannedLpn = lpn;
                 const target = allLpnsInWave.find(item => item.lpn === lpn);
                 if (target) {
-                    target.status = 'Scanned'; target.qty = qty; target.color = color; target.scan_type = type;
+                    target.status = 'Scanned'; target.qty = localTotalQty === null ? qty : localTotalQty; target.color = color; target.scan_type = type;
                     target.color_breakdown = []; target.palletNo = scannedPalletNo; target.palletColor = activePalletColor;
+                    if (!Array.isArray(target.pallet_breakdown) || !target.pallet_breakdown.length) target.pallet_breakdown = [{ pallet_no: scannedPalletNo, qty, color, type }];
                 }
                 updateDashboardUI(); saveCurrentWaveDataCache(); persistPalletWorkflowState();
                 showToast(`บันทึกข้อมูล ${lpn} สำเร็จ`); flashScreen(true); lpnInput.focus();
                 const lpnWave = target ? (target.wave_no || currentWave) : currentWave;
                 const scanPayload = { wave_no: lpnWave, branch_code: selectedBranchCode, branch_name: selectedBranchName, lpn: lpn, type: type, color: color, qty: qty, emp_id: loggedInEmpId, pallet_no: scannedPalletNo };
                 if (expectedPreviousQty !== null && expectedPreviousQty !== undefined) scanPayload.expected_previous_qty = parseInt(expectedPreviousQty) || 0;
-                else if (!isDirectQtyLpn(lpn)) scanPayload.expected_previous_qty = 0;
                 pushToQueue(scanPayload);
                 finishCorrectionAfterScan();
             }
@@ -4807,11 +5107,13 @@
             }
             function getPalletItems(palletNo, branchCode = selectedBranchCode) {
                 const no = parseInt(palletNo) || 0;
-                return allLpnsInWave.filter(i =>
-                    (i.branch || 'Unknown') === branchCode
-                    && i.status === 'Scanned'
-                    && (parseInt(i.palletNo) || 0) === no
-                );
+                return allLpnsInWave.flatMap(item => {
+                    if ((item.branch || 'Unknown') !== branchCode || item.status !== 'Scanned') return [];
+                    const parts = Array.isArray(item.pallet_breakdown) && item.pallet_breakdown.length
+                        ? item.pallet_breakdown
+                        : [{ pallet_no: parseInt(item.palletNo) || parseInt(item.pallet_no) || 0, qty: parseInt(item.qty) || 0, color: item.color, type: item.scan_type }];
+                    return parts.filter(part => parseInt(part.pallet_no) === no).map(part => ({ ...item, qty: parseInt(part.qty) || 0, palletNo: no, pallet_no: no, _palletPart: true }));
+                });
             }
             function getBranchScannedPalletNos(branchCode = selectedBranchCode) {
                 return getCurrentBranchPalletNos(branchCode);
@@ -5001,7 +5303,7 @@
                 const correctionPayload = buildCorrectionPayload(item, newQty, reason, note, correctionId);
                 const submitBtn = document.getElementById('correctionSubmitBtn');
                 if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'กำลังบันทึกหลักฐาน...'; submitBtn.classList.add('opacity-60'); }
-                showLoading();
+                showLoading('กำลังบันทึกยอดแก้ไขและหลักฐาน...');
                 try {
                     await waitForSyncQueue(120000);
                     const res = await fetchWithTimeout(backendApiUrl + '/api/correct-lpn', {
@@ -5277,7 +5579,13 @@
             }
             function renderPalletGroups() {
                 const el = document.getElementById('palletGroupsContainer'); if (!el) return;
-                const items = allLpnsInWave.filter(i => (i.branch || 'Unknown') === selectedBranchCode && i.status === 'Scanned' && i.palletNo).slice().sort(compareLpnDesc);
+                const items = allLpnsInWave.flatMap(item => {
+                    if ((item.branch || 'Unknown') !== selectedBranchCode || item.status !== 'Scanned') return [];
+                    const parts = Array.isArray(item.pallet_breakdown) && item.pallet_breakdown.length
+                        ? item.pallet_breakdown
+                        : [{ pallet_no: parseInt(item.palletNo) || parseInt(item.pallet_no) || 0, qty: parseInt(item.qty) || 0, color: item.color, type: item.scan_type }];
+                    return parts.filter(part => parseInt(part.pallet_no) > 0).map(part => ({ ...item, qty: parseInt(part.qty) || 0, palletNo: parseInt(part.pallet_no), pallet_no: parseInt(part.pallet_no), _palletPart: true }));
+                }).sort(compareLpnDesc);
                 if (!items.length) { el.innerHTML = ''; return; }
                 const groups = {};
                 items.forEach(i => { const k = i.palletNo; (groups[k] = groups[k] || { no: k, color: i.palletColor, items: [] }).items.push(i); });
@@ -5313,39 +5621,47 @@
             function closeConfirm() { document.getElementById('confirmModal').classList.add('hidden'); document.getElementById('lpnInput').focus(); }
 
             async function prepareBranchClose(timeoutMs = 120000) {
+                await ensureBackendReady(true);
                 // ต้องส่งยอด LPN ให้ถึง Server ก่อนจึงค่อย Stamp ปิดสาขา
                 // ล้าง error ชั่วคราวและลองส่งซ้ำระหว่างที่ popup ปิดงานแสดงอยู่
                 const deadline = Date.now() + timeoutMs;
-                while (syncQueue.length > 0 && Date.now() < deadline) {
-                    if (!navigator.onLine) throw new Error(`อินเทอร์เน็ตออฟไลน์ — ยังมียอด LPN ค้างส่ง ${syncQueue.length} รายการ`);
-                    syncQueueError = null;
+                while (getCurrentJobQueue().length > 0 && Date.now() < deadline) {
+                    const currentPending = getCurrentJobQueue().length;
+                    if (!navigator.onLine) throw new Error(`อินเทอร์เน็ตออฟไลน์ — งานนี้ยังมียอด LPN ค้างส่ง ${currentPending} รายการ`);
+                    if (getCurrentJobQueueError()) syncQueueError = null;
                     updateSyncStatusUI();
                     await processQueue();
-                    if (syncQueue.length === 0) break;
+                    if (getCurrentJobQueue().length === 0) break;
                     await new Promise(resolve => setTimeout(resolve, 1000));
                 }
-                if (syncQueue.length > 0) {
-                    const failedLpn = syncQueueError && syncQueueError.lpn ? ` (ล่าสุด: ${syncQueueError.lpn})` : '';
-                    throw new Error(`ยังมียอด LPN ค้างส่ง ${syncQueue.length} รายการ${failedLpn}`);
+                const remaining = getCurrentJobQueue().length;
+                if (remaining > 0) {
+                    const currentError = getCurrentJobQueueError();
+                    const failedLpn = currentError && currentError.lpn ? ` (ล่าสุด: ${currentError.lpn})` : '';
+                    throw new Error(`งานนี้ยังมียอด LPN ค้างส่ง ${remaining} รายการ${failedLpn}`);
                 }
-                syncQueueError = null;
+                if (getCurrentJobQueueError()) syncQueueError = null;
                 updateSyncStatusUI();
+                await assertNoOtherDevicePending();
                 return true;
             }
 
             async function closeBranchWaves(waves, branchCode, completedAtIso) {
                 if (noSaveMode) return true;
                 const results = await Promise.all(waves.map(async waveNo => {
-                    try {
-                        const res = await fetchWithTimeout(backendApiUrl + '/api/close-job', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ wave: waveNo, branch: branchCode, emp_id: loggedInEmpId, completed_at: completedAtIso })
-                        }, 25000);
-                        return res.ok;
-                    } catch (e) {
-                        return false;
+                    for (let attempt = 0; attempt < 3; attempt++) {
+                        try {
+                            const res = await fetchWithTimeout(backendApiUrl + '/api/close-job', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ wave: waveNo, branch: branchCode, emp_id: loggedInEmpId, completed_at: completedAtIso })
+                            }, 60000);
+                            if (res.ok) return true;
+                            if (res.status >= 400 && res.status < 500) return false;
+                        } catch (e) { }
+                        if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 2000 * (attempt + 1)));
                     }
+                    return false;
                 }));
                 return results.every(Boolean);
             }
@@ -5362,7 +5678,7 @@
                     await prepareBranchClose();
                 } catch (e) {
                     hideLoading();
-                    showAlert('ยังไม่ Stamp ปิดสาขา', `${e && e.message ? e.message : 'ยังส่งยอด LPN ไม่ครบ'}\n\nระบบเก็บงานไว้แล้ว กรุณาตรวจอินเทอร์เน็ตและกดปิดสาขาอีกครั้ง เพื่อป้องกัน Timestamp ขึ้นแต่ยอดไม่ขึ้น`);
+                    showAlert('ยังไม่ Stamp ปิดสาขา', `${e && e.message ? e.message : 'ยังส่งยอด LPN ไม่ครบ'}\n\nระบบเก็บงานไว้แล้ว หากเครื่องยังออนไลน์ให้รอสักครู่แล้วกดปิดสาขาอีกครั้ง ไม่ต้องสแกนใหม่`);
                     return;
                 }
 
@@ -5425,7 +5741,7 @@
                     await prepareBranchClose();
                 } catch (e) {
                     hideLoading();
-                    showAlert('ยังไม่ Stamp ปิดสาขา', `${e && e.message ? e.message : 'ยังส่งยอด LPN ไม่ครบ'}\n\nระบบเก็บงานไว้แล้ว กรุณาตรวจอินเทอร์เน็ตและกดปิดสาขาอีกครั้ง เพื่อป้องกัน Timestamp ขึ้นแต่ยอดไม่ขึ้น`);
+                    showAlert('ยังไม่ Stamp ปิดสาขา', `${e && e.message ? e.message : 'ยังส่งยอด LPN ไม่ครบ'}\n\nระบบเก็บงานไว้แล้ว หากเครื่องยังออนไลน์ให้รอสักครู่แล้วกดปิดสาขาอีกครั้ง ไม่ต้องสแกนใหม่`);
                     return;
                 }
 
@@ -5743,7 +6059,7 @@
             <button onclick="palletModalBack()" class="mt-2.5 w-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm">← กลับไปเลือกสาขา</button>
         </div>
     </div>
-    <div class="fixed bottom-1 left-1.5 z-[1400] text-[9px] leading-none text-slate-400 font-bold pointer-events-none select-none">Pro LPN Scanner · v1.3.3 (2026-08-03)</div>
+    <div class="fixed bottom-1 left-1.5 z-[1400] text-[9px] leading-none text-slate-400 font-bold pointer-events-none select-none">Pro LPN Scanner · v1.5.4 (2026-08-19)</div>
     <div id="quickTools" class="fixed z-[1500] flex flex-col gap-2" style="bottom:16px;right:12px">
         <button onclick="openHelp()" title="วิธีใช้งาน / คำอธิบาย" class="w-11 h-11 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-black shadow-lg text-lg opacity-90">?</button>
         <button onclick="toggleBigText()" id="bigTextBtn" title="ปรับตัวอักษรใหญ่" class="w-11 h-11 rounded-full bg-slate-700 hover:bg-slate-800 text-white font-black shadow-lg text-base opacity-90">ก+</button>
