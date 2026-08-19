@@ -4020,39 +4020,6 @@
             } else {
                 updateDashboardUI();
             }
-            refreshQcStatusesForLoadedLpns();
-        }
-
-        let qcLookupRequestId = 0;
-        async function refreshQcStatusesForLoadedLpns() {
-            const requestId = ++qcLookupRequestId;
-            const lpns = Array.from(new Set((allLpnsInWave || [])
-                .map(item => String(item && item.lpn || '').trim().toUpperCase())
-                .filter(Boolean)));
-            if (!lpns.length) return;
-            try {
-                const response = await fetchWithTimeout(backendApiUrl + '/api/qc-status', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ lpns })
-                }, 60000);
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                const data = await response.json();
-                if (requestId !== qcLookupRequestId) return;
-                const qcItems = data && data.items && typeof data.items === 'object' ? data.items : {};
-                (allLpnsInWave || []).forEach(item => {
-                    const detail = qcItems[String(item.lpn || '').trim().toUpperCase()];
-                    item.qc_required = Boolean(detail && detail.qc_required);
-                    item.qc_status = item.qc_required ? 'ต้อง QC' : '';
-                    item.qc_risk = detail ? (detail.qc_risk || '') : '';
-                    item.qc_source = detail ? (detail.qc_source || '') : '';
-                });
-                saveCurrentWaveDataCache();
-                if (selectedBranchCode) updateDashboardUI(); else renderBranchGrid();
-            } catch (error) {
-                // QC เป็นข้อมูลประกอบ: โหลดไม่ได้ต้องไม่ขัดขวางการสแกนหรือการปิดงาน
-                console.warn('QC status unavailable (non-critical)', error);
-            }
         }
 
         async function checkAndLoadWave() {
@@ -6061,7 +6028,7 @@
             <button onclick="palletModalBack()" class="mt-2.5 w-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm">← กลับไปเลือกสาขา</button>
         </div>
     </div>
-    <div class="fixed bottom-1 left-1.5 z-[1400] text-[9px] leading-none text-slate-400 font-bold pointer-events-none select-none">Pro LPN Scanner · v1.5.0 (2026-08-18)</div>
+    <div class="fixed bottom-1 left-1.5 z-[1400] text-[9px] leading-none text-slate-400 font-bold pointer-events-none select-none">Pro LPN Scanner · v1.5.1 (2026-08-19)</div>
     <div id="quickTools" class="fixed z-[1500] flex flex-col gap-2" style="bottom:16px;right:12px">
         <button onclick="openHelp()" title="วิธีใช้งาน / คำอธิบาย" class="w-11 h-11 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-black shadow-lg text-lg opacity-90">?</button>
         <button onclick="toggleBigText()" id="bigTextBtn" title="ปรับตัวอักษรใหญ่" class="w-11 h-11 rounded-full bg-slate-700 hover:bg-slate-800 text-white font-black shadow-lg text-base opacity-90">ก+</button>
