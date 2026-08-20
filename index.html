@@ -2061,7 +2061,9 @@
             if (devices.length) {
                 const total = devices.reduce((sum, item) => sum + Number(item.pending_count || 0), 0);
                 const lpns = devices.flatMap(item => item.pending_lpns || []).slice(0, 5).join(', ');
-                throw new Error(`ยังมีอีก ${devices.length} เครื่องกำลังส่งงานค้างรวม ${total} รายการ${lpns ? ` (LPN: ${lpns})` : ''} กรุณารอให้เครื่องนั้นขึ้นคำว่า อัปเดตแล้ว`);
+                const err = new Error(`ยังมีอีก ${devices.length} เครื่องกำลังส่งงานค้างรวม ${total} รายการ${lpns ? ` (LPN: ${lpns})` : ''} กรุณารอให้เครื่องนั้นขึ้นคำว่า อัปเดตแล้ว`);
+                err.isOtherDevicePending = true;
+                throw err;
             }
             return true;
         }
@@ -2825,12 +2827,14 @@
             return { data: await res.json(), isWaveOnly: !isBookingMode };
         }
 
-        async function verifyDocumentAgainstServer() {
+        async function verifyDocumentAgainstServer(bypassOtherDevices = false) {
             await ensureBackendReady(true);
             // หลังยิงเสร็จให้รอคิวส่งต่อเองได้นานพอบน Wi-Fi หน้างาน
             // โดยไม่ตัดเป็น Error ทั้งที่ Server เพียงตอบช้าชั่วคราว
             await waitForSyncQueue(180000);
-            await assertNoOtherDevicePending();
+            if (!bypassOtherDevices) {
+                await assertNoOtherDevicePending();
+            }
             // A local/server LPN difference can be a valid Short Pick.
             // Only require the local sync queue to finish, then use the fresh server snapshot.
             const latest = await fetchFreshCurrentJobData();
@@ -2850,7 +2854,7 @@
             return true;
         }
 
-        async function openShippingDocument(preferredBranchCode = '') {
+        async function openShippingDocument(preferredBranchCode = '', bypassOtherDevices = false) {
             if (!currentWave || allLpnsInWave.length === 0) {
                 showAlert('ยังไม่มีข้อมูล Wave', 'กรุณาเลือก Wave ก่อนเปิดเอกสารใบคุมส่งสินค้า');
                 return;
@@ -2858,9 +2862,18 @@
 
             showLoading('กำลังตรวจสอบข้อมูลล่าสุดก่อนเปิดเอกสาร...');
             try {
-                await verifyDocumentAgainstServer();
+                await verifyDocumentAgainstServer(bypassOtherDevices);
             } catch (e) {
                 hideLoading();
+                if (e && e.isOtherDevicePending) {
+                    showConfirm(
+                        '⚠️ มีเครื่องอื่นส่งงานค้างอยู่',
+                        `${e.message}\n\nหากเครื่องดังกล่าวพักเบรคหรือไม่ได้ใช้งานแล้ว คุณต้องการเปิดเอกสารดูยอดจากเครื่องนี้ทันทีหรือไม่?`,
+                        'เปิดเอกสารทันที',
+                        () => openShippingDocument(preferredBranchCode, true)
+                    );
+                    return;
+                }
                 showAlert('ยังเปิดเอกสารไม่ได้', e && e.message ? e.message : 'ไม่สามารถยืนยันข้อมูลกับส่วนกลางได้');
                 return;
             }
@@ -5662,7 +5675,7 @@
             function openConfirmModal() { document.getElementById('confirmModal').classList.remove('hidden'); }
             function closeConfirm() { document.getElementById('confirmModal').classList.add('hidden'); document.getElementById('lpnInput').focus(); }
 
-            async function prepareBranchClose(timeoutMs = 120000) {
+            async function prepareBranchClose(timeoutMs = 120000, bypassOtherDevices = false) {
                 await ensureBackendReady(true);
                 // ต้องส่งยอด LPN ให้ถึง Server ก่อนจึงค่อย Stamp ปิดสาขา
                 // ล้าง error ชั่วคราวและลองส่งซ้ำระหว่างที่ popup ปิดงานแสดงอยู่
@@ -5684,7 +5697,9 @@
                 }
                 if (getCurrentJobQueueError()) syncQueueError = null;
                 updateSyncStatusUI();
-                await assertNoOtherDevicePending();
+                if (!bypassOtherDevices) {
+                    await assertNoOtherDevicePending();
+                }
                 return true;
             }
 
@@ -5708,7 +5723,7 @@
                 return results.every(Boolean);
             }
 
-            async function confirmForceClose() {
+            async function confirmForceClose(bypassOtherDevices = false) {
                 closeConfirm();
                 showLoading('กำลังดำเนินการปิดงานสาขา...');
                 const branchCodeToClose = selectedBranchCode;
@@ -5717,9 +5732,18 @@
                 if (correctionPalletNo) finishPalletCorrection(false);
                 markActivePalletSubmitted(false);
                 try {
-                    await prepareBranchClose();
+                    await prepareBranchClose(120000, bypassOtherDevices);
                 } catch (e) {
                     hideLoading();
+                    if (e && e.isOtherDevicePending) {
+                        showConfirm(
+                            '⚠️ มีเครื่องอื่นส่งงานค้างอยู่',
+                            `${e.message}\n\nหากเครื่องดังกล่าวพักเบรคหรือไม่ได้ใช้งานแล้ว คุณต้องการบังคับปิดงานสาขานี้จากเครื่องนี้ทันทีหรือไม่?`,
+                            'บังคับปิดทันที',
+                            () => confirmForceClose(true)
+                        );
+                        return;
+                    }
                     showAlert('ยังไม่ Stamp ปิดสาขา', `${e && e.message ? e.message : 'ยังส่งยอด LPN ไม่ครบ'}\n\nระบบเก็บงานไว้แล้ว หากเครื่องยังออนไลน์ให้รอสักครู่แล้วกดปิดสาขาอีกครั้ง ไม่ต้องสแกนใหม่`);
                     return;
                 }
@@ -5772,7 +5796,7 @@
                 performFinishBranchJob();
             }
 
-            async function performFinishBranchJob() {
+            async function performFinishBranchJob(bypassOtherDevices = false) {
                 showLoading('กำลังดำเนินการปิดงานสาขา...');
                 const branchCodeToClose = selectedBranchCode;
                 const completedAtIso = new Date().toISOString();
@@ -5780,9 +5804,18 @@
                 if (correctionPalletNo) finishPalletCorrection(false);
                 markActivePalletSubmitted(false);
                 try {
-                    await prepareBranchClose();
+                    await prepareBranchClose(120000, bypassOtherDevices);
                 } catch (e) {
                     hideLoading();
+                    if (e && e.isOtherDevicePending) {
+                        showConfirm(
+                            '⚠️ มีเครื่องอื่นส่งงานค้างอยู่',
+                            `${e.message}\n\nหากเครื่องดังกล่าวพักเบรคหรือไม่ได้ใช้งานแล้ว คุณต้องการปิดจบงานสาขานี้จากเครื่องนี้ทันทีหรือไม่?`,
+                            'ปิดจบสาขาทันที',
+                            () => performFinishBranchJob(true)
+                        );
+                        return;
+                    }
                     showAlert('ยังไม่ Stamp ปิดสาขา', `${e && e.message ? e.message : 'ยังส่งยอด LPN ไม่ครบ'}\n\nระบบเก็บงานไว้แล้ว หากเครื่องยังออนไลน์ให้รอสักครู่แล้วกดปิดสาขาอีกครั้ง ไม่ต้องสแกนใหม่`);
                     return;
                 }
@@ -6101,7 +6134,7 @@
             <button onclick="palletModalBack()" class="mt-2.5 w-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm">← กลับไปเลือกสาขา</button>
         </div>
     </div>
-    <div class="fixed bottom-1 left-1.5 z-[1400] text-[9px] leading-none text-slate-400 font-bold pointer-events-none select-none">Pro LPN Scanner · v1.5.7 (2026-08-20)</div>
+    <div class="fixed bottom-1 left-1.5 z-[1400] text-[9px] leading-none text-slate-400 font-bold pointer-events-none select-none">Pro LPN Scanner · v1.5.8 (2026-08-20)</div>
     <div id="quickTools" class="fixed z-[1500] flex flex-col gap-2" style="bottom:16px;right:12px">
         <button onclick="openHelp()" title="วิธีใช้งาน / คำอธิบาย" class="w-11 h-11 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-black shadow-lg text-lg opacity-90">?</button>
         <button onclick="toggleBigText()" id="bigTextBtn" title="ปรับตัวอักษรใหญ่" class="w-11 h-11 rounded-full bg-slate-700 hover:bg-slate-800 text-white font-black shadow-lg text-base opacity-90">ก+</button>
