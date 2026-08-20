@@ -2981,6 +2981,122 @@
             return ownerDisplayMap[code] || ownerCode || '-';
         }
 
+        function getBranchSummaryData(bCode, specificWave = null) {
+            loadDocumentOverrides();
+            const branchItems = allLpnsInWave.filter(item => (item.branch || 'Unknown') === bCode).slice().sort(compareLpnDesc);
+            
+            // Get owner from the items (if any item has a valid owner)
+            let owner = 'Unknown';
+            const mappedOwnerItem = branchItems.find(item => item.owner && ownerDisplayMap[normalizeBranchLookupCode(item.owner)]);
+            if (mappedOwnerItem) {
+                owner = mappedOwnerItem.owner;
+            } else {
+                const firstWithOwner = branchItems.find(item => item.owner && item.owner !== 'Unknown');
+                if (firstWithOwner) {
+                    owner = firstWithOwner.owner;
+                } else if (branchItems[0]) {
+                    owner = branchItems[0].owner || 'Unknown';
+                }
+            }
+
+            let autoM = 0;
+            let autoRed = 0;
+            let autoBlue = 0;
+            let autoGreen = 0;
+            let autoBlack = 0;
+            let yellowCount = 0;
+            let paperBoxCount = 0;
+
+            const addQtyToSummary = (prefix, color, type, qty) => {
+                const normalizedColor = String(color || '').toUpperCase();
+                const normalizedType = String(type || '').toUpperCase();
+                const normalizedPrefix = String(prefix || '').toUpperCase();
+                const isPaperTote = (normalizedPrefix === 'PT' || normalizedPrefix === 'PN')
+                    && (normalizedType === 'CARTON' || normalizedColor === 'REUSE');
+
+                if (isPaperTote) {
+                    autoM += qty;
+                } else if (normalizedPrefix === 'PP' || normalizedPrefix === 'SP' || normalizedType === 'CARTON' || normalizedColor === 'REUSE') {
+                    autoM += qty;
+                } else {
+                    if (normalizedColor === 'RED') autoRed += qty;
+                    else if (normalizedColor === 'BLUE') autoBlue += qty;
+                    else if (normalizedColor === 'GREEN') autoGreen += qty;
+                    else if (normalizedColor === 'BLACK') autoBlack += qty;
+                    else if (normalizedColor === 'YELLOW') yellowCount += qty;
+                    else autoM += qty;
+                }
+            };
+
+            branchItems.forEach(item => {
+                if (item.status === 'Scanned') {
+                    if (item.combinedWith) return;
+                    const qty = getActualQty(item);
+                    const prefix = String(item.lpn || '').substring(0, 2).toUpperCase();
+                    const color = String(item.color || '').toUpperCase();
+                    const type = String(item.scan_type || '').toUpperCase();
+
+                    if (item.isMaster) {
+                        const combinedChildren = branchItems.filter(child => child.combinedWith === item.lpn);
+                        const masterPart = getColorBreakdown(item)[0];
+                        const childPart = combinedChildren
+                            .flatMap(child => getColorBreakdown(child))
+                            .find(Boolean);
+                        const physicalContainer = masterPart || childPart;
+
+                        if (physicalContainer) {
+                            addQtyToSummary(prefix, physicalContainer.color, physicalContainer.type, 1);
+                        } else {
+                            addQtyToSummary(prefix, color, type, 1);
+                        }
+                        return;
+                    }
+
+                    if (isDirectQtyPrefix(prefix)) {
+                        autoM += qty;
+                    } else {
+                        const breakdown = getColorBreakdown(item);
+                        if (breakdown.length > 0) {
+                            breakdown.forEach(part => addQtyToSummary(prefix, part.color, part.type, part.qty));
+                        } else {
+                            addQtyToSummary(prefix, color, type, qty);
+                        }
+                    }
+                }
+            });
+
+            const autoPalletCount = getCurrentBranchPalletNos(bCode).length;
+            const ov = documentOverrides[bCode] || {};
+            const mCount = (ov.m !== undefined && ov.m !== null && ov.m !== '') ? (parseInt(ov.m) || 0) : autoM;
+            const redCount = (ov.red !== undefined && ov.red !== null && ov.red !== '') ? (parseInt(ov.red) || 0) : autoRed;
+            const blueCount = (ov.blue !== undefined && ov.blue !== null && ov.blue !== '') ? (parseInt(ov.blue) || 0) : autoBlue;
+            const greenCount = (ov.green !== undefined && ov.green !== null && ov.green !== '') ? (parseInt(ov.green) || 0) : autoGreen;
+            const blackCount = (ov.black !== undefined && ov.black !== null && ov.black !== '') ? (parseInt(ov.black) || 0) : autoBlack;
+            const branchPallets = (ov.pallet !== undefined && ov.pallet !== null && ov.pallet !== '') ? (parseInt(ov.pallet) || 0) : autoPalletCount;
+            const branchTotalBoxes = mCount + redCount + blueCount + greenCount + blackCount + paperBoxCount + yellowCount;
+
+            const firstItem = branchItems[0] || {};
+            const cleanBranchName = getBranchNameOrFallback(firstItem.branch_name || firstItem.branchName, bCode).replace(/\s*\([^)]+\)\s*/g, '').trim();
+            const summaryWave = String(specificWave || (branchItems.find(item => item.wave_no) || {}).wave_no || currentWave || '').replace(/\D/g, '');
+
+            return {
+                wave: summaryWave,
+                booking: String(currentBookingNo || '').trim().toUpperCase(),
+                branch: bCode,
+                branch_name: cleanBranchName,
+                bu: owner,
+                label_count: new Set(branchItems.filter(item => item.lpn).map(item => String(item.lpn).trim().toUpperCase())).size,
+                m: mCount,
+                red: redCount,
+                blue: blueCount,
+                green: greenCount,
+                black: blackCount,
+                total: branchTotalBoxes,
+                pallet: branchPallets,
+                autoM, autoRed, autoBlue, autoGreen, autoBlack, autoPalletCount, paperBoxCount, yellowCount, owner
+            };
+        }
+
         function renderShippingDocument() {
             loadDocumentOverrides();
             latestDocumentSummaries = [];
@@ -3018,104 +3134,17 @@
             const printRows = [];
             const activeRows = branches.map((branch, index) => {
                 const bCode = branch.code;
-                const branchItems = allLpnsInWave.filter(item => (item.branch || 'Unknown') === bCode).slice().sort(compareLpnDesc);
-                
-                // Get owner from the items (if any item has a valid owner)
-                let owner = 'Unknown';
-                const mappedOwnerItem = branchItems.find(item => item.owner && ownerDisplayMap[normalizeBranchLookupCode(item.owner)]);
-                if (mappedOwnerItem) {
-                    owner = mappedOwnerItem.owner;
-                } else {
-                    const firstWithOwner = branchItems.find(item => item.owner && item.owner !== 'Unknown');
-                    if (firstWithOwner) {
-                        owner = firstWithOwner.owner;
-                    } else if (branchItems[0]) {
-                        owner = branchItems[0].owner || 'Unknown';
-                    }
-                }
+                const summary = getBranchSummaryData(bCode);
+                const mCount = summary.m;
+                const redCount = summary.red;
+                const blueCount = summary.blue;
+                const greenCount = summary.green;
+                const blackCount = summary.black;
+                const branchPallets = summary.pallet;
+                const branchTotalBoxes = summary.total;
+                const paperBoxCount = summary.paperBoxCount || 0;
+                const owner = summary.owner;
 
-                // Sum quantities by category (Auto scanned totals)
-                let autoM = 0;
-                let autoRed = 0;
-                let autoBlue = 0;
-                let autoGreen = 0;
-                let autoBlack = 0;
-                let yellowCount = 0;
-                let paperBoxCount = 0;
-
-                const addQtyToSummary = (prefix, color, type, qty) => {
-                    const normalizedColor = String(color || '').toUpperCase();
-                    const normalizedType = String(type || '').toUpperCase();
-                    const normalizedPrefix = String(prefix || '').toUpperCase();
-                    const isPaperTote = (normalizedPrefix === 'PT' || normalizedPrefix === 'PN')
-                        && (normalizedType === 'CARTON' || normalizedColor === 'REUSE');
-
-                    if (isPaperTote) {
-                        autoM += qty;
-                    } else if (normalizedPrefix === 'PP' || normalizedPrefix === 'SP' || normalizedType === 'CARTON' || normalizedColor === 'REUSE') {
-                        autoM += qty;
-                    } else {
-                        if (normalizedColor === 'RED') autoRed += qty;
-                        else if (normalizedColor === 'BLUE') autoBlue += qty;
-                        else if (normalizedColor === 'GREEN') autoGreen += qty;
-                        else if (normalizedColor === 'BLACK') autoBlack += qty;
-                        else if (normalizedColor === 'YELLOW') yellowCount += qty;
-                        else autoM += qty;
-                    }
-                };
-
-                branchItems.forEach(item => {
-                    if (item.status === 'Scanned') {
-                        if (item.combinedWith) return;
-                        const qty = getActualQty(item);
-                        const prefix = String(item.lpn || '').substring(0, 2).toUpperCase();
-                        const color = String(item.color || '').toUpperCase();
-                        const type = String(item.scan_type || '').toUpperCase();
-
-                        if (item.isMaster) {
-                            const combinedChildren = branchItems.filter(child => child.combinedWith === item.lpn);
-                            const masterPart = getColorBreakdown(item)[0];
-                            const childPart = combinedChildren
-                                .flatMap(child => getColorBreakdown(child))
-                                .find(Boolean);
-                            const physicalContainer = masterPart || childPart;
-
-                            if (physicalContainer) {
-                                addQtyToSummary(prefix, physicalContainer.color, physicalContainer.type, 1);
-                            } else {
-                                addQtyToSummary(prefix, color, type, 1);
-                            }
-                            return;
-                        }
-
-                        if (isDirectQtyPrefix(prefix)) {
-                            autoM += qty;
-                        } else {
-                            const breakdown = getColorBreakdown(item);
-                            if (breakdown.length > 0) {
-                                breakdown.forEach(part => addQtyToSummary(prefix, part.color, part.type, part.qty));
-                            } else {
-                                addQtyToSummary(prefix, color, type, qty);
-                            }
-                        }
-
-                    }
-                });
-
-                // นับเฉพาะพาเลทที่ยังมี LPN อยู่จริงในสถานะปัจจุบัน
-                // ไม่รวมเลขที่เคยจองแล้วถูกยกเลิกหรือพาเลทที่ถูกแก้จนว่าง
-                const autoPalletCount = getCurrentBranchPalletNos(bCode).length;
-
-                // Check manual overrides per field
-                const ov = documentOverrides[bCode] || {};
-                const mCount = (ov.m !== undefined && ov.m !== null && ov.m !== '') ? (parseInt(ov.m) || 0) : autoM;
-                const redCount = (ov.red !== undefined && ov.red !== null && ov.red !== '') ? (parseInt(ov.red) || 0) : autoRed;
-                const blueCount = (ov.blue !== undefined && ov.blue !== null && ov.blue !== '') ? (parseInt(ov.blue) || 0) : autoBlue;
-                const greenCount = (ov.green !== undefined && ov.green !== null && ov.green !== '') ? (parseInt(ov.green) || 0) : autoGreen;
-                const blackCount = (ov.black !== undefined && ov.black !== null && ov.black !== '') ? (parseInt(ov.black) || 0) : autoBlack;
-                const branchPallets = (ov.pallet !== undefined && ov.pallet !== null && ov.pallet !== '') ? (parseInt(ov.pallet) || 0) : autoPalletCount;
-
-                const branchTotalBoxes = mCount + redCount + blueCount + greenCount + blackCount + paperBoxCount + yellowCount;
                 if (branchPallets === 0) allBranchesHavePalletCount = false;
                 const branchPalletDisplay = branchPallets > 0 ? String(branchPallets) : '-';
 
@@ -3133,23 +3162,8 @@
                 const province = getProvinceForBranch(bCode, branch.name);
                 const ownerDisplay = getOwnerDisplayName(owner);
 
-                const summaryWave = String((branchItems.find(item => item.wave_no) || {}).wave_no || currentWave || '').replace(/\D/g, '');
-                if (summaryWave) {
-                    latestDocumentSummaries.push({
-                        wave: summaryWave,
-                        booking: String(currentBookingNo || '').trim().toUpperCase(),
-                        branch: bCode,
-                        branch_name: cleanBranchName,
-                        bu: owner,
-                        label_count: new Set(branchItems.filter(item => item.lpn).map(item => String(item.lpn).trim().toUpperCase())).size,
-                        m: mCount,
-                        red: redCount,
-                        blue: blueCount,
-                        green: greenCount,
-                        black: blackCount,
-                        total: branchTotalBoxes,
-                        pallet: branchPallets
-                    });
+                if (summary.wave) {
+                    latestDocumentSummaries.push(summary);
                 }
 
                 printRows.push(`
@@ -5708,12 +5722,19 @@
             async function closeBranchWaves(waves, branchCode, completedAtIso) {
                 if (noSaveMode) return true;
                 const results = await Promise.all(waves.map(async waveNo => {
+                    const branchSummary = getBranchSummaryData(branchCode, waveNo);
                     for (let attempt = 0; attempt < 3; attempt++) {
                         try {
                             const res = await fetchWithTimeout(backendApiUrl + '/api/close-job', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ wave: waveNo, branch: branchCode, emp_id: loggedInEmpId, completed_at: completedAtIso })
+                                body: JSON.stringify({
+                                    wave: waveNo,
+                                    branch: branchCode,
+                                    emp_id: loggedInEmpId,
+                                    completed_at: completedAtIso,
+                                    summary: branchSummary
+                                })
                             }, 60000);
                             if (res.ok) return true;
                             if (res.status >= 400 && res.status < 500) return false;
@@ -6140,7 +6161,7 @@
             <button onclick="palletModalBack()" class="mt-2.5 w-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm">← กลับไปเลือกสาขา</button>
         </div>
     </div>
-    <div class="fixed bottom-1 left-1.5 z-[1400] text-[9px] leading-none text-slate-400 font-bold pointer-events-none select-none">Pro LPN Scanner · v1.5.9 (2026-08-20)</div>
+    <div class="fixed bottom-1 left-1.5 z-[1400] text-[9px] leading-none text-slate-400 font-bold pointer-events-none select-none">Pro LPN Scanner · v1.6.0 (2026-08-20)</div>
     <div id="quickTools" class="fixed z-[1500] flex flex-col gap-2" style="bottom:16px;right:12px">
         <button onclick="openHelp()" title="วิธีใช้งาน / คำอธิบาย" class="w-11 h-11 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-black shadow-lg text-lg opacity-90">?</button>
         <button onclick="toggleBigText()" id="bigTextBtn" title="ปรับตัวอักษรใหญ่" class="w-11 h-11 rounded-full bg-slate-700 hover:bg-slate-800 text-white font-black shadow-lg text-base opacity-90">ก+</button>
