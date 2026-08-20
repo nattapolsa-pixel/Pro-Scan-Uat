@@ -2881,10 +2881,12 @@
             document.getElementById('shippingDocumentModal').classList.remove('hidden');
             document.getElementById('shippingDocumentModal').classList.add('flex');
             renderShippingDocument();
+            pushDocumentSummaryToServer(true).catch(() => {});
             loadBranchProvinceMap().then(() => {
                 const modal = document.getElementById('shippingDocumentModal');
                 if (modal && !modal.classList.contains('hidden')) {
                     renderShippingDocument();
+                    pushDocumentSummaryToServer(true).catch(() => {});
                 }
             }).catch(() => { });
         }
@@ -5763,6 +5765,8 @@
                         if (successAll) {
                             setBranchCompletionRecord(branchCodeToClose, completedAtIso, 'force_close');
                             renderBranchGrid();
+                            renderShippingDocument();
+                            pushDocumentSummaryToServer(true).catch(() => {});
                             showAlert('ดำเนินการสำเร็จ', `บังคับปิดงานสาขา ${branchCodeToClose} เสร็จสมบูรณ์\nบันทึกจบงานเมื่อ: ${completedAtText}`, 'border-green-600', true);
                         } else {
                             showAlert('ข้อผิดพลาด', `ไม่สามารถปิดงานบาง Wave สำหรับสาขา ${branchCodeToClose} ได้`, 'border-red-600', false);
@@ -5831,6 +5835,8 @@
                         if (successAll) {
                             setBranchCompletionRecord(branchCodeToClose, completedAtIso, 'finish');
                             renderBranchGrid();
+                            renderShippingDocument();
+                            pushDocumentSummaryToServer(true).catch(() => {});
                             showAlert('ดำเนินการสำเร็จ', `ปิดยอดสาขา ${branchCodeToClose} เรียบร้อยแล้ว\nนับกล่อง Tote ทั้งหมดเสร็จเมื่อ: ${completedAtText}`, 'border-green-600', true);
                         } else {
                             showAlert('ข้อผิดพลาด', `ไม่สามารถปิดงานบาง Wave สำหรับสาขา ${branchCodeToClose} ได้`, 'border-red-600', false);
@@ -6134,7 +6140,7 @@
             <button onclick="palletModalBack()" class="mt-2.5 w-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm">← กลับไปเลือกสาขา</button>
         </div>
     </div>
-    <div class="fixed bottom-1 left-1.5 z-[1400] text-[9px] leading-none text-slate-400 font-bold pointer-events-none select-none">Pro LPN Scanner · v1.5.8 (2026-08-20)</div>
+    <div class="fixed bottom-1 left-1.5 z-[1400] text-[9px] leading-none text-slate-400 font-bold pointer-events-none select-none">Pro LPN Scanner · v1.5.9 (2026-08-20)</div>
     <div id="quickTools" class="fixed z-[1500] flex flex-col gap-2" style="bottom:16px;right:12px">
         <button onclick="openHelp()" title="วิธีใช้งาน / คำอธิบาย" class="w-11 h-11 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-black shadow-lg text-lg opacity-90">?</button>
         <button onclick="toggleBigText()" id="bigTextBtn" title="ปรับตัวอักษรใหญ่" class="w-11 h-11 rounded-full bg-slate-700 hover:bg-slate-800 text-white font-black shadow-lg text-base opacity-90">ก+</button>
