@@ -3871,9 +3871,12 @@
         function printShippingDocument() {
             const content = document.getElementById('shippingDocumentContent');
             if (!content) return;
-            if (getCurrentJobQueue().length > 0 || getCurrentJobQueueError() || !shippingDocumentVerifiedAt || Date.now() - shippingDocumentVerifiedAt > 120000) {
-                showAlert('ข้อมูลเอกสารยังไม่พร้อมพิมพ์', 'กรุณาปิดเอกสารแล้วเปิดใหม่ ระบบจะส่งคิวและตรวจข้อมูลส่วนกลางอีกครั้งก่อนพิมพ์');
-                return;
+
+            // ตรวจสอบคิวที่ค้างส่ง (ถ้ามี)
+            const pendingQueue = getCurrentJobQueue();
+            if (pendingQueue.length > 0) {
+                const proceed = window.confirm(`⚠️ ยังมีข้อมูลที่กำลังส่งค้างอยู่ ${pendingQueue.length} รายการ\n\nต้องการพิมพ์เอกสารจากข้อมูลล่าสุดบนเครื่องนี้ทันทีหรือไม่?`);
+                if (!proceed) return;
             }
 
             saveDocumentOverrides();
