@@ -1757,17 +1757,18 @@
         let backendReadyAt = 0;
         let backendReadyPromise = null;
         async function ensureBackendReady(showStatus = false) {
-            if (Date.now() - backendReadyAt < 240000) return true;
+            // ⚡ Standard Plan: ไม่มี Cold Start → ลด timeout เหลือ 8 วินาที, และ ready เร็วขึ้น มาก
+            if (Date.now() - backendReadyAt < 300000) return true; // cache 5 min
             if (backendReadyPromise) return backendReadyPromise;
             if (showStatus) updateSyncStatusUI('waking');
             backendReadyPromise = (async () => {
                 let lastError = null;
-                for (let attempt = 0; attempt < 3; attempt++) {
+                for (let attempt = 0; attempt < 2; attempt++) {
                     try {
-                        const res = await fetchWithTimeout(backendApiUrl + '/api/health', { cache: 'no-store' }, 65000);
+                        const res = await fetchWithTimeout(backendApiUrl + '/api/health', { cache: 'no-store' }, 8000);
                         if (res.ok) { backendReadyAt = Date.now(); return true; }
                     } catch (e) { lastError = e; }
-                    await new Promise(resolve => setTimeout(resolve, 1500));
+                    await new Promise(resolve => setTimeout(resolve, 500));
                 }
                 throw lastError || new Error('Server ยังไม่พร้อม');
             })().finally(() => { backendReadyPromise = null; updateSyncStatusUI(); });
@@ -1777,19 +1778,17 @@
         function keepAliveHeartbeat() {
             const ping = () => {
                 if (navigator.onLine) {
-                    fetchWithTimeout(backendApiUrl + '/api/health', { cache: 'no-store' }, 10000)
+                    // ⚡ Standard Plan: Server ไม่หลับ → ใช้ ping เพื่อเช็ค health เท่านั้น (ไม่ต้องปลุก)
+                    fetchWithTimeout(backendApiUrl + '/api/health', { cache: 'no-store' }, 5000)
                         .then(() => { backendReadyAt = Date.now(); })
                         .catch(() => { });
                 }
             };
             ping();
             prefetchPendingWaves();
-            // ปลุก Server ทุกๆ 4 นาที (240,000ms) ป้องกัน Render Free Tier หลับ
-            setInterval(ping, 240000);
-            window.addEventListener('focus', ping);
-            document.addEventListener('visibilitychange', () => {
-                if (document.visibilityState === 'visible') ping();
-            });
+            // ⚡ Standard: server อยู่เสมอ → ping ทุก 10 นาทีเพื่อตรวจ health check สั้นๆ
+            setInterval(ping, 600000); // 10 นาที (free คือ 4 นาที)
+            // ไม่ต้อง focus/visibility event สำหรับปลุก server อีกต่อไป
         }
 
         // ✅ fetchWithTimeout: fetch พร้อม AbortController เพื่อไม่ให้ request ค้างนานโดยไม่จำกัด
@@ -2257,8 +2256,8 @@
             if (remaining > 0) throw new Error(`งานนี้ยังมี ${remaining} รายการที่ส่งไม่สำเร็จภายในเวลาที่กำหนด`);
             return true;
         }
-        // ปรับแต่งคิวเบื้องหลังให้ทำงานลื่นไหล ไม่แย่งแบนด์วิดท์ Wi-Fi
-        setInterval(processQueue, 12000);
+        // ⚡ Standard Plan: เซิร์ฟเวอร์ไม่หลับ → sync ทุก 5 วินาที (จาก 12 วินาที)
+        setInterval(processQueue, 5000);
 
         let isSharedStateRefreshing = false;
         async function refreshSharedBranchState() {
@@ -2278,7 +2277,7 @@
                 const url = isBookingMode
                     ? backendApiUrl + `/api/check-booking?booking_no=${encodeURIComponent(currentBookingNo)}&_ts=${Date.now()}`
                     : backendApiUrl + `/api/check-wave?wave_no=${encodeURIComponent(activeWavesList[0] || currentWave)}&_ts=${Date.now()}`;
-                const res = await fetchWithTimeout(url, { cache: 'no-store' }, 30000);
+                const res = await fetchWithTimeout(url, { cache: 'no-store' }, 15000);
                 if (!res.ok) return;
                 const data = await res.json();
                 applyWaveDataToScreen(data, !isBookingMode);
@@ -2288,8 +2287,8 @@
                 isSharedStateRefreshing = false;
             }
         }
-        // ลดภาระ API เมื่อมีหลาย Handheld: overlay ทำให้ยอดสแกนเห็นทันทีอยู่แล้ว
-        setInterval(refreshSharedBranchState, 60000);
+        // ⚡ Standard Plan: refresh สถานะสาขาทุก 30 วินาที (จาก 60 วินาที) เซิร์ฟเวอร์รองรับไปแล้ว
+        setInterval(refreshSharedBranchState, 30000);
 
         window.addEventListener('beforeunload', function (e) {
             if (syncQueue.length > 0 || backgroundTasks > 0) {
