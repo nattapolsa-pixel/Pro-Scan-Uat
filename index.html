@@ -3064,6 +3064,23 @@
                     );
                     return;
                 }
+                const errStr = String(e && e.message ? e.message : e || '');
+                const isNetworkError = !navigator.onLine || /failed to fetch|network|timeout|offline|load failed|http 5/i.test(errStr);
+                if (isNetworkError && allLpnsInWave && allLpnsInWave.length > 0) {
+                    showConfirm(
+                        '⚠️ ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์',
+                        `ไม่สามารถยืนยันข้อมูลล่าสุดกับเซิร์ฟเวอร์ส่วนกลางได้ (${errStr || 'Failed to fetch'})\n\nคุณต้องการเปิดเอกสารโดยใช้ข้อมูลที่สแกนแล้วบนเครื่องนี้ทันทีหรือไม่?`,
+                        'เปิดดูยอดบนเครื่องนี้',
+                        () => {
+                            document.getElementById('shippingDocumentModal').classList.remove('hidden');
+                            document.getElementById('shippingDocumentModal').classList.add('flex');
+                            shippingDocumentVerifiedAt = Date.now();
+                            renderShippingDocument();
+                            pushDocumentSummaryToServer(true).catch(() => {});
+                        }
+                    );
+                    return;
+                }
                 showAlert('ยังเปิดเอกสารไม่ได้', e && e.message ? e.message : 'ไม่สามารถยืนยันข้อมูลกับส่วนกลางได้');
                 return;
             }
