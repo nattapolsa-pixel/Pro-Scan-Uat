@@ -919,10 +919,14 @@
                 <span class="font-bold text-blue-100 text-xs md:text-sm flex items-center gap-2 mb-3">
                     📄 เอกสารใบคุมส่งสินค้า (สามารถแก้ไขตัวเลขในตารางได้ทุกช่อง)
                 </span>
-                <div class="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2.5">
                     <button onclick="openBookingBranchMove()" title="เพิ่มสาขาที่นับแล้วเข้ารถคันนี้"
                         class="group min-h-[58px] bg-gradient-to-br from-amber-400 to-orange-500 hover:from-amber-300 hover:to-orange-400 text-slate-950 font-black px-3 py-2.5 rounded-xl text-xs md:text-sm transition active:scale-95 shadow-lg shadow-orange-950/30 border border-amber-200 flex items-center justify-center gap-2">
                         <span class="text-xl group-hover:scale-110 transition">🚚</span><span class="leading-tight">เพิ่ม/ย้ายสาขา<br><small class="font-bold opacity-75">เข้ารถคันนี้</small></span>
+                    </button>
+                    <button onclick="openManageDocBranchesModal()" title="จัดการ ซ่อน/แสดง สาขาในเอกสารใบคุมส่งสินค้านี้"
+                        class="group min-h-[58px] bg-gradient-to-br from-indigo-500 to-purple-700 hover:from-indigo-400 hover:to-purple-600 text-white font-black px-3 py-2.5 rounded-xl text-xs md:text-sm transition active:scale-95 shadow-lg shadow-indigo-950/30 border border-indigo-300/60 flex items-center justify-center gap-2">
+                        <span class="text-xl group-hover:scale-110 transition">👁️</span><span class="leading-tight">ซ่อน/แสดงสาขา<br><small id="docHiddenBranchesBtnLabel" class="font-bold text-indigo-100">จัดการจุดส่ง</small></span>
                     </button>
                     <button onclick="resetDocumentOverrides()" title="คืนค่าเป็นยอดสแกนจริงในระบบ"
                         class="group min-h-[58px] bg-gradient-to-br from-slate-600 to-slate-700 hover:from-slate-500 hover:to-slate-600 text-white font-black px-3 py-2.5 rounded-xl text-xs md:text-sm transition active:scale-95 shadow-lg border border-slate-400/60 flex items-center justify-center gap-2">
@@ -947,6 +951,33 @@
         <div class="flex-1 overflow-y-auto p-3 md:p-6 bg-gray-200">
             <div id="shippingDocumentContent"
                 class="max-w-5xl mx-auto min-h-full flex flex-col gap-6"></div>
+        </div>
+    </div>
+
+    <!-- Modal จัดการสาขาในเอกสาร (ซ่อน/แสดง สาขา) -->
+    <div id="manageDocBranchesModal" class="hidden fixed inset-0 z-[160] bg-slate-950/70 p-3 items-center justify-center">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[92vh] flex flex-col overflow-hidden">
+            <div class="bg-gradient-to-r from-indigo-600 to-purple-600 p-4 text-white flex justify-between items-center shrink-0">
+                <div>
+                    <div class="text-xs font-bold text-indigo-200">จัดการจุดส่งสินค้า (จัดของขึ้นรถ)</div>
+                    <h2 class="text-lg md:text-xl font-black flex items-center gap-2">📦 จัดการสาขาในเอกสาร (ซ่อน / แสดง)</h2>
+                </div>
+                <button onclick="closeManageDocBranchesModal()" class="text-white hover:text-slate-200 text-3xl font-black leading-none p-1">×</button>
+            </div>
+            <div class="p-3.5 bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-600 flex flex-wrap items-center justify-between gap-2 shrink-0">
+                <div id="manageDocBranchesSummary">กำลังโหลดข้อมูลสาขา...</div>
+                <button onclick="restoreAllHiddenBranchesInDocument()" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg px-2.5 py-1 text-xs font-black transition active:scale-95 flex items-center gap-1">
+                    ↩️ แสดงทุกสาขา (ยกเลิกการซ่อน)
+                </button>
+            </div>
+            <div id="manageDocBranchesList" class="p-4 space-y-2.5 overflow-y-auto flex-1 bg-slate-100/60">
+                <!-- Dynamic branch list -->
+            </div>
+            <div class="p-3 bg-white border-t border-slate-200 flex justify-end shrink-0">
+                <button onclick="closeManageDocBranchesModal()" class="bg-slate-800 hover:bg-slate-900 text-white font-black px-5 py-2.5 rounded-xl text-sm transition active:scale-95 shadow">
+                    ปิดหน้าต่าง
+                </button>
+            </div>
         </div>
     </div>
 
@@ -2315,9 +2346,13 @@
         }
 
         let documentOverrides = {};
+        let documentHiddenBranches = [];
         let latestDocumentSummaries = [];
         function getDocumentOverridesStorageKey() {
             return 'proScannerDocOverrides_' + (currentBookingNo || currentWave || 'default');
+        }
+        function getDocumentHiddenBranchesStorageKey() {
+            return 'proScannerDocHiddenBranches_' + (currentBookingNo || currentWave || 'default');
         }
         function loadDocumentOverrides() {
             try {
@@ -2333,6 +2368,146 @@
             } catch (e) {
                 return false;
             }
+        }
+        function loadDocumentHiddenBranches() {
+            try {
+                const raw = localStorage.getItem(getDocumentHiddenBranchesStorageKey());
+                documentHiddenBranches = raw ? JSON.parse(raw) : [];
+                if (!Array.isArray(documentHiddenBranches)) documentHiddenBranches = [];
+            } catch (e) {
+                documentHiddenBranches = [];
+            }
+        }
+        function saveDocumentHiddenBranches() {
+            try {
+                localStorage.setItem(getDocumentHiddenBranchesStorageKey(), JSON.stringify(documentHiddenBranches));
+                return true;
+            } catch (e) {
+                return false;
+            }
+        }
+
+        function hideBranchInDocument(branchCode) {
+            if (!branchCode) return;
+            loadDocumentHiddenBranches();
+            if (!documentHiddenBranches.includes(branchCode)) {
+                documentHiddenBranches.push(branchCode);
+                saveDocumentHiddenBranches();
+            }
+            renderShippingDocument();
+            updateManageDocBranchesModalContent();
+            pushDocumentSummaryToServer(false);
+            showToast(`ซ่อนสาขา ${branchCode} ออกจากเอกสารแล้ว`);
+        }
+
+        function restoreBranchInDocument(branchCode) {
+            if (!branchCode) return;
+            loadDocumentHiddenBranches();
+            documentHiddenBranches = documentHiddenBranches.filter(c => c !== branchCode);
+            saveDocumentHiddenBranches();
+            renderShippingDocument();
+            updateManageDocBranchesModalContent();
+            pushDocumentSummaryToServer(false);
+            showToast(`นำสาขา ${branchCode} กลับมารวมในเอกสารแล้ว`);
+        }
+
+        function restoreAllHiddenBranchesInDocument() {
+            loadDocumentHiddenBranches();
+            if (documentHiddenBranches.length === 0) {
+                showToast('ไม่มีสาขาที่ถูกซ่อนอยู่');
+                return;
+            }
+            const count = documentHiddenBranches.length;
+            documentHiddenBranches = [];
+            saveDocumentHiddenBranches();
+            renderShippingDocument();
+            updateManageDocBranchesModalContent();
+            pushDocumentSummaryToServer(false);
+            showToast(`นำสาขากลับมาแสดงทั้งหมด ${count} สาขาเรียบร้อยแล้ว`);
+        }
+
+        function openManageDocBranchesModal() {
+            updateManageDocBranchesModalContent();
+            const modal = document.getElementById('manageDocBranchesModal');
+            if (modal) {
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            }
+        }
+
+        function closeManageDocBranchesModal() {
+            const modal = document.getElementById('manageDocBranchesModal');
+            if (modal) {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+            if (selectedBranchCode && !document.getElementById('mainApp').classList.contains('hidden')) {
+                const lpnInput = document.getElementById('lpnInput');
+                if (lpnInput) lpnInput.focus();
+            }
+        }
+
+        function updateManageDocBranchesModalContent() {
+            loadDocumentHiddenBranches();
+            const allBranches = getAllDocumentBranchesRaw();
+            const listEl = document.getElementById('manageDocBranchesList');
+            const summaryEl = document.getElementById('manageDocBranchesSummary');
+            if (!listEl) return;
+
+            const hiddenCount = documentHiddenBranches.length;
+            const activeCount = allBranches.length - hiddenCount;
+
+            if (summaryEl) {
+                summaryEl.innerHTML = `สาขาทั้งหมด: <b>${allBranches.length}</b> สาขา (แสดงในเอกสาร <b>${activeCount}</b> / ซ่อนไว้ <b class="text-rose-600">${hiddenCount}</b>)`;
+            }
+
+            if (allBranches.length === 0) {
+                listEl.innerHTML = '<div class="p-8 text-center text-slate-500 font-bold">ไม่พบข้อมูลสาขาใน Wave / Booking นี้</div>';
+                return;
+            }
+
+            listEl.innerHTML = allBranches.map(branch => {
+                const bCode = branch.code;
+                const isHidden = documentHiddenBranches.includes(bCode);
+                const summary = getBranchSummaryData(bCode);
+                const cleanBranchName = getBranchNameOrFallback(branch.name, bCode).replace(/\s*\([^)]+\)\s*/g, '').trim();
+                const province = getProvinceForBranch(bCode, branch.name);
+                const ownerDisplay = getOwnerDisplayName(summary.owner);
+
+                const cardBorder = isHidden ? 'border-rose-300 bg-rose-50/70' : 'border-slate-200 bg-white hover:border-indigo-300';
+                const statusBadge = isHidden
+                    ? '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-rose-600 text-white text-[11px] font-black shadow-sm">🚫 ซ่อนอยู่ (ไม่รวมในเอกสาร)</span>'
+                    : '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-black border border-emerald-300">🟢 รวมในเอกสาร (นำไปส่ง)</span>';
+
+                const actionButton = isHidden
+                    ? `<button onclick="restoreBranchInDocument('${escapeDocumentText(bCode)}')" class="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs px-3.5 py-2 rounded-xl shadow transition active:scale-95 flex items-center gap-1.5 shrink-0">
+                        <span>↩️</span><span>ดึงกลับมาแสดง</span>
+                       </button>`
+                    : `<button onclick="hideBranchInDocument('${escapeDocumentText(bCode)}')" class="bg-rose-50 hover:bg-rose-100 text-rose-700 hover:text-rose-900 border border-rose-300 font-black text-xs px-3.5 py-2 rounded-xl transition active:scale-95 flex items-center gap-1.5 shrink-0">
+                        <span>❌</span><span>ซ่อนออกจากเอกสาร</span>
+                       </button>`;
+
+                return `
+                    <div class="p-3.5 rounded-2xl border-2 ${cardBorder} shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition">
+                        <div class="min-w-0 flex-1">
+                            <div class="flex items-center gap-2 flex-wrap mb-1">
+                                <span class="font-black text-base md:text-lg text-slate-900 tracking-wider font-mono">${escapeDocumentText(bCode)}</span>
+                                <span class="text-xs font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">${escapeDocumentText(ownerDisplay)}</span>
+                                ${statusBadge}
+                            </div>
+                            <div class="text-sm font-bold text-slate-700 truncate">${escapeDocumentText(cleanBranchName)}</div>
+                            <div class="flex items-center gap-3 mt-1.5 text-xs text-slate-500 font-medium">
+                                <span>📍 จ.${escapeDocumentText(province)}</span>
+                                <span>📦 ยอด: <b class="text-slate-800 font-black">${summary.total}</b> กล่อง</span>
+                                <span>🪵 พาเลท: <b class="text-indigo-800 font-black">${summary.pallet || '-'}</b></span>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2 self-end sm:self-center">
+                            ${actionButton}
+                        </div>
+                    </div>
+                `;
+            }).join('');
         }
 
         let pushSummaryTimer = null;
@@ -2469,13 +2644,16 @@
         function resetDocumentOverrides() {
             showGenericConfirm(
                 '🔄 คืนค่าเป็นยอดสแกนจริง',
-                'คุณต้องการล้างการแก้ไขตัวเลขทั้งหมด และคืนค่ากลับเป็นยอดที่สแกนจริงในระบบใช่หรือไม่?',
+                'คุณต้องการล้างการแก้ไขตัวเลขทั้งหมด และคืนค่ากลับเป็นยอดที่สแกนจริงในระบบใช่หรือไม่?\n(รวมถึงนำสาขาที่ซ่อนไว้กลับมาแสดงทั้งหมด)',
                 async () => {
                     documentOverrides = {};
                     saveDocumentOverrides();
+                    documentHiddenBranches = [];
+                    saveDocumentHiddenBranches();
                     renderShippingDocument();
+                    updateManageDocBranchesModalContent();
                     await pushDocumentSummaryToServer(true);
-                    showToast('คืนค่าเป็นยอดสแกนจริงในระบบเรียบร้อยแล้ว');
+                    showToast('คืนค่าเป็นยอดสแกนจริงและแสดงทุกสาขาเรียบร้อยแล้ว');
                 }
             );
         }
@@ -2677,7 +2855,7 @@
             return bLpn.localeCompare(aLpn, undefined, { numeric: true, sensitivity: 'base' });
         }
 
-        function getDocumentBranches() {
+        function getAllDocumentBranchesRaw() {
             const branchMap = new Map();
             allLpnsInWave.forEach(item => {
                 const code = item.branch || 'Unknown';
@@ -2689,6 +2867,18 @@
             return Array.from(branchMap.entries())
                 .sort(([a], [b]) => a.localeCompare(b))
                 .map(([code, name]) => ({ code, name }));
+        }
+
+        function getDocumentBranches() {
+            loadDocumentHiddenBranches();
+            const allBranches = getAllDocumentBranchesRaw();
+            return allBranches.filter(item => !documentHiddenBranches.includes(item.code));
+        }
+
+        function getDocumentHiddenBranches() {
+            loadDocumentHiddenBranches();
+            const allBranches = getAllDocumentBranchesRaw();
+            return allBranches.filter(item => documentHiddenBranches.includes(item.code));
         }
 
         function getStatusBadge(item) {
@@ -3099,11 +3289,63 @@
 
         function renderShippingDocument() {
             loadDocumentOverrides();
+            loadDocumentHiddenBranches();
             latestDocumentSummaries = [];
             const content = document.getElementById('shippingDocumentContent');
             const branches = getDocumentBranches();
+            const allBranches = getAllDocumentBranchesRaw();
+            const hiddenBranches = getDocumentHiddenBranches();
+
+            // Update header button label badge
+            const btnLabel = document.getElementById('docHiddenBranchesBtnLabel');
+            if (btnLabel) {
+                btnLabel.innerHTML = hiddenBranches.length > 0
+                    ? `<span class="text-amber-300 font-black">🚫 ซ่อน ${hiddenBranches.length} สาขา</span>`
+                    : 'จัดการจุดส่ง';
+            }
+
+            let hiddenBannerHtml = '';
+            if (hiddenBranches.length > 0) {
+                const badgeList = hiddenBranches.map(b => {
+                    const cleanName = getBranchNameOrFallback(b.name, b.code).replace(/\s*\([^)]+\)\s*/g, '').trim();
+                    return `<span class="inline-flex items-center gap-1.5 bg-amber-100 border border-amber-300 text-amber-900 px-2.5 py-1 rounded-lg text-xs font-black">
+                        <b>${escapeDocumentText(b.code)}</b> <span class="font-normal opacity-80 truncate max-w-[140px]">${escapeDocumentText(cleanName)}</span>
+                        <button onclick="restoreBranchInDocument('${escapeDocumentText(b.code)}')" title="ดึงสาขานี้กลับมาแสดง" class="hover:text-red-700 ml-1 text-sm font-black">×</button>
+                    </span>`;
+                }).join(' ');
+
+                hiddenBannerHtml = `
+                    <div class="bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-300 rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 no-print shadow-sm text-left">
+                        <div class="min-w-0 flex-1">
+                            <div class="flex items-center gap-2">
+                                <span class="text-xl">🚫</span>
+                                <span class="font-black text-amber-900 text-sm md:text-base">มีการซ่อน ${hiddenBranches.length} สาขาออกจากใบคุมนี้ (ไม่รวมยอดและไม่พิมพ์ลงเอกสาร):</span>
+                            </div>
+                            <div class="flex flex-wrap gap-1.5 mt-2">
+                                ${badgeList}
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2 shrink-0 self-end md:self-center">
+                            <button onclick="restoreAllHiddenBranchesInDocument()" class="bg-amber-600 hover:bg-amber-700 text-white text-xs font-black px-3.5 py-2 rounded-xl shadow transition active:scale-95 flex items-center gap-1">
+                                <span>↩️</span><span>ดึงกลับมาทั้งหมด</span>
+                            </button>
+                            <button onclick="openManageDocBranchesModal()" class="bg-slate-800 hover:bg-slate-900 text-white text-xs font-black px-3.5 py-2 rounded-xl shadow transition active:scale-95 flex items-center gap-1">
+                                <span>⚙️</span><span>จัดการสาขา</span>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }
+
             if (branches.length === 0) {
-                content.innerHTML = '<div class="text-center font-bold text-gray-600 py-10">ไม่พบข้อมูลสาขาใน Wave นี้</div>';
+                content.innerHTML = `
+                    <div class="screen-document-sheet bg-white p-8 rounded-xl shadow-xl border border-slate-200 text-center space-y-4 max-w-4xl mx-auto my-6">
+                        ${hiddenBannerHtml}
+                        <div class="text-2xl font-black text-slate-800">ไม่มีสาขาแสดงในเอกสารใบคุมนี้</div>
+                        <p class="text-sm font-bold text-slate-500">${allBranches.length > 0 ? `สาขาทั้งหมด (${allBranches.length} สาขา) ถูกซ่อนไว้อยู่` : 'ไม่พบข้อมูลสาขาใน Wave / Booking นี้'}</p>
+                        ${allBranches.length > 0 ? `<button onclick="restoreAllHiddenBranchesInDocument()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-black px-6 py-3 rounded-xl shadow-lg transition active:scale-95 text-base">↩️ ดึงทุกสาขากลับมาแสดงในเอกสาร</button>` : ''}
+                    </div>
+                `;
                 return;
             }
 
@@ -3245,13 +3487,21 @@
                         <td class="p-2 border-r border-slate-200 bg-slate-50/50 font-black text-slate-900 font-sans">${branchTotalBoxes}</td>
                         
                         <!-- 📦 พาเลท -->
-                        <td class="p-2 font-black bg-slate-50/50 text-indigo-900 font-sans">
+                        <td class="p-2 border-r border-slate-200 font-black bg-slate-50/50 text-indigo-900 font-sans">
                             <input type="number" min="0" step="1" value="${branchPallets || ''}" placeholder="0"
                                 data-branch="${escapeDocumentText(bCode)}" data-field="pallet"
                                 onchange="updateDocumentFieldValue(this.dataset.branch, 'pallet', this.value)"
                                 onkeydown="if (event.key === 'Enter') this.blur()"
                                 class="no-print w-14 max-w-full text-center bg-white border border-slate-200 rounded-lg px-1 py-1 text-indigo-900 font-black outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100">
                             <span class="print-only">${branchPallets || '-'}</span>
+                        </td>
+
+                        <!-- ❌ จัดการ ซ่อนสาขา -->
+                        <td class="no-print p-2 border-r border-slate-200 text-center">
+                            <button onclick="hideBranchInDocument('${escapeDocumentText(bCode)}')" title="ซ่อนสาขานี้ออกจากใบคุมส่งสินค้านี้"
+                                class="bg-rose-50 hover:bg-rose-100 text-rose-700 hover:text-rose-900 border border-rose-200 text-[11px] font-black px-2 py-1 rounded transition active:scale-95 flex items-center justify-center gap-1 mx-auto shadow-sm">
+                                ❌ ซ่อน
+                            </button>
                         </td>
                     </tr>
                 `;
@@ -3277,7 +3527,8 @@
                             <td class="p-3 border-r border-slate-200 text-green-600 font-bold font-sans"></td>
                             <td class="p-3 border-r border-slate-200 text-slate-800 font-bold font-sans"></td>
                             <td class="p-3 border-r border-slate-200 bg-slate-50/50 font-black text-slate-900 font-sans"></td>
-                            <td class="p-3 font-black bg-slate-50/50 text-indigo-900 font-sans"></td>
+                            <td class="p-3 border-r border-slate-200 font-black bg-slate-50/50 text-indigo-900 font-sans"></td>
+                            <td class="no-print p-3 border-r border-slate-200 text-slate-400 font-sans"></td>
                         </tr>
                     `;
                 }
@@ -3294,7 +3545,8 @@
                     <td class="p-3 border-r border-slate-200 text-green-700 font-sans">${totalGreen}</td>
                     <td class="p-3 border-r border-slate-200 text-slate-900 font-sans">${totalBlack}</td>
                     <td class="p-3 border-r border-slate-200 bg-slate-200 text-slate-950 font-sans">${totalAllBoxes}</td>
-                    <td class="p-3 bg-slate-200 text-indigo-950 font-sans">${escapeDocumentText(totalPalletDisplay)}</td>
+                    <td class="p-3 border-r border-slate-200 bg-slate-200 text-indigo-950 font-sans">${escapeDocumentText(totalPalletDisplay)}</td>
+                    <td class="no-print p-3 bg-slate-200"></td>
                 </tr>
             `;
 
@@ -3497,6 +3749,8 @@
                         <p class="text-xs md:text-sm text-slate-500 font-bold mt-1">เอกสารใบรายการคุมส่งสินค้า (Shipping Document Summary)</p>
                     </div>
 
+                    ${hiddenBannerHtml}
+
                     <!-- Metadata Grid -->
                     <div class="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-slate-50 rounded-xl border border-slate-100 text-sm">
                         <div class="flex flex-col gap-1">
@@ -3538,7 +3792,8 @@
                                     <th class="p-3 border-r border-slate-700 w-24 text-center font-sans text-green-300">TOTE เขียว</th>
                                     <th class="p-3 border-r border-slate-700 w-24 text-center font-sans text-slate-300">TOTE ดำ</th>
                                     <th class="p-3 border-r border-slate-700 w-24 text-center bg-slate-700 font-sans">รวมกล่อง</th>
-                                    <th class="p-3 w-20 text-center bg-slate-700 text-indigo-200 font-sans">พาเลท</th>
+                                    <th class="p-3 border-r border-slate-700 w-20 text-center bg-slate-700 text-indigo-200 font-sans">พาเลท</th>
+                                    <th class="no-print p-3 w-16 text-center bg-slate-700 text-rose-300 font-sans">จัดการ</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-200">
