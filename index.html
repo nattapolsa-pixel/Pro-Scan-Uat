@@ -2142,31 +2142,80 @@
             try { await ensureBackendReady(false); }
             catch (e) { isSyncing = false; syncQueueError = { ...getCurrentJobQueue()[0], status: 0, message: 'กำลังรอ Server พร้อมใช้งาน' }; updateSyncStatusUI(); return; }
 
-            // Process a bounded batch. Current Wave gets priority and one bad/stale
-            // item is rotated to the back instead of blocking every later scan.
+            const now = Date.now();
             const maxAttempts = Math.min(syncQueue.length, 20);
             let attempts = 0;
+
             while (syncQueue.length > 0 && attempts < maxAttempts) {
-                const now = Date.now();
-                let nextIndex = syncQueue.findIndex(item => !item._deadLetter && isQueuePayloadForCurrentJob(item) && Number(item._retryAfter || 0) <= now);
-                if (nextIndex < 0) nextIndex = syncQueue.findIndex(item => !item._deadLetter && Number(item._retryAfter || 0) <= now);
-                if (nextIndex < 0) break;
-                const payload = syncQueue.splice(nextIndex, 1)[0];
+                const nowTs = Date.now();
+
+                // ⚡ Standard Plan: รวมรายการที่รอส่งใน Wave เดียวกัน ส่ง batch ครั้งเดียว
+                const readyItems = [];
+                const readyIndexes = [];
+                for (let i = 0; i < syncQueue.length && readyItems.length < 10; i++) {
+                    const item = syncQueue[i];
+                    if (!item._deadLetter && !item._endpoint && Number(item._retryAfter || 0) <= nowTs && isQueuePayloadForCurrentJob(item)) {
+                        readyIndexes.push(i);
+                        readyItems.push(item);
+                    }
+                }
+                // ถ้ามีหลายรายการ → batch; ถ้ามี 1 รายการ → ส่งตรง; ถ้าไม่มี → ลองหารายการอื่น
+                let singleItem = null;
+                let singleIndex = -1;
+                if (readyItems.length === 0) {
+                    singleIndex = syncQueue.findIndex(item => !item._deadLetter && Number(item._retryAfter || 0) <= nowTs);
+                    if (singleIndex < 0) break;
+                    singleItem = syncQueue[singleIndex];
+                }
+
                 attempts += 1;
+                if (isQueuePayloadForCurrentJob(singleItem || readyItems[0])) syncQueueError = null;
+                updateSyncStatusUI();
+
                 try {
-                    if (isQueuePayloadForCurrentJob(payload)) syncQueueError = null;
-                    updateSyncStatusUI();
-                    // ✅ ใช้ fetchWithTimeout ป้องกัน request ค้างนานโดยไม่มีกำหนด
+                    // ⚡ Batch path: ส่งพร้อมกันหลายรายการ
+                    if (readyItems.length > 1) {
+                        const batchPayload = readyItems.map(item => {
+                            const p = { ...item };
+                            delete p._endpoint; delete p._retryCount; delete p._retryAfter;
+                            delete p._lastError; delete p._deadLetter; delete p._deadReason;
+                            delete p._failedAt; delete p._queuedAt;
+                            return p;
+                        });
+                        const res = await fetchWithTimeout(backendApiUrl + '/api/scan-batch', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ scans: batchPayload })
+                        }, 45000);
+                        if (res.ok) {
+                            // ลบรายการที่ส่งสำเร็จออกจาก queue (ลบจากหลังไปหน้าเพื่อไม่ให้ index เลื่อน)
+                            for (let i = readyIndexes.length - 1; i >= 0; i--) {
+                                syncQueue.splice(readyIndexes[i], 1);
+                            }
+                            saveSyncQueue(); updateSyncStatusUI();
+                            await new Promise(resolve => setTimeout(resolve, 50));
+                            continue;
+                        } else {
+                            // Batch failed → fallback ส่งแบบทีละตัวใหม่
+                            for (const item of readyItems) {
+                                item._retryCount = Number(item._retryCount || 0) + 1;
+                                item._retryAfter = Date.now() + 2000;
+                            }
+                            saveSyncQueue();
+                            break;
+                        }
+                    }
+
+                    // Single item path
+                    const payload = singleItem || readyItems[0];
+                    const pIdx = singleIndex >= 0 ? singleIndex : readyIndexes[0];
+                    syncQueue.splice(pIdx, 1);
+
                     const queueEndpoint = payload._endpoint || '/api/scan';
                     const requestPayload = { ...payload };
-                    delete requestPayload._endpoint;
-                    delete requestPayload._retryCount;
-                    delete requestPayload._retryAfter;
-                    delete requestPayload._lastError;
-                    delete requestPayload._deadLetter;
-                    delete requestPayload._deadReason;
-                    delete requestPayload._failedAt;
-                    delete requestPayload._queuedAt;
+                    delete requestPayload._endpoint; delete requestPayload._retryCount; delete requestPayload._retryAfter;
+                    delete requestPayload._lastError; delete requestPayload._deadLetter; delete requestPayload._deadReason;
+                    delete requestPayload._failedAt; delete requestPayload._queuedAt;
                     const res = await fetchWithTimeout(backendApiUrl + queueEndpoint, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -2174,20 +2223,13 @@
                     }, 45000);
 
                     if (res.ok) {
-                        saveSyncQueue();
-                        updateSyncStatusUI();
+                        saveSyncQueue(); updateSyncStatusUI();
                         await new Promise(resolve => setTimeout(resolve, 50));
                     } else {
                         let detail = '';
-                        try {
-                            const errorBody = await res.json();
-                            detail = typeof errorBody.detail === 'string'
-                                ? errorBody.detail
-                                : JSON.stringify(errorBody.detail || errorBody);
-                        } catch (e) { }
+                        try { const eb = await res.json(); detail = typeof eb.detail === 'string' ? eb.detail : JSON.stringify(eb.detail || eb); } catch (e) { }
                         if (res.status === 409) {
                             const conflictMessage = detail || 'ข้อมูล LPN ถูกอีกเครื่องอัปเดตก่อนแล้ว';
-                            // รายการนี้ห้าม retry เพราะเป็นยอดสะสมจากฐานเก่า การส่งซ้ำจะเขียนทับงานของอีกเครื่อง
                             syncQueue = syncQueue.filter(queued => !(
                                 String(queued.lpn || '').toUpperCase() === String(payload.lpn || '').toUpperCase()
                                 && String(queued.branch_code || '').toUpperCase() === String(payload.branch_code || '').toUpperCase()
@@ -2196,48 +2238,30 @@
                             saveSyncQueue();
                             syncQueueError = { ...payload, status: 409, lpn: payload.lpn || '-', message: conflictMessage };
                             updateSyncStatusUI();
-                            try {
-                                const latest = await fetchFreshCurrentJobData();
-                                applyWaveDataToScreen(latest.data, latest.isWaveOnly);
-                                saveCurrentWaveDataCache();
-                            } catch (refreshError) { }
+                            try { const latest = await fetchFreshCurrentJobData(); applyWaveDataToScreen(latest.data, latest.isWaveOnly); saveCurrentWaveDataCache(); } catch (refreshError) { }
                             showAlert('อีกเครื่องอัปเดต LPN นี้แล้ว', `${conflictMessage}\n\nระบบยกเลิกรายการจากเครื่องนี้และโหลดค่าล่าสุด เพื่อไม่ให้ยอดของอีกคนถูกเขียนทับ`);
-                            syncQueueError = null;
-                            updateSyncStatusUI();
-                            break;
+                            syncQueueError = null; updateSyncStatusUI(); break;
                         }
                         payload._retryCount = Number(payload._retryCount || 0) + 1;
                         payload._retryAfter = Date.now() + Math.min(30000, 1500 * Math.pow(2, Math.min(payload._retryCount, 4)));
                         payload._lastError = detail || `HTTP ${res.status}`;
-                        // 4xx กลุ่มนี้เป็นข้อมูลที่ต้องให้คนแก้ จึงหยุดส่งได้
-                        // ส่วน 5xx/timeout เป็นอาการชั่วคราว ห้ามเปลี่ยนเป็นรายการเสียเพราะข้อมูลยังส่งซ้ำได้
-                        if ([400, 404, 422].includes(res.status)) {
-                            payload._deadLetter = true; payload._deadReason = payload._lastError; payload._failedAt = new Date().toISOString();
-                        }
-                        syncQueue.push(payload);
-                        saveSyncQueue();
-                        syncQueueError = {
-                            ...payload,
-                            status: res.status,
-                            lpn: payload.lpn || '-',
-                            message: detail || `HTTP ${res.status}`
-                        };
+                        if ([400, 404, 422].includes(res.status)) { payload._deadLetter = true; payload._deadReason = payload._lastError; payload._failedAt = new Date().toISOString(); }
+                        syncQueue.push(payload); saveSyncQueue();
+                        syncQueueError = { ...payload, status: res.status, lpn: payload.lpn || '-', message: detail || `HTTP ${res.status}` };
                     }
                 } catch (e) {
-                    payload._retryCount = Number(payload._retryCount || 0) + 1;
-                    payload._retryAfter = Date.now() + Math.min(30000, 1500 * Math.pow(2, Math.min(payload._retryCount, 4)));
-                    payload._lastError = e && e.name === 'AbortError' ? 'หมดเวลารอ Server' : 'เชื่อมต่อ Server ไม่สำเร็จ';
-                    syncQueue.push(payload);
-                    saveSyncQueue();
-                    syncQueueError = {
-                        ...payload,
-                        status: 0,
-                        lpn: payload.lpn || '-',
-                        message: e && e.name === 'AbortError' ? 'หมดเวลารอ Server' : 'เชื่อมต่อ Server ไม่สำเร็จ'
-                    };
+                    const payload = singleItem || readyItems[0];
+                    if (payload) {
+                        payload._retryCount = Number(payload._retryCount || 0) + 1;
+                        payload._retryAfter = Date.now() + Math.min(30000, 1500 * Math.pow(2, Math.min(payload._retryCount, 4)));
+                        payload._lastError = e && e.name === 'AbortError' ? 'หมดเวลารอ Server' : 'เชื่อมต่อ Server ไม่สำเร็จ';
+                        syncQueue.push(payload); saveSyncQueue();
+                        syncQueueError = { ...payload, status: 0, lpn: payload.lpn || '-', message: payload._lastError };
+                    }
                 }
             }
             isSyncing = false; updateSyncStatusUI();
+
         }
         async function waitForSyncQueue(timeoutMs = 60000) {
             const deadline = Date.now() + timeoutMs;
