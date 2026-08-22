@@ -3086,6 +3086,10 @@
                 return;
             }
 
+            if (typeof submitAllUnsubmittedPallets === 'function') {
+                submitAllUnsubmittedPallets(false);
+            }
+
             // ⚡ เปิดหน้าเอกสารทันทีแบบ 0 วินาทีจากข้อมูลในเครื่อง ไม่ต้องรอโหลด
             document.getElementById('shippingDocumentModal').classList.remove('hidden');
             document.getElementById('shippingDocumentModal').classList.add('flex');
@@ -5520,10 +5524,49 @@
                 const modal = document.getElementById('shippingDocumentModal');
                 if (modal && !modal.classList.contains('hidden')) renderShippingDocument();
             }
+            function submitAllUnsubmittedPallets(showFeedback = false) {
+                if (!selectedBranchCode) return false;
+                const branchPalletNos = getCurrentBranchPalletNos(selectedBranchCode);
+                let submittedAny = false;
+                const waves = (activeWavesList.length ? activeWavesList : String(currentWave || '').split(','))
+                    .map(w => String(w || '').trim()).filter(Boolean);
+
+                branchPalletNos.forEach(no => {
+                    if (!submittedPalletNos.has(no) && getPalletItems(no).length > 0) {
+                        const items = getPalletItems(no);
+                        const sampleItem = items[0] || {};
+                        const color = sampleItem.palletColor || activePalletColor || 'Green';
+                        submittedPalletNos.add(no);
+                        pushToQueue({
+                            _endpoint: '/api/submit-pallet',
+                            waves,
+                            booking_no: currentBookingNo || '',
+                            branch_code: selectedBranchCode,
+                            branch_name: selectedBranchName,
+                            pallet_no: no,
+                            color: color,
+                            emp_id: loggedInEmpId
+                        });
+                        submittedAny = true;
+                    }
+                });
+
+                if (submittedAny) {
+                    persistPalletWorkflowState();
+                    syncSubmittedPalletDocumentCount();
+                    if (showFeedback) {
+                        showToast(`✅ บันทึกส่งพาเลทอัตโนมัติเรียบร้อย (${submittedPalletNos.size} พาเลท)`);
+                    }
+                }
+                return submittedAny;
+            }
+
             function markActivePalletSubmitted(showFeedback = true) {
                 const current = getPersistedActivePallet();
                 const no = parseInt(current.no) || 0;
-                if (!no || getPalletItems(no).length === 0) return false;
+                if (!no || getPalletItems(no).length === 0) {
+                    return submitAllUnsubmittedPallets(showFeedback);
+                }
                 submittedPalletNos.add(no);
                 const waves = (activeWavesList.length ? activeWavesList : String(currentWave || '').split(','))
                     .map(w => String(w || '').trim()).filter(Boolean);
@@ -5537,6 +5580,7 @@
                     color: current.color || '',
                     emp_id: loggedInEmpId
                 });
+                submitAllUnsubmittedPallets(false);
                 persistPalletWorkflowState();
                 syncSubmittedPalletDocumentCount();
                 if (showFeedback) {
@@ -5810,6 +5854,9 @@
             }
             async function setActivePallet(color, type) {
                 if (isAllocatingPallet) return;
+                if (correctionPalletNo) finishPalletCorrection(false);
+                // ⚡ Auto-Submit: ส่งพาเลทเดิมที่มีของอัตโนมัติก่อนเริ่มพาเลทใหม่ (ลื่นไหล ไม่ต้องมี Popup เตือน)
+                submitAllUnsubmittedPallets(false);
                 isAllocatingPallet = true;
                 palletColorMode = false;
                 activePalletNo = 0;
