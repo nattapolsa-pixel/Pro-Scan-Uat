@@ -1596,6 +1596,13 @@
         // 💡 เพิ่มบรรทัดนี้กลับมา เพื่อให้ระบบ Login ตรวจรหัสพนักงานได้
         const employeeApiUrl = 'https://script.google.com/macros/s/AKfycbybmW6N7TxfsHqEa-Fx6ayy8M8xfjKGmTYO27izmbEoLJmQRrFD3i9c0XogP0fG6tlG/exec';
         const branchProvinceSheetId = '1-qmS7WmLjkbrDxcdo_Ep_FBRWMDpuQQoetKgJ9CQYMY';
+        const bookingSenderSheetId = '1jOnJnnwlWZ491FEAFXAMgc7BftssHZcZp8x17LOQj6k';
+        const bookingSenderSheetGid = '499980322';
+        const bookingSenderCacheKey = 'proScannerBookingSenderCache';
+        const bookingSenderCacheTtlMs = 30 * 60 * 1000;
+        let bookingSenderMap = {};
+        let bookingSenderLoaded = false;
+        let bookingSenderLoadPromise = null;
         const waveDataCachePrefix = 'proScannerWaveDataCache:';
         const waveDataCacheIndexKey = 'proScannerWaveDataCacheIndex';
         const waveDataCacheMaxItems = 8;
@@ -2804,6 +2811,110 @@
 
         readCachedBranchProvinceMap();
 
+        function readCachedBookingSenderMap() {
+            try {
+                const cached = JSON.parse(localStorage.getItem(bookingSenderCacheKey));
+                if (cached && cached.data && cached.saved_at && (Date.now() - cached.saved_at < bookingSenderCacheTtlMs)) {
+                    bookingSenderMap = cached.data;
+                    bookingSenderLoaded = true;
+                    return bookingSenderMap;
+                }
+            } catch (e) { }
+            return bookingSenderMap;
+        }
+
+        function saveBookingSenderMap(data) {
+            try {
+                localStorage.setItem(bookingSenderCacheKey, JSON.stringify({
+                    saved_at: Date.now(),
+                    data
+                }));
+            } catch (e) { }
+        }
+
+        function applyBookingSenderSheetResponse(response) {
+            const rows = response && response.table && Array.isArray(response.table.rows) ? response.table.rows : [];
+            const nextMap = { ...bookingSenderMap };
+
+            rows.forEach(row => {
+                const cells = row && Array.isArray(row.c) ? row.c : [];
+                const bookingVal = getSheetCellText(cells[0]);
+                const senderVal = getSheetCellText(cells[1]);
+
+                if (!bookingVal || !senderVal) return;
+                const cleanKey = bookingVal.toUpperCase().replace(/\s+/g, '');
+                const compactKey = cleanKey.replace(/-/g, '');
+                nextMap[cleanKey] = senderVal;
+                nextMap[compactKey] = senderVal;
+                if (/^\d{6,}$/.test(compactKey)) {
+                    nextMap[`B001-${compactKey}`] = senderVal;
+                }
+            });
+
+            if (Object.keys(nextMap).length > 0) {
+                bookingSenderMap = nextMap;
+                bookingSenderLoaded = true;
+                saveBookingSenderMap(nextMap);
+            }
+
+            return bookingSenderMap;
+        }
+
+        function loadBookingSenderMap(specificBooking = '') {
+            readCachedBookingSenderMap();
+            const bookingClean = String(specificBooking || currentBookingNo || '').trim().toUpperCase().replace(/\s+/g, '');
+            if (bookingClean && (bookingSenderMap[bookingClean] || bookingSenderMap[bookingClean.replace(/-/g, '')])) {
+                return Promise.resolve(bookingSenderMap);
+            }
+            if (bookingSenderLoadPromise) return bookingSenderLoadPromise;
+
+            bookingSenderLoadPromise = new Promise((resolve) => {
+                const callbackName = `bookingSenderSheetCallback_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+                const script = document.createElement('script');
+                let settled = false;
+
+                const finish = (value) => {
+                    if (settled) return;
+                    settled = true;
+                    clearTimeout(timeout);
+                    delete window[callbackName];
+                    script.remove();
+                    resolve(value || bookingSenderMap);
+                };
+
+                const timeout = setTimeout(() => {
+                    finish(bookingSenderMap);
+                }, 8000);
+
+                window[callbackName] = response => {
+                    finish(applyBookingSenderSheetResponse(response));
+                };
+
+                script.onerror = () => {
+                    finish(bookingSenderMap);
+                };
+
+                const tq = bookingClean
+                    ? `SELECT K, Q WHERE K = '${bookingClean}' OR K = '${bookingClean.replace(/-/g, '')}' LIMIT 5`
+                    : `SELECT K, Q WHERE K IS NOT NULL`;
+                script.src = `https://docs.google.com/spreadsheets/d/${bookingSenderSheetId}/gviz/tq?gid=${bookingSenderSheetGid}&tqx=out:json;responseHandler:${callbackName}&tq=${encodeURIComponent(tq)}`;
+                document.head.appendChild(script);
+            }).finally(() => {
+                bookingSenderLoadPromise = null;
+            });
+
+            return bookingSenderLoadPromise;
+        }
+
+        function getSenderNameForBooking(bookingNo = currentBookingNo) {
+            const raw = String(bookingNo || '').trim().toUpperCase().replace(/\s+/g, '');
+            if (!raw) return '';
+            const compact = raw.replace(/-/g, '');
+            return bookingSenderMap[raw] || bookingSenderMap[compact] || bookingSenderMap[`B001-${compact}`] || '';
+        }
+
+        readCachedBookingSenderMap();
+
         function getExpectedQty(item) {
             return parseInt(item.Total_Qty || item.total_qty) || 1;
         }
@@ -3117,6 +3228,13 @@
                 if (modal && !modal.classList.contains('hidden')) {
                     renderShippingDocument();
                     pushDocumentSummaryToServer(true).catch(() => {});
+                }
+            }).catch(() => { });
+
+            loadBookingSenderMap(currentBookingNo).then(() => {
+                const modal = document.getElementById('shippingDocumentModal');
+                if (modal && !modal.classList.contains('hidden')) {
+                    renderShippingDocument();
                 }
             }).catch(() => { });
         }
@@ -3636,6 +3754,8 @@
             }
             if (printChunks.length === 0) printChunks.push([]);
 
+            const senderName = getSenderNameForBooking(currentBookingNo);
+
             const printPagesHtml = printChunks.map((chunk, pageIndex) => {
                 const isLastPage = pageIndex === printChunks.length - 1;
                 const blankRows = Array.from(
@@ -3699,7 +3819,7 @@
                                 <div class="print-courier">
                                     <div>
                                         <strong>คนส่ง :</strong>
-                                        <span class="print-dotted-line">&nbsp;</span>
+                                        <span class="print-dotted-line">${escapeDocumentText(senderName || '') || '&nbsp;'}</span>
                                     </div>
                                     <div class="print-role">(ผู้จัดส่งสินค้า)</div>
                                 </div>
@@ -3792,7 +3912,7 @@
                     ${hiddenBannerHtml}
 
                     <!-- Metadata Grid -->
-                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-slate-50 rounded-xl border border-slate-100 text-sm">
+                    <div class="grid grid-cols-1 md:grid-cols-5 gap-3 p-4 bg-slate-50 rounded-xl border border-slate-100 text-sm">
                         <div class="flex flex-col gap-1">
                             <span class="text-slate-400 font-bold text-xs uppercase tracking-wider">Booking No.</span>
                             <span class="text-slate-800 font-black text-base">${escapeDocumentText(currentBookingNo || '-')}</span>
@@ -3800,6 +3920,10 @@
                         <div class="flex flex-col gap-1">
                             <span class="text-slate-400 font-bold text-xs uppercase tracking-wider">Wave No.</span>
                             <span class="text-slate-800 font-black text-base">${escapeDocumentText(currentWave || '0000000000')}</span>
+                        </div>
+                        <div class="flex flex-col gap-1">
+                            <span class="text-slate-400 font-bold text-xs uppercase tracking-wider">คนส่ง (ผู้จัดส่ง)</span>
+                            <span class="text-blue-700 font-black text-base">${escapeDocumentText(senderName || '-')}</span>
                         </div>
                         <div class="flex flex-col gap-1">
                             <span class="text-slate-400 font-bold text-xs uppercase tracking-wider">ทะเบียนรถ (License Plate)</span>
@@ -4327,6 +4451,9 @@
             ]));
             currentBookingNo = data.booking_no ? String(data.booking_no).trim() : '';
             currentLicensePlate = data.license_plate ? String(data.license_plate).trim() : '';
+            if (currentBookingNo) {
+                loadBookingSenderMap(currentBookingNo).catch(() => { });
+            }
 
             if (isWaveOnly) {
                 currentWave = data.wave_no;
