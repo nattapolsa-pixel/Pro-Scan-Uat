@@ -2549,8 +2549,12 @@
         let pushSummaryTimer = null;
         async function pushDocumentSummaryToServer(isImmediate = false) {
             if (!latestDocumentSummaries || latestDocumentSummaries.length === 0) return;
+            const enrichedSummaries = latestDocumentSummaries.map(s => ({
+                ...s,
+                is_hidden: Boolean(documentHiddenBranches.includes(s.branch))
+            }));
             const payload = {
-                summaries: latestDocumentSummaries,
+                summaries: enrichedSummaries,
                 emp_id: loggedInEmpId || ''
             };
             const doSend = async () => {
@@ -2560,7 +2564,7 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload)
                     }, 30000);
-                    console.log("✅ Document summary synced to Google Sheets");
+                    console.log("✅ Document summary synced to Server & Google Sheets");
                 } catch (e) {
                     console.warn("⚠️ Document summary sync warning:", e);
                 }
@@ -2664,7 +2668,7 @@
                 const branchCount = Object.keys(documentOverrides).filter(branch => Object.keys(documentOverrides[branch] || {}).length > 0).length;
                 const fieldCount = Object.values(documentOverrides).reduce((sum, fields) => sum + Object.keys(fields || {}).length, 0);
                 const savedAt = new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date());
-                showAlert('✅ บันทึกยอดแก้ไขสำเร็จ', `บันทึกแล้ว ${fieldCount} ช่อง จาก ${branchCount} สาขา\nเวลา ${savedAt} น.\n\nส่งยอดเข้า Google Sheet และสามารถพิมพ์เอกสารต่อได้เลย`, 'border-green-600', true);
+                showAlert('✅ บันทึกยอดแก้ไขสำเร็จ', `บันทึกแล้ว ${fieldCount} ช่อง จาก ${branchCount} สาขา\nเวลา ${savedAt} น.\n\nยอดนี้จะแสดงตรงกันทุกเครื่องและส่งเข้า Google Sheet เรียบร้อยแล้ว`, 'border-green-600', true);
             } catch (e) {
                 showAlert('บันทึกยอดไม่สำเร็จ', `${e && e.message ? e.message : e}\n\nกรุณาลองกดบันทึกอีกครั้ง`, 'border-red-600', false);
             } finally {
@@ -2689,6 +2693,11 @@
                     renderShippingDocument();
                     updateManageDocBranchesModalContent();
                     await pushDocumentSummaryToServer(true);
+                    fetchWithTimeout(backendApiUrl + '/api/reset-document-overrides', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ wave: currentWave, booking: currentBookingNo, emp_id: loggedInEmpId || '' })
+                    }).catch(e => console.warn('Reset overrides on server warning:', e));
                     showToast('คืนค่าเป็นยอดสแกนจริงและแสดงทุกสาขาเรียบร้อยแล้ว');
                 }
             );
@@ -4517,7 +4526,34 @@
 
             loadBookingSenderMap(currentBookingNo).catch(() => { });
 
-            allLpnsInWave = data.lpn_list || [];
+            // โหลด Document Overrides ที่บันทึกไว้บนส่วนกลาง (เพื่อให้ทุกเครื่องเห็นยอดแก้ไขและสถานะซ่อนสาขาตรงกัน)
+            loadDocumentOverrides();
+            loadDocumentHiddenBranches();
+            if (data.document_overrides && typeof data.document_overrides === 'object') {
+                const serverOverrides = data.document_overrides || {};
+                const mergedOverrides = { ...documentOverrides };
+                const serverHidden = [];
+                for (const [bCode, ov] of Object.entries(serverOverrides)) {
+                    if (ov) {
+                        mergedOverrides[bCode] = {
+                            ...(mergedOverrides[bCode] || {}),
+                            m: (ov.m !== undefined && ov.m !== null) ? ov.m : undefined,
+                            red: (ov.red !== undefined && ov.red !== null) ? ov.red : undefined,
+                            blue: (ov.blue !== undefined && ov.blue !== null) ? ov.blue : undefined,
+                            green: (ov.green !== undefined && ov.green !== null) ? ov.green : undefined,
+                            black: (ov.black !== undefined && ov.black !== null) ? ov.black : undefined,
+                            pallet: (ov.pallet !== undefined && ov.pallet !== null) ? ov.pallet : undefined
+                        };
+                        if (ov.is_hidden) serverHidden.push(bCode);
+                    }
+                }
+                documentOverrides = mergedOverrides;
+                saveDocumentOverrides();
+                if (serverHidden.length > 0) {
+                    documentHiddenBranches = Array.from(new Set([...documentHiddenBranches, ...serverHidden]));
+                    saveDocumentHiddenBranches();
+                }
+            }
             allLpnsInWave.forEach(item => {
                 const cleanBranchName = normalizeBranchDisplayName(item.branch_name, item.branch);
                 item.branch_name = cleanBranchName || 'ไม่พบชื่อสาขา';
