@@ -5106,7 +5106,9 @@
                     const prevBreakdown = Array.isArray(target.pallet_breakdown) && target.pallet_breakdown.length
                         ? target.pallet_breakdown.filter(part => part && typeof part === 'object')
                         : (prevQty > 0 ? [{ pallet_no: parseInt(target.palletNo) || parseInt(target.pallet_no) || 0, qty: prevQty, color: 'None', type: 'Carton' }] : []);
-                    target.pallet_breakdown = [...prevBreakdown.filter(part => parseInt(part.pallet_no) !== parseInt(activePalletNo)), { pallet_no: parseInt(activePalletNo) || 0, qty: qtyVal, color: 'None', type: 'Carton' }];
+                    const samePalletPart = prevBreakdown.find(part => parseInt(part.pallet_no) === parseInt(activePalletNo));
+                    const currentPalletQty = samePalletPart ? (parseInt(samePalletPart.qty) || 0) + qtyVal : qtyVal;
+                    target.pallet_breakdown = [...prevBreakdown.filter(part => parseInt(part.pallet_no) !== parseInt(activePalletNo)), { pallet_no: parseInt(activePalletNo) || 0, qty: currentPalletQty, color: 'None', type: 'Carton' }];
                     executeScanSave('None', 'Carton', qtyVal, lpn, prevQty, cumulative);
                     if (cumulative > expectedTotal) {
                         showToast(`บันทึกแล้ว รวม ${cumulative}/${expectedTotal} — เกินเป้า ${cumulative - expectedTotal} กล่อง`, true);
