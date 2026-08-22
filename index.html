@@ -4554,6 +4554,8 @@
                     saveDocumentHiddenBranches();
                 }
             }
+
+            allLpnsInWave = data.lpn_list || [];
             allLpnsInWave.forEach(item => {
                 const cleanBranchName = normalizeBranchDisplayName(item.branch_name, item.branch);
                 item.branch_name = cleanBranchName || 'ไม่พบชื่อสาขา';
