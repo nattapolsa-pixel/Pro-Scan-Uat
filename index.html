@@ -4448,8 +4448,8 @@
 
             try {
                 const url = isWaveOnly
-                    ? backendApiUrl + `/api/check-wave?wave_no=${inputVal}`
-                    : backendApiUrl + `/api/check-booking?booking_no=${encodeURIComponent(inputVal)}`;
+                    ? backendApiUrl + `/api/check-wave?wave_no=${inputVal}&force=true&_ts=${Date.now()}`
+                    : backendApiUrl + `/api/check-booking?booking_no=${encodeURIComponent(inputVal)}&force=true&_ts=${Date.now()}`;
 
                 let res = await fetchJobDataWithRetry(url, usedCache);
                 if (requestId !== latestWaveLoadRequestId) return;
@@ -4463,7 +4463,7 @@
                         .filter(candidate => candidate !== inputVal || isWaveOnly);
 
                     for (const bookingCandidate of bookingCandidates) {
-                        const bookingUrl = backendApiUrl + `/api/check-booking?booking_no=${encodeURIComponent(bookingCandidate)}`;
+                        const bookingUrl = backendApiUrl + `/api/check-booking?booking_no=${encodeURIComponent(bookingCandidate)}&force=true&_ts=${Date.now()}`;
                         const bookingRes = await fetchJobDataWithRetry(bookingUrl, true, false);
                         if (requestId !== latestWaveLoadRequestId) return;
                         if (bookingRes.ok) {
