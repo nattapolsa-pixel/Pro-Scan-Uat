@@ -1596,13 +1596,6 @@
         // 💡 เพิ่มบรรทัดนี้กลับมา เพื่อให้ระบบ Login ตรวจรหัสพนักงานได้
         const employeeApiUrl = 'https://script.google.com/macros/s/AKfycbybmW6N7TxfsHqEa-Fx6ayy8M8xfjKGmTYO27izmbEoLJmQRrFD3i9c0XogP0fG6tlG/exec';
         const branchProvinceSheetId = '1-qmS7WmLjkbrDxcdo_Ep_FBRWMDpuQQoetKgJ9CQYMY';
-        const bookingSenderSheetId = '1jOnJnnwlWZ491FEAFXAMgc7BftssHZcZp8x17LOQj6k';
-        const bookingSenderSheetGid = '499980322';
-        const bookingSenderCacheKey = 'proScannerBookingSenderCache';
-        const bookingSenderCacheTtlMs = 30 * 60 * 1000;
-        let bookingSenderMap = {};
-        let bookingSenderLoaded = false;
-        let bookingSenderLoadPromise = null;
         const waveDataCachePrefix = 'proScannerWaveDataCache:';
         const waveDataCacheIndexKey = 'proScannerWaveDataCacheIndex';
         const waveDataCacheMaxItems = 8;
@@ -2811,61 +2804,98 @@
 
         readCachedBranchProvinceMap();
 
+        // ==================== GOOGLE SHEET BOOKING & WAVE MAP ====================
+        const bookingSenderSheetId = '1jOnJnnwlWZ491FEAFXAMgc7BftssHZcZp8x17LOQj6k';
+        const bookingSenderSheetGid = '499980322';
+        const bookingSenderCacheKey = 'pro_scanner_booking_meta_cache_v3';
+        const bookingSenderCacheTtlMs = 5 * 60 * 1000;
+        let bookingMetaMap = {};
+        let waveMetaMap = {};
+        let bookingSenderLoaded = false;
+        let bookingSenderLoadPromise = null;
+
+        function getSheetCellText(cell) {
+            if (!cell) return '';
+            if (cell.f !== undefined && cell.f !== null) return String(cell.f).trim();
+            if (cell.v !== undefined && cell.v !== null) return String(cell.v).trim();
+            return '';
+        }
+
         function readCachedBookingSenderMap() {
             try {
                 const cached = JSON.parse(localStorage.getItem(bookingSenderCacheKey));
-                if (cached && cached.data && cached.saved_at && (Date.now() - cached.saved_at < bookingSenderCacheTtlMs)) {
-                    bookingSenderMap = cached.data;
+                if (cached && cached.bookings && cached.waves && cached.saved_at && (Date.now() - cached.saved_at < bookingSenderCacheTtlMs)) {
+                    bookingMetaMap = cached.bookings;
+                    waveMetaMap = cached.waves;
                     bookingSenderLoaded = true;
-                    return bookingSenderMap;
+                    return { bookings: bookingMetaMap, waves: waveMetaMap };
                 }
             } catch (e) { }
-            return bookingSenderMap;
+            return { bookings: bookingMetaMap, waves: waveMetaMap };
         }
 
-        function saveBookingSenderMap(data) {
+        function saveBookingSenderMap(bookings, waves) {
             try {
                 localStorage.setItem(bookingSenderCacheKey, JSON.stringify({
                     saved_at: Date.now(),
-                    data
+                    bookings,
+                    waves
                 }));
             } catch (e) { }
         }
 
         function applyBookingSenderSheetResponse(response) {
             const rows = response && response.table && Array.isArray(response.table.rows) ? response.table.rows : [];
-            const nextMap = { ...bookingSenderMap };
+            const bMap = { ...bookingMetaMap };
+            const wMap = { ...waveMetaMap };
 
             rows.forEach(row => {
                 const cells = row && Array.isArray(row.c) ? row.c : [];
                 const bookingVal = getSheetCellText(cells[0]);
-                const senderVal = getSheetCellText(cells[1]);
+                const waveStr = getSheetCellText(cells[1]);
+                const senderVal = getSheetCellText(cells[2]);
+                const plateVal = getSheetCellText(cells[3]);
 
-                if (!bookingVal || !senderVal) return;
-                const cleanKey = bookingVal.toUpperCase().replace(/\s+/g, '');
-                const compactKey = cleanKey.replace(/-/g, '');
-                nextMap[cleanKey] = senderVal;
-                nextMap[compactKey] = senderVal;
-                if (/^\d{6,}$/.test(compactKey)) {
-                    nextMap[`B001-${compactKey}`] = senderVal;
+                if (!bookingVal && !waveStr) return;
+                const cleanBooking = bookingVal.toUpperCase().replace(/\s+/g, '');
+                const compactBooking = cleanBooking.replace(/-/g, '');
+                const rawNum = compactBooking.replace(/^B0*1*/i, '');
+                const waves = (waveStr.match(/\b\d{5,}\b/g) || []).map(w => String(parseInt(w, 10)));
+
+                const entry = {
+                    booking: cleanBooking,
+                    waves: waves,
+                    sender: senderVal,
+                    plate: plateVal
+                };
+
+                if (cleanBooking) {
+                    bMap[cleanBooking] = entry;
+                    bMap[compactBooking] = entry;
+                    if (rawNum) {
+                        bMap[rawNum] = entry;
+                        bMap[`B001-${rawNum}`] = entry;
+                    }
                 }
+
+                waves.forEach(w => {
+                    wMap[w] = entry;
+                    wMap[w.padStart(10, '0')] = entry;
+                });
             });
 
-            if (Object.keys(nextMap).length > 0) {
-                bookingSenderMap = nextMap;
+            if (Object.keys(bMap).length > 0 || Object.keys(wMap).length > 0) {
+                bookingMetaMap = bMap;
+                waveMetaMap = wMap;
                 bookingSenderLoaded = true;
-                saveBookingSenderMap(nextMap);
+                saveBookingSenderMap(bMap, wMap);
             }
 
-            return bookingSenderMap;
+            return { bookings: bookingMetaMap, waves: waveMetaMap };
         }
 
         function loadBookingSenderMap(specificBooking = '') {
             readCachedBookingSenderMap();
-            const bookingClean = String(specificBooking || currentBookingNo || '').trim().toUpperCase().replace(/\s+/g, '');
-            if (bookingClean && (bookingSenderMap[bookingClean] || bookingSenderMap[bookingClean.replace(/-/g, '')])) {
-                return Promise.resolve(bookingSenderMap);
-            }
             if (bookingSenderLoadPromise) return bookingSenderLoadPromise;
 
             bookingSenderLoadPromise = new Promise((resolve) => {
@@ -2879,11 +2909,11 @@
                     clearTimeout(timeout);
                     delete window[callbackName];
                     script.remove();
-                    resolve(value || bookingSenderMap);
+                    resolve(value || { bookings: bookingMetaMap, waves: waveMetaMap });
                 };
 
                 const timeout = setTimeout(() => {
-                    finish(bookingSenderMap);
+                    finish({ bookings: bookingMetaMap, waves: waveMetaMap });
                 }, 8000);
 
                 window[callbackName] = response => {
@@ -2891,12 +2921,10 @@
                 };
 
                 script.onerror = () => {
-                    finish(bookingSenderMap);
+                    finish({ bookings: bookingMetaMap, waves: waveMetaMap });
                 };
 
-                const tq = bookingClean
-                    ? `SELECT K, Q WHERE K = '${bookingClean}' OR K = '${bookingClean.replace(/-/g, '')}' LIMIT 5`
-                    : `SELECT K, Q WHERE K IS NOT NULL`;
+                const tq = `SELECT K, L, Q, R WHERE K IS NOT NULL OR L IS NOT NULL`;
                 script.src = `https://docs.google.com/spreadsheets/d/${bookingSenderSheetId}/gviz/tq?gid=${bookingSenderSheetGid}&tqx=out:json;responseHandler:${callbackName}&tq=${encodeURIComponent(tq)}`;
                 document.head.appendChild(script);
             }).finally(() => {
@@ -2906,14 +2934,34 @@
             return bookingSenderLoadPromise;
         }
 
-        function getSenderNameForBooking(bookingNo = currentBookingNo) {
-            const raw = String(bookingNo || '').trim().toUpperCase().replace(/\s+/g, '');
-            if (!raw) return '';
-            const compact = raw.replace(/-/g, '');
-            return bookingSenderMap[raw] || bookingSenderMap[compact] || bookingSenderMap[`B001-${compact}`] || '';
+        function getMetaForWaveOrBooking(waveNo = currentWave, bookingNo = currentBookingNo) {
+            const cleanWave = String(waveNo || '').replace(/\D/g, '');
+            if (cleanWave && waveMetaMap[cleanWave]) return waveMetaMap[cleanWave];
+            if (cleanWave && waveMetaMap[cleanWave.padStart(10, '0')]) return waveMetaMap[cleanWave.padStart(10, '0')];
+
+            const rawB = String(bookingNo || '').trim().toUpperCase().replace(/\s+/g, '');
+            if (rawB) {
+                const compact = rawB.replace(/-/g, '');
+                const rawNum = compact.replace(/^B0*1*/i, '');
+                return bookingMetaMap[rawB] || bookingMetaMap[compact] || bookingMetaMap[rawNum] || bookingMetaMap[`B001-${rawNum}`] || null;
+            }
+            return null;
+        }
+
+        function getSenderNameForBooking(bookingNo = currentBookingNo, waveNo = currentWave) {
+            const meta = getMetaForWaveOrBooking(waveNo, bookingNo);
+            if (meta && meta.sender) return meta.sender;
+            return '';
+        }
+
+        function getLicensePlateForWave(waveNo = currentWave, bookingNo = currentBookingNo) {
+            const meta = getMetaForWaveOrBooking(waveNo, bookingNo);
+            if (meta && meta.plate) return meta.plate;
+            return currentLicensePlate || '';
         }
 
         readCachedBookingSenderMap();
+        loadBookingSenderMap().catch(() => { });
 
         function getExpectedQty(item) {
             return parseInt(item.Total_Qty || item.total_qty) || 1;
@@ -3754,7 +3802,8 @@
             }
             if (printChunks.length === 0) printChunks.push([]);
 
-            const senderName = getSenderNameForBooking(currentBookingNo);
+            const senderName = getSenderNameForBooking(currentBookingNo, currentWave);
+            if (!currentLicensePlate) currentLicensePlate = getLicensePlateForWave(currentWave, currentBookingNo);
 
             const printPagesHtml = printChunks.map((chunk, pageIndex) => {
                 const isLastPage = pageIndex === printChunks.length - 1;
@@ -4451,9 +4500,6 @@
             ]));
             currentBookingNo = data.booking_no ? String(data.booking_no).trim() : '';
             currentLicensePlate = data.license_plate ? String(data.license_plate).trim() : '';
-            if (currentBookingNo) {
-                loadBookingSenderMap(currentBookingNo).catch(() => { });
-            }
 
             if (isWaveOnly) {
                 currentWave = data.wave_no;
@@ -4462,6 +4508,14 @@
                 activeWavesList = data.waves || [];
                 currentWave = activeWavesList.join(', ');
             }
+
+            const sheetMeta = getMetaForWaveOrBooking(currentWave, currentBookingNo);
+            if (sheetMeta) {
+                if (sheetMeta.booking) currentBookingNo = sheetMeta.booking;
+                if (sheetMeta.plate) currentLicensePlate = sheetMeta.plate;
+            }
+
+            loadBookingSenderMap(currentBookingNo).catch(() => { });
 
             allLpnsInWave = data.lpn_list || [];
             allLpnsInWave.forEach(item => {
@@ -4600,6 +4654,23 @@
                             fallbackBookingNo = bookingCandidate;
                             currentWaveDataCacheKey = lookupCacheKey;
                             break;
+                        }
+                    }
+                }
+
+                if (!res.ok) {
+                    const sheetMeta = getMetaForWaveOrBooking(inputVal, inputVal);
+                    if (sheetMeta && sheetMeta.waves && sheetMeta.waves.length > 0) {
+                        const targetWave = sheetMeta.waves[0];
+                        const waveUrl = backendApiUrl + `/api/check-wave?wave_no=${encodeURIComponent(targetWave)}&force=true&_ts=${Date.now()}`;
+                        const waveRes = await fetchJobDataWithRetry(waveUrl, true, false);
+                        if (requestId !== latestWaveLoadRequestId) return;
+                        if (waveRes.ok) {
+                            res = waveRes;
+                            lookupIsWaveOnly = sheetMeta.waves.length === 1;
+                            lookupCacheKey = getWaveDataCacheKey(inputVal, false);
+                            fallbackBookingNo = sheetMeta.booking || inputVal;
+                            currentWaveDataCacheKey = lookupCacheKey;
                         }
                     }
                 }
