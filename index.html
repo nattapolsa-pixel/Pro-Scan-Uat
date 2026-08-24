@@ -2188,12 +2188,40 @@
                             body: JSON.stringify({ scans: batchPayload })
                         }, 45000);
                         if (res.ok) {
-                            // ลบรายการที่ส่งสำเร็จออกจาก queue (ลบจากหลังไปหน้าเพื่อไม่ให้ index เลื่อน)
-                            for (let i = readyIndexes.length - 1; i >= 0; i--) {
-                                syncQueue.splice(readyIndexes[i], 1);
+                            let body = {};
+                            try { body = await res.json(); } catch (e) { }
+                            const processedIds = new Set((body.processed_transaction_ids || []).filter(Boolean));
+                            const failedById = new Map((body.errors || [])
+                                .filter(error => error && error.transaction_id)
+                                .map(error => [error.transaction_id, error]));
+                            // Backward compatibility during deployment: an old API without per-item IDs
+                            // is treated as all-success only when it did not report failed rows.
+                            if (processedIds.size === 0 && failedById.size === 0 && Number(body.failed_count || 0) === 0) {
+                                readyItems.forEach(item => processedIds.add(item.transaction_id));
                             }
+                            const successfulItems = readyItems.filter(item => processedIds.has(item.transaction_id));
+                            const successfulBranches = successfulItems.map(item => item.branch_code).filter(Boolean);
+                            syncQueue = syncQueue.filter(item => !processedIds.has(item.transaction_id));
+
+                            let hasBatchFailure = false;
+                            readyItems.filter(item => !processedIds.has(item.transaction_id)).forEach(item => {
+                                const error = failedById.get(item.transaction_id) || {};
+                                const reason = String(error.reason || 'รายการนี้ยังไม่ถูก Server รับ');
+                                item._retryCount = Number(item._retryCount || 0) + 1;
+                                item._lastError = reason;
+                                if (/ไม่พบ LPN|รหัส Wave ไม่ถูกต้อง/i.test(reason)) {
+                                    item._deadLetter = true;
+                                    item._deadReason = reason;
+                                    item._failedAt = new Date().toISOString();
+                                } else {
+                                    item._retryAfter = Date.now() + 2000;
+                                }
+                                hasBatchFailure = true;
+                            });
                             saveSyncQueue(); updateSyncStatusUI();
+                            if (successfulBranches.length) queueAutoTotalsSync(successfulBranches);
                             await new Promise(resolve => setTimeout(resolve, 50));
+                            if (hasBatchFailure) break;
                             continue;
                         } else {
                             // Batch failed → fallback ส่งแบบทีละตัวใหม่
@@ -2224,6 +2252,7 @@
 
                     if (res.ok) {
                         saveSyncQueue(); updateSyncStatusUI();
+                        if (payload.branch_code) queueAutoTotalsSync([payload.branch_code]);
                         await new Promise(resolve => setTimeout(resolve, 50));
                     } else {
                         let detail = '';
@@ -2251,7 +2280,16 @@
                     }
                 } catch (e) {
                     const payload = singleItem || readyItems[0];
-                    if (payload) {
+                    if (readyItems.length > 1) {
+                        // Batch ยังอยู่ใน queue เดิมทั้งหมด ห้าม push ซ้ำเมื่อ Network หลุด
+                        readyItems.forEach(item => {
+                            item._retryCount = Number(item._retryCount || 0) + 1;
+                            item._retryAfter = Date.now() + Math.min(30000, 1500 * Math.pow(2, Math.min(item._retryCount, 4)));
+                            item._lastError = e && e.name === 'AbortError' ? 'หมดเวลารอ Server' : 'เชื่อมต่อ Server ไม่สำเร็จ';
+                        });
+                        saveSyncQueue();
+                        syncQueueError = { ...readyItems[0], status: 0, lpn: readyItems[0].lpn || '-', message: readyItems[0]._lastError };
+                    } else if (payload) {
                         payload._retryCount = Number(payload._retryCount || 0) + 1;
                         payload._retryAfter = Date.now() + Math.min(30000, 1500 * Math.pow(2, Math.min(payload._retryCount, 4)));
                         payload._lastError = e && e.name === 'AbortError' ? 'หมดเวลารอ Server' : 'เชื่อมต่อ Server ไม่สำเร็จ';
@@ -2384,6 +2422,15 @@
         let documentOverrides = {};
         let documentHiddenBranches = [];
         let latestDocumentSummaries = [];
+        let autoTotalsSyncTimer = null;
+        let autoTotalsRetryTimer = null;
+        const pendingAutoTotalsBranches = new Set();
+        let manualSummaryTimer = null;
+        let documentOverridesRevision = 0;
+        let syncedDocumentOverridesRevision = 0;
+        function markDocumentOverridesDirty() {
+            documentOverridesRevision += 1;
+        }
         function getDocumentOverridesStorageKey() {
             return 'proScannerDocOverrides_' + (currentBookingNo || currentWave || 'default');
         }
@@ -2430,9 +2477,10 @@
                 documentHiddenBranches.push(branchCode);
                 saveDocumentHiddenBranches();
             }
+            markDocumentOverridesDirty();
             renderShippingDocument();
             updateManageDocBranchesModalContent();
-            pushDocumentSummaryToServer(false);
+            pushDocumentSummaryToServer(false, true, null, 'hide_branch');
             showToast(`ซ่อนสาขา ${branchCode} ออกจากเอกสารแล้ว`);
         }
 
@@ -2441,9 +2489,10 @@
             loadDocumentHiddenBranches();
             documentHiddenBranches = documentHiddenBranches.filter(c => c !== branchCode);
             saveDocumentHiddenBranches();
+            markDocumentOverridesDirty();
             renderShippingDocument();
             updateManageDocBranchesModalContent();
-            pushDocumentSummaryToServer(false);
+            pushDocumentSummaryToServer(false, true, null, 'restore_branch');
             showToast(`นำสาขา ${branchCode} กลับมารวมในเอกสารแล้ว`);
         }
 
@@ -2456,9 +2505,10 @@
             const count = documentHiddenBranches.length;
             documentHiddenBranches = [];
             saveDocumentHiddenBranches();
+            markDocumentOverridesDirty();
             renderShippingDocument();
             updateManageDocBranchesModalContent();
-            pushDocumentSummaryToServer(false);
+            pushDocumentSummaryToServer(false, true, null, 'restore_all_branches');
             showToast(`นำสาขากลับมาแสดงทั้งหมด ${count} สาขาเรียบร้อยแล้ว`);
         }
 
@@ -2546,35 +2596,102 @@
             }).join('');
         }
 
+        function collectDocumentSummariesForSync(branchCodes = null) {
+            loadDocumentOverrides();
+            loadDocumentHiddenBranches();
+            const wanted = Array.isArray(branchCodes) && branchCodes.length
+                ? new Set(branchCodes.map(code => normalizeBranchLookupCode(code)))
+                : null;
+            let branches = [];
+            try { branches = getAllDocumentBranchesRaw(); } catch (e) { }
+            if (!branches.length) {
+                branches = Array.from(new Set(allLpnsInWave.map(item => item.branch).filter(Boolean)))
+                    .map(code => ({ code, name: code }));
+            }
+            return branches
+                .filter(branch => !wanted || wanted.has(normalizeBranchLookupCode(branch.code)))
+                .flatMap(branch => {
+                    const branchKey = normalizeBranchLookupCode(branch.code);
+                    const waves = Array.from(new Set(allLpnsInWave
+                        .filter(item => normalizeBranchLookupCode(item.branch) === branchKey)
+                        .map(item => String(item.wave_no || '').replace(/\D/g, ''))
+                        .filter(Boolean)
+                        .map(wave => String(parseInt(wave, 10)))));
+                    return waves.length > 0
+                        ? waves.map(wave => getBranchSummaryData(branch.code, wave))
+                        : [getBranchSummaryData(branch.code)];
+                })
+                .filter(summary => summary && summary.wave)
+                .map(summary => ({
+                    ...summary,
+                    is_hidden: Boolean(documentHiddenBranches.includes(summary.branch))
+                }));
+        }
+
         let pushSummaryTimer = null;
-        async function pushDocumentSummaryToServer(isImmediate = false) {
-            if (!latestDocumentSummaries || latestDocumentSummaries.length === 0) return;
-            const enrichedSummaries = latestDocumentSummaries.map(s => ({
+        async function pushDocumentSummaryToServer(isImmediate = false, persistOverrides = false, branchCodes = null, reason = 'auto_snapshot') {
+            const currentSummaries = collectDocumentSummariesForSync(branchCodes);
+            const sourceSummaries = currentSummaries.length ? currentSummaries : (latestDocumentSummaries || []);
+            if (!sourceSummaries.length) return { status: 'skipped' };
+            const enrichedSummaries = sourceSummaries.map(s => ({
                 ...s,
                 is_hidden: Boolean(documentHiddenBranches.includes(s.branch))
             }));
             const payload = {
                 summaries: enrichedSummaries,
-                emp_id: loggedInEmpId || ''
+                emp_id: loggedInEmpId || '',
+                persist_overrides: Boolean(persistOverrides),
+                reason
             };
+            const sentRevision = documentOverridesRevision;
             const doSend = async () => {
-                try {
-                    await fetchWithTimeout(backendApiUrl + '/api/document-summary', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    }, 30000);
-                    console.log("✅ Document summary synced to Server & Google Sheets");
-                } catch (e) {
-                    console.warn("⚠️ Document summary sync warning:", e);
+                const response = await fetchWithTimeout(backendApiUrl + '/api/document-summary', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                }, 30000);
+                let body = {};
+                try { body = await response.json(); } catch (e) { }
+                if (!response.ok) throw new Error(typeof body.detail === 'string' ? body.detail : `HTTP ${response.status}`);
+                if (persistOverrides) {
+                    syncedDocumentOverridesRevision = Math.max(syncedDocumentOverridesRevision, sentRevision);
                 }
+                console.log("✅ Document summary queued for both Google Sheets", reason);
+                return body;
             };
             if (isImmediate) {
-                await doSend();
+                if (persistOverrides) clearTimeout(manualSummaryTimer);
+                return await doSend();
             } else {
-                clearTimeout(pushSummaryTimer);
-                pushSummaryTimer = setTimeout(doSend, 600);
+                if (persistOverrides) {
+                    clearTimeout(manualSummaryTimer);
+                    manualSummaryTimer = setTimeout(() => doSend().catch(e => console.warn("⚠️ Manual document sync warning:", e)), 350);
+                } else {
+                    clearTimeout(pushSummaryTimer);
+                    pushSummaryTimer = setTimeout(() => doSend().catch(e => console.warn("⚠️ Document summary sync warning:", e)), 350);
+                }
+                return { status: 'scheduled' };
             }
+        }
+
+        function queueAutoTotalsSync(branchCodes = [], delayMs = 250) {
+            (Array.isArray(branchCodes) ? branchCodes : [branchCodes]).filter(Boolean)
+                .forEach(code => pendingAutoTotalsBranches.add(normalizeBranchLookupCode(code)));
+            clearTimeout(autoTotalsSyncTimer);
+            autoTotalsSyncTimer = setTimeout(async () => {
+                const branches = Array.from(pendingAutoTotalsBranches);
+                if (!branches.length) return;
+                pendingAutoTotalsBranches.clear();
+                try {
+                    await pushDocumentSummaryToServer(true, false, branches, 'scanner_change');
+                    clearTimeout(autoTotalsRetryTimer);
+                } catch (e) {
+                    branches.forEach(code => pendingAutoTotalsBranches.add(code));
+                    console.warn('⚠️ Auto totals sync queued for retry:', e);
+                    clearTimeout(autoTotalsRetryTimer);
+                    autoTotalsRetryTimer = setTimeout(() => queueAutoTotalsSync([], 0), 3000);
+                }
+            }, Math.max(0, delayMs));
         }
 
         function updateDocumentFieldValue(branchCode, field, value) {
@@ -2587,8 +2704,9 @@
                 documentOverrides[branchCode][field] = Math.max(0, parseInt(val) || 0);
             }
             saveDocumentOverrides();
+            markDocumentOverridesDirty();
             renderShippingDocument();
-            pushDocumentSummaryToServer(false);
+            pushDocumentSummaryToServer(false, true, null, 'manual_total_edit');
         }
         let genericConfirmCallback = null;
         let isConfirmOpen = false;
@@ -2664,11 +2782,11 @@
                 if (!saved) throw new Error('พื้นที่จัดเก็บของเครื่องไม่พร้อมใช้งาน');
                 renderShippingDocument();
                 if (!latestDocumentSummaries.length) throw new Error('ไม่พบยอดสาขาที่จะบันทึก');
-                await pushDocumentSummaryToServer(true);
+                await pushDocumentSummaryToServer(true, true, null, 'manual_total_save');
                 const branchCount = Object.keys(documentOverrides).filter(branch => Object.keys(documentOverrides[branch] || {}).length > 0).length;
                 const fieldCount = Object.values(documentOverrides).reduce((sum, fields) => sum + Object.keys(fields || {}).length, 0);
                 const savedAt = new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date());
-                showAlert('✅ บันทึกยอดแก้ไขสำเร็จ', `บันทึกแล้ว ${fieldCount} ช่อง จาก ${branchCount} สาขา\nเวลา ${savedAt} น.\n\nยอดนี้จะแสดงตรงกันทุกเครื่องและส่งเข้า Google Sheet เรียบร้อยแล้ว`, 'border-green-600', true);
+                showAlert('✅ รับยอดแก้ไขเรียบร้อย', `บันทึกแล้ว ${fieldCount} ช่อง จาก ${branchCount} สาขา\nเวลา ${savedAt} น.\n\nServer รับยอดแล้ว และกำลังอัปเดตทั้งสอง Google Sheet เบื้องหลัง`, 'border-green-600', true);
             } catch (e) {
                 showAlert('บันทึกยอดไม่สำเร็จ', `${e && e.message ? e.message : e}\n\nกรุณาลองกดบันทึกอีกครั้ง`, 'border-red-600', false);
             } finally {
@@ -2690,15 +2808,22 @@
                     saveDocumentOverrides();
                     documentHiddenBranches = [];
                     saveDocumentHiddenBranches();
+                    markDocumentOverridesDirty();
                     renderShippingDocument();
                     updateManageDocBranchesModalContent();
-                    await pushDocumentSummaryToServer(true);
-                    fetchWithTimeout(backendApiUrl + '/api/reset-document-overrides', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ wave: currentWave, booking: currentBookingNo, emp_id: loggedInEmpId || '' })
-                    }).catch(e => console.warn('Reset overrides on server warning:', e));
-                    showToast('คืนค่าเป็นยอดสแกนจริงและแสดงทุกสาขาเรียบร้อยแล้ว');
+                    try {
+                        const resetResponse = await fetchWithTimeout(backendApiUrl + '/api/reset-document-overrides', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ wave: currentWave, booking: currentBookingNo, emp_id: loggedInEmpId || '' })
+                        });
+                        if (!resetResponse.ok) throw new Error(`HTTP ${resetResponse.status}`);
+                        syncedDocumentOverridesRevision = documentOverridesRevision;
+                        await pushDocumentSummaryToServer(true, false, null, 'reset_to_scanner_totals');
+                        showToast('คืนค่าเป็นยอดสแกนจริงและแสดงทุกสาขาเรียบร้อยแล้ว');
+                    } catch (e) {
+                        showAlert('คืนยอดเดิมไม่สำเร็จ', 'Server ยังไม่รับคำสั่ง กรุณาลองใหม่อีกครั้ง');
+                    }
                 }
             );
         }
@@ -3388,7 +3513,13 @@
 
         function getBranchSummaryData(bCode, specificWave = null) {
             loadDocumentOverrides();
-            const branchItems = allLpnsInWave.filter(item => (item.branch || 'Unknown') === bCode).slice().sort(compareLpnDesc);
+            const specificWaveKey = specificWave ? String(parseInt(String(specificWave).replace(/\D/g, ''), 10)) : '';
+            const branchItems = allLpnsInWave.filter(item => {
+                if ((item.branch || 'Unknown') !== bCode) return false;
+                if (!specificWaveKey) return true;
+                const itemWave = String(item.wave_no || '').replace(/\D/g, '');
+                return itemWave && String(parseInt(itemWave, 10)) === specificWaveKey;
+            }).slice().sort(compareLpnDesc);
             
             // Get owner from the items (if any item has a valid owner)
             let owner = 'Unknown';
@@ -3428,7 +3559,8 @@
                     else if (normalizedColor === 'BLUE') autoBlue += qty;
                     else if (normalizedColor === 'GREEN') autoGreen += qty;
                     else if (normalizedColor === 'BLACK') autoBlack += qty;
-                    else if (normalizedColor === 'YELLOW') yellowCount += qty;
+                    // เอกสาร/Sheet ไม่มีคอลัมน์เหลือง จึงรวมเข้ากล่อง M ให้ยอดรวมไม่หาย
+                    else if (normalizedColor === 'YELLOW') autoM += qty;
                     else autoM += qty;
                 }
             };
@@ -3470,7 +3602,19 @@
                 }
             });
 
-            const autoPalletCount = getCurrentBranchPalletNos(bCode).length;
+            let autoPalletCount = getCurrentBranchPalletNos(bCode).length;
+            if (specificWaveKey) {
+                const wavePalletNos = new Set();
+                branchItems.filter(item => item.status === 'Scanned').forEach(item => {
+                    const itemPalletNo = parseInt(item.palletNo || item.pallet_no) || 0;
+                    if (itemPalletNo > 0) wavePalletNos.add(itemPalletNo);
+                    (Array.isArray(item.pallet_breakdown) ? item.pallet_breakdown : []).forEach(part => {
+                        const partNo = parseInt(part && (part.pallet_no || part.palletNo)) || 0;
+                        if (partNo > 0) wavePalletNos.add(partNo);
+                    });
+                });
+                autoPalletCount = wavePalletNos.size;
+            }
             const ov = documentOverrides[bCode] || {};
             const mCount = (ov.m !== undefined && ov.m !== null && ov.m !== '') ? (parseInt(ov.m) || 0) : autoM;
             const redCount = (ov.red !== undefined && ov.red !== null && ov.red !== '') ? (parseInt(ov.red) || 0) : autoRed;
@@ -4531,7 +4675,10 @@
             loadDocumentHiddenBranches();
             if (data.document_overrides && typeof data.document_overrides === 'object') {
                 const serverOverrides = data.document_overrides || {};
-                const mergedOverrides = { ...documentOverrides };
+                const hasUnsavedLocalOverride = documentOverridesRevision > syncedDocumentOverridesRevision;
+                // Server เป็นแหล่งหลักเมื่อไม่มีการแก้ที่กำลังรอบันทึก ช่วยล้าง snapshot เก่าในเครื่อง
+                // และทำให้ทุก Handheld เห็นยอดแก้ไขชุดเดียวกัน
+                const mergedOverrides = hasUnsavedLocalOverride ? { ...documentOverrides } : {};
                 const serverHidden = [];
                 for (const [bCode, ov] of Object.entries(serverOverrides)) {
                     if (ov) {
@@ -4549,10 +4696,12 @@
                 }
                 documentOverrides = mergedOverrides;
                 saveDocumentOverrides();
-                if (serverHidden.length > 0) {
+                if (hasUnsavedLocalOverride) {
                     documentHiddenBranches = Array.from(new Set([...documentHiddenBranches, ...serverHidden]));
-                    saveDocumentHiddenBranches();
+                } else {
+                    documentHiddenBranches = serverHidden;
                 }
+                saveDocumentHiddenBranches();
             }
 
             allLpnsInWave = data.lpn_list || [];
@@ -5975,6 +6124,7 @@
                     applyQtyCorrectionLocally(item, newQty);
                     closeQtyCorrection();
                     updateDashboardUI(); saveCurrentWaveDataCache(); persistPalletWorkflowState();
+                    queueAutoTotalsSync([selectedBranchCode]);
                     showAlert('แก้ยอดและบันทึกหลักฐานแล้ว', `${item.lpn}\nยอดเดิม ${oldQty} → ยอดใหม่ ${newQty} กล่อง\nเหตุผล: ${reason}\nผู้แก้: ${loggedInEmpId || '-'}`, 'border-green-600', true);
                 } catch (e) {
                     const errorMessage = String(e && e.message ? e.message : e || '');
@@ -6311,7 +6461,14 @@
 
             async function closeBranchWaves(waves, branchCode, completedAtIso) {
                 if (noSaveMode) return true;
-                const results = await Promise.all(waves.map(async waveNo => {
+                const branchWaveKeys = new Set(allLpnsInWave
+                    .filter(item => (item.branch || 'Unknown') === branchCode)
+                    .map(item => String(item.wave_no || '').replace(/\D/g, ''))
+                    .filter(Boolean)
+                    .map(wave => String(parseInt(wave, 10))));
+                const relevantWaves = waves.filter(waveNo => branchWaveKeys.has(String(parseInt(String(waveNo).replace(/\D/g, ''), 10))));
+                const wavesToClose = relevantWaves.length ? relevantWaves : waves.slice(0, 1);
+                const results = await Promise.all(wavesToClose.map(async waveNo => {
                     const branchSummary = getBranchSummaryData(branchCode, waveNo);
                     for (let attempt = 0; attempt < 3; attempt++) {
                         try {
@@ -6751,7 +6908,7 @@
             <button onclick="palletModalBack()" class="mt-2.5 w-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm">← กลับไปเลือกสาขา</button>
         </div>
     </div>
-    <div class="fixed bottom-1 left-1.5 z-[1400] text-[9px] leading-none text-slate-400 font-bold pointer-events-none select-none">Pro LPN Scanner · v1.6.0 (2026-08-20)</div>
+    <div class="fixed bottom-1 left-1.5 z-[1400] text-[9px] leading-none text-slate-400 font-bold pointer-events-none select-none">Pro LPN Scanner · v1.6.1 (2026-08-24)</div>
     <div id="quickTools" class="fixed z-[1500] flex flex-col gap-2" style="bottom:16px;right:12px">
         <button onclick="openHelp()" title="วิธีใช้งาน / คำอธิบาย" class="w-11 h-11 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-black shadow-lg text-lg opacity-90">?</button>
         <button onclick="toggleBigText()" id="bigTextBtn" title="ปรับตัวอักษรใหญ่" class="w-11 h-11 rounded-full bg-slate-700 hover:bg-slate-800 text-white font-black shadow-lg text-base opacity-90">ก+</button>
