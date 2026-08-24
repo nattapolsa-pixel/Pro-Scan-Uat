@@ -4044,6 +4044,12 @@
                 const itemRows = branchItems.map((item, index) => {
                     const lpnPrefix = item.lpn.substring(0, 2);
                     let typeBadge = '';
+                    const scannerNames = String(item.scanner_emp_ids || '')
+                        .split(',').map(id => id.trim()).filter(Boolean)
+                        .map(id => employeeDB[id] || id);
+                    const scannerDisplay = scannerNames.length
+                        ? scannerNames.map(name => escapeDocumentText(name)).join('<br>')
+                        : '<span class="text-slate-400">-</span>';
                     if (item.historical_summary) {
                         const historyColor = ({ Red: 'แดง', Blue: 'น้ำเงิน', Green: 'เขียว', Black: 'ดำ' })[item.color] || item.color || '-';
                         const historyType = String(item.scan_type || '').toUpperCase() === 'CARTON' ? 'กล่อง M' : `TOTE ${historyColor}`;
@@ -4064,6 +4070,7 @@
                             <td class="p-2 border-r border-slate-100 font-sans">${typeBadge}</td>
                             <td class="p-2 border-r border-slate-100 font-sans">${getStatusBadge(item)}</td>
                             <td class="p-2 border-r border-slate-100 font-black text-slate-800 font-sans">${getActualQty(item)}</td>
+                            <td class="p-2 border-r border-slate-100 font-bold text-slate-700 font-sans">${scannerDisplay}</td>
                             <td class="p-2 text-left text-slate-700 font-sans">${getDocumentDetailHtml(item, branchItems)}</td>
                         </tr>
                     `;
@@ -4090,6 +4097,7 @@
                                         <th class="p-2 border-r border-slate-200 w-28">Type</th>
                                         <th class="p-2 border-r border-slate-200 w-24">Status</th>
                                         <th class="p-2 border-r border-slate-200 w-16">Qty</th>
+                                        <th class="p-2 border-r border-slate-200 w-28">ผู้สแกน</th>
                                         <th class="p-2">Details</th>
                                     </tr>
                                 </thead>
@@ -5788,6 +5796,7 @@
                 toteContinuationLpn = null;
                 if (target) {
                     target.status = 'Scanned';
+                    target.scanner_emp_ids = loggedInEmpId || target.scanner_emp_ids || '';
                     target.qty = previousQty + totalQty;
                     target.color = entries.length === 1 ? entries[0].color : 'Multiple';
                     target.scan_type = entries.length === 1 ? entries[0].type : 'TOTE_MULTI';
@@ -5831,6 +5840,7 @@
                 const target = allLpnsInWave.find(item => item.lpn === lpn);
                 if (target) {
                     target.status = 'Scanned'; target.qty = localTotalQty === null ? qty : localTotalQty; target.color = color; target.scan_type = type;
+                    target.scanner_emp_ids = loggedInEmpId || target.scanner_emp_ids || '';
                     target.color_breakdown = []; target.palletNo = scannedPalletNo; target.palletColor = activePalletColor;
                     if (!Array.isArray(target.pallet_breakdown) || !target.pallet_breakdown.length) target.pallet_breakdown = [{ pallet_no: scannedPalletNo, qty, color, type }];
                 }
@@ -6908,7 +6918,7 @@
             <button onclick="palletModalBack()" class="mt-2.5 w-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm">← กลับไปเลือกสาขา</button>
         </div>
     </div>
-    <div class="fixed bottom-1 left-1.5 z-[1400] text-[9px] leading-none text-slate-400 font-bold pointer-events-none select-none">Pro LPN Scanner · v1.6.1 (2026-08-24)</div>
+    <div class="fixed bottom-1 left-1.5 z-[1400] text-[9px] leading-none text-slate-400 font-bold pointer-events-none select-none">Pro LPN Scanner · v1.6.2 (2026-08-24)</div>
     <div id="quickTools" class="fixed z-[1500] flex flex-col gap-2" style="bottom:16px;right:12px">
         <button onclick="openHelp()" title="วิธีใช้งาน / คำอธิบาย" class="w-11 h-11 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-black shadow-lg text-lg opacity-90">?</button>
         <button onclick="toggleBigText()" id="bigTextBtn" title="ปรับตัวอักษรใหญ่" class="w-11 h-11 rounded-full bg-slate-700 hover:bg-slate-800 text-white font-black shadow-lg text-base opacity-90">ก+</button>
