@@ -920,9 +920,9 @@
                     📄 เอกสารใบคุมส่งสินค้า (สามารถแก้ไขตัวเลขในตารางได้ทุกช่อง)
                 </span>
                 <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2.5">
-                    <button onclick="openBookingBranchMove()" title="เพิ่มสาขาที่นับแล้วเข้ารถคันนี้"
+                    <button onclick="openBookingBranchMove()" title="ย้ายทั้งสาขา หรือแบ่งบางส่วนเข้ารถคันนี้"
                         class="group min-h-[58px] bg-gradient-to-br from-amber-400 to-orange-500 hover:from-amber-300 hover:to-orange-400 text-slate-950 font-black px-3 py-2.5 rounded-xl text-xs md:text-sm transition active:scale-95 shadow-lg shadow-orange-950/30 border border-amber-200 flex items-center justify-center gap-2">
-                        <span class="text-xl group-hover:scale-110 transition">🚚</span><span class="leading-tight">เพิ่ม/ย้ายสาขา<br><small class="font-bold opacity-75">เข้ารถคันนี้</small></span>
+                        <span class="text-xl group-hover:scale-110 transition">🚚</span><span class="leading-tight">จัดสาขาเข้ารถ<br><small class="font-bold opacity-75">ย้ายทั้งหมด / แบ่งบางส่วน</small></span>
                     </button>
                     <button onclick="openManageDocBranchesModal()" title="จัดการ ซ่อน/แสดง สาขาในเอกสารใบคุมส่งสินค้านี้"
                         class="group min-h-[58px] bg-gradient-to-br from-indigo-500 to-purple-700 hover:from-indigo-400 hover:to-purple-600 text-white font-black px-3 py-2.5 rounded-xl text-xs md:text-sm transition active:scale-95 shadow-lg shadow-indigo-950/30 border border-indigo-300/60 flex items-center justify-center gap-2">
@@ -983,16 +983,32 @@
 
     <div id="bookingBranchMoveModal" class="hidden fixed inset-0 z-[160] bg-slate-950/70 p-3 items-center justify-center">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[92vh] overflow-auto">
-            <div class="bg-amber-500 p-4 flex justify-between items-center"><div><div class="text-xs font-bold">เปลี่ยนแผนขนส่ง</div><h2 class="text-xl font-black">🚚 เพิ่ม/ย้ายสาขาเข้ารถคันนี้</h2></div><button onclick="closeBookingBranchMove()" class="text-3xl font-black">×</button></div>
+            <div class="bg-amber-500 p-4 flex justify-between items-center"><div><div class="text-xs font-bold">เปลี่ยนแผนขนส่ง</div><h2 class="text-xl font-black">🚚 จัดสาขาเข้ารถคันนี้</h2></div><button onclick="closeBookingBranchMove()" class="text-3xl font-black">×</button></div>
             <div class="p-4 space-y-3">
-                <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm"><b>Booking ปลายทาง:</b> <span id="moveTargetBooking" class="font-black text-blue-700"></span><br><span class="text-xs">ยอดสแกนและพาเลทเดิมจะถูกย้ายมาแสดง ไม่ต้องยิงใหม่</span></div>
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm"><b>Booking รถคันนี้:</b> <span id="moveTargetBooking" class="font-black text-blue-700"></span><br><span class="text-xs">เลือกได้ว่าจะย้ายทั้งสาขา หรือแบ่งเฉพาะยอดที่รถคันนี้รับไป</span></div>
+                <div class="grid grid-cols-2 gap-2">
+                    <button id="moveModeAllBtn" onclick="setBookingMoveMode('all')" class="border-2 border-blue-600 bg-blue-50 text-blue-800 rounded-xl p-3 font-black text-sm">🚚 ย้ายทั้งสาขา</button>
+                    <button id="moveModeSplitBtn" onclick="setBookingMoveMode('split')" class="border-2 border-slate-200 bg-white text-slate-700 rounded-xl p-3 font-black text-sm">📦 แบ่งบางส่วน</button>
+                </div>
                 <label class="block text-sm font-bold">Wave ของสาขาที่จะเพิ่ม<input id="moveWaveInput" inputmode="numeric" class="mt-1 w-full border-2 rounded-lg p-3 text-lg font-black" placeholder="เช่น 59078"></label>
                 <button onclick="loadWaveBranchesForMove()" class="w-full bg-slate-800 text-white rounded-lg p-3 font-black">🔎 ค้นหาสาขาใน Wave นี้</button>
                 <div id="moveBranchChoices" class="hidden space-y-2 max-h-64 overflow-auto border rounded-xl p-2 bg-slate-50"></div>
                 <div id="moveBranchPreview" class="hidden border-2 border-amber-300 bg-amber-50 rounded-xl p-3 text-sm"></div>
+                <div id="moveSplitFields" class="hidden border-2 border-purple-200 bg-purple-50 rounded-xl p-3">
+                    <div class="font-black text-purple-900 mb-2">📦 ใส่ยอดที่รถคันนี้รับไป</div>
+                    <div class="grid grid-cols-3 gap-2 text-xs">
+                        <label class="font-bold">กล่อง M<input id="moveSplitM" type="number" min="0" value="0" class="mt-1 w-full border rounded-lg p-2 text-center font-black"></label>
+                        <label class="font-bold text-red-700">TOTE แดง<input id="moveSplitRed" type="number" min="0" value="0" class="mt-1 w-full border rounded-lg p-2 text-center font-black"></label>
+                        <label class="font-bold text-blue-700">TOTE น้ำเงิน<input id="moveSplitBlue" type="number" min="0" value="0" class="mt-1 w-full border rounded-lg p-2 text-center font-black"></label>
+                        <label class="font-bold text-green-700">TOTE เขียว<input id="moveSplitGreen" type="number" min="0" value="0" class="mt-1 w-full border rounded-lg p-2 text-center font-black"></label>
+                        <label class="font-bold">TOTE ดำ<input id="moveSplitBlack" type="number" min="0" value="0" class="mt-1 w-full border rounded-lg p-2 text-center font-black"></label>
+                        <label class="font-bold text-indigo-700">พาเลท<input id="moveSplitPallet" type="number" min="0" value="0" class="mt-1 w-full border rounded-lg p-2 text-center font-black"></label>
+                    </div>
+                    <div class="text-[11px] text-purple-700 font-bold mt-2">Booking เดิมจะเหลือยอดส่วนที่ไม่ได้แบ่ง และสาขาจะอยู่ได้ทั้ง 2 Booking</div>
+                </div>
                 <label class="block text-sm font-bold">เหตุผล<select id="moveReasonInput" class="mt-1 w-full border-2 rounded-lg p-3"><option value="">-- เลือกเหตุผล --</option><option>เพิ่มจุดส่ง</option><option>เปลี่ยนรถ</option><option>รถเดิมเต็ม</option><option>จัดเส้นทางใหม่</option><option>อื่นๆ</option></select></label>
                 <label class="block text-sm font-bold">หมายเหตุ (ถ้ามี)<input id="moveNoteInput" class="mt-1 w-full border-2 rounded-lg p-3" placeholder="รายละเอียดเพิ่มเติม"></label>
-                <button id="confirmMoveBranchBtn" disabled onclick="confirmBookingBranchMove()" class="w-full bg-emerald-600 disabled:bg-slate-300 text-white rounded-lg p-3 font-black">ยืนยันเพิ่มสาขาเข้า Booking นี้</button>
+                <button id="confirmMoveBranchBtn" disabled onclick="confirmBookingBranchMove()" class="w-full bg-emerald-600 disabled:bg-slate-300 text-white rounded-lg p-3 font-black">ยืนยันย้ายทั้งสาขา</button>
             </div>
         </div>
     </div>
@@ -3338,7 +3354,8 @@
         }
 
         async function fetchFreshCurrentJobData() {
-            const isBookingMode = activeWavesList.length > 1 || String(currentWave || '').includes(',');
+            // Booking ที่มี Wave เดียวก็ยังต้องโหลดผ่าน Booking เพื่อให้สาขาที่ย้าย/แบ่งเข้ามาแสดง
+            const isBookingMode = !currentLookupIsWaveOnly;
             const url = isBookingMode
                 ? backendApiUrl + `/api/check-booking?booking_no=${encodeURIComponent(currentBookingNo)}&_ts=${Date.now()}`
                 : backendApiUrl + `/api/check-wave?wave_no=${encodeURIComponent(activeWavesList[0] || currentWave)}&_ts=${Date.now()}`;
@@ -3431,9 +3448,19 @@
         }
 
         let bookingBranchMovePreview = null;
+        let bookingBranchMoveMode = 'all';
+        function setBookingMoveMode(mode) {
+            bookingBranchMoveMode = mode === 'split' ? 'split' : 'all';
+            const isSplit = bookingBranchMoveMode === 'split';
+            document.getElementById('moveModeAllBtn').className = `border-2 ${isSplit ? 'border-slate-200 bg-white text-slate-700' : 'border-blue-600 bg-blue-50 text-blue-800'} rounded-xl p-3 font-black text-sm`;
+            document.getElementById('moveModeSplitBtn').className = `border-2 ${isSplit ? 'border-purple-600 bg-purple-50 text-purple-800' : 'border-slate-200 bg-white text-slate-700'} rounded-xl p-3 font-black text-sm`;
+            document.getElementById('moveSplitFields').classList.toggle('hidden', !isSplit || !bookingBranchMovePreview);
+            document.getElementById('confirmMoveBranchBtn').textContent = isSplit ? 'ยืนยันแบ่งยอดเข้า Booking นี้' : 'ยืนยันย้ายทั้งสาขา';
+        }
         function openBookingBranchMove() {
             if (!currentBookingNo) return showAlert('ไม่พบ Booking ปลายทาง', 'ฟังก์ชันนี้ใช้เมื่อเปิดงานด้วย Booking เท่านั้น');
             bookingBranchMovePreview = null;
+            setBookingMoveMode('all');
             document.getElementById('moveTargetBooking').textContent = currentBookingNo;
             document.getElementById('moveWaveInput').value = '';
             document.getElementById('moveReasonInput').value = '';
@@ -3441,6 +3468,7 @@
             document.getElementById('moveBranchChoices').classList.add('hidden');
             document.getElementById('moveBranchChoices').innerHTML = '';
             document.getElementById('moveBranchPreview').classList.add('hidden');
+            document.getElementById('moveSplitFields').classList.add('hidden');
             document.getElementById('confirmMoveBranchBtn').disabled = true;
             const modal = document.getElementById('bookingBranchMoveModal'); modal.classList.remove('hidden'); modal.classList.add('flex');
         }
@@ -3472,19 +3500,39 @@
             const closed = item.is_closed ? '✅ ปิดจบแล้ว' : '🟡 ยังไม่ Stamp ปิดสาขา';
             document.getElementById('moveBranchPreview').innerHTML = `<div class="font-black text-lg">เลือก: ${escapeDocumentText(item.branch_code)} — ${escapeDocumentText(item.branch_name)}</div><div class="grid grid-cols-2 gap-2 mt-2"><div><b>Booking ปัจจุบัน</b><br>${escapeDocumentText(item.current_booking || '-')}</div><div><b>สถานะ</b><br>${closed}</div><div><b>LPN ยิงแล้ว</b><br>${item.lpn_scanned}/${item.lpn_total}</div><div><b>ยอดนับ</b><br>${item.box_qty} กล่อง / ${item.pallet_count} พาเลท</div></div><div class="mt-2 text-xs text-red-700 font-bold">ยืนยันแล้ว Booking ${escapeDocumentText(currentBookingNo)} จะรวมยอดเดิมทันที ไม่ต้องยิงใหม่</div>`;
             document.getElementById('moveBranchPreview').classList.remove('hidden');
+            const totals = item.totals || {};
+            ['M', 'Red', 'Blue', 'Green', 'Black', 'Pallet'].forEach(name => {
+                const input = document.getElementById('moveSplit' + name);
+                if (input) { input.value = 0; input.max = parseInt(totals[name.toLowerCase()]) || 0; }
+            });
+            document.getElementById('moveSplitFields').classList.toggle('hidden', bookingBranchMoveMode !== 'split');
             document.getElementById('confirmMoveBranchBtn').disabled = String(item.current_booking || '').toUpperCase() === String(currentBookingNo || '').toUpperCase();
         }
         async function confirmBookingBranchMove() {
             const reason = document.getElementById('moveReasonInput').value;
             if (!bookingBranchMovePreview || !reason) return showAlert('ข้อมูลไม่ครบ', 'กรุณาตรวจสอบสาขาและเลือกเหตุผล');
-            showLoading('กำลังย้ายสาขาและบันทึกหลักฐาน...');
+            const isSplit = bookingBranchMoveMode === 'split';
+            const split = isSplit ? {
+                m: parseInt(document.getElementById('moveSplitM').value) || 0,
+                red: parseInt(document.getElementById('moveSplitRed').value) || 0,
+                blue: parseInt(document.getElementById('moveSplitBlue').value) || 0,
+                green: parseInt(document.getElementById('moveSplitGreen').value) || 0,
+                black: parseInt(document.getElementById('moveSplitBlack').value) || 0,
+                pallet: parseInt(document.getElementById('moveSplitPallet').value) || 0
+            } : {};
+            if (isSplit && (split.m + split.red + split.blue + split.green + split.black) <= 0) return showAlert('ยังไม่ได้ใส่ยอด', 'กรุณาใส่ยอดกล่องที่รถคันนี้รับไปอย่างน้อย 1 กล่อง');
+            showLoading(isSplit ? 'กำลังแบ่งยอดและบันทึกหลักฐาน...' : 'กำลังย้ายสาขาและบันทึกหลักฐาน...');
             try {
-                const res = await fetchWithTimeout(backendApiUrl + '/api/move-booking-branch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ target_booking: currentBookingNo, wave_no: bookingBranchMovePreview.wave_no, branch_code: bookingBranchMovePreview.branch_code, reason, note: document.getElementById('moveNoteInput').value.trim(), emp_id: loggedInEmpId }) }, 120000);
+                const endpoint = isSplit ? '/api/split-booking-branch' : '/api/move-booking-branch';
+                const payload = { target_booking: currentBookingNo, wave_no: bookingBranchMovePreview.wave_no, branch_code: bookingBranchMovePreview.branch_code, reason, note: document.getElementById('moveNoteInput').value.trim(), emp_id: loggedInEmpId, ...split };
+                const res = await fetchWithTimeout(backendApiUrl + endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }, 120000);
                 const data = await res.json();
                 if (!res.ok) throw new Error(typeof data.detail === 'string' ? data.detail : `HTTP ${res.status}`);
                 closeBookingBranchMove();
                 const latest = await fetchFreshCurrentJobData(); applyWaveDataToScreen(latest.data, latest.isWaveOnly); saveCurrentWaveDataCache(); renderShippingDocument(); shippingDocumentVerifiedAt = Date.now();
-                showAlert('เพิ่มสาขาเข้ารถเรียบร้อย', `${bookingBranchMovePreview.branch_code}\n${data.previous_booking || '-'} → ${data.target_booking}\nยอดเดิมถูกนำมาใช้ ไม่ต้องสแกนใหม่`, 'border-green-600', true);
+                showAlert(isSplit ? 'แบ่งยอดเข้ารถเรียบร้อย' : 'ย้ายสาขาเข้ารถเรียบร้อย', isSplit
+                    ? `${bookingBranchMovePreview.branch_code}\nสาขานี้อยู่ทั้ง ${data.source_booking} และ ${data.target_booking}\nBooking นี้รับเพิ่ม ${split.m + split.red + split.blue + split.green + split.black} กล่อง`
+                    : `${bookingBranchMovePreview.branch_code}\n${data.previous_booking || '-'} → ${data.target_booking}\nยอดเดิมถูกนำมาใช้ ไม่ต้องสแกนใหม่`, 'border-green-600', true);
             } catch (e) { showAlert('ย้ายสาขาไม่สำเร็จ', e.message || String(e)); }
             finally { hideLoading(); }
         }
@@ -3603,6 +3651,16 @@
                 }
             });
 
+            // สาขาที่แบ่งอยู่หลาย Booking ใช้ยอดจัดสรรจากส่วนกลางเป็นค่าหลัก
+            const bookingSplit = branchItems.find(item => item.booking_split_summary)?.booking_split_summary;
+            if (bookingSplit) {
+                autoM = parseInt(bookingSplit.m) || 0;
+                autoRed = parseInt(bookingSplit.red) || 0;
+                autoBlue = parseInt(bookingSplit.blue) || 0;
+                autoGreen = parseInt(bookingSplit.green) || 0;
+                autoBlack = parseInt(bookingSplit.black) || 0;
+            }
+
             let autoPalletCount = getCurrentBranchPalletNos(bCode).length;
             if (specificWaveKey) {
                 const wavePalletNos = new Set();
@@ -3616,7 +3674,9 @@
                 });
                 autoPalletCount = wavePalletNos.size;
             }
-            const ov = documentOverrides[bCode] || {};
+            if (bookingSplit) autoPalletCount = parseInt(bookingSplit.pallet) || 0;
+            // ยอดแบ่ง Booking เป็นยอดเฉพาะเที่ยวรถ ห้ามเอา override รวมของสาขามาทับ
+            const ov = bookingSplit ? {} : (documentOverrides[bCode] || {});
             const mCount = (ov.m !== undefined && ov.m !== null && ov.m !== '') ? (parseInt(ov.m) || 0) : autoM;
             const redCount = (ov.red !== undefined && ov.red !== null && ov.red !== '') ? (parseInt(ov.red) || 0) : autoRed;
             const blueCount = (ov.blue !== undefined && ov.blue !== null && ov.blue !== '') ? (parseInt(ov.blue) || 0) : autoBlue;
@@ -3643,6 +3703,7 @@
                 black: blackCount,
                 total: branchTotalBoxes,
                 pallet: branchPallets,
+                booking_split: Boolean(bookingSplit),
                 autoM, autoRed, autoBlue, autoGreen, autoBlack, autoPalletCount, paperBoxCount, yellowCount, owner
             };
         }
@@ -6919,7 +6980,7 @@
             <button onclick="palletModalBack()" class="mt-2.5 w-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm">← กลับไปเลือกสาขา</button>
         </div>
     </div>
-    <div class="fixed bottom-1 left-1.5 z-[1400] text-[9px] leading-none text-slate-400 font-bold pointer-events-none select-none">Pro LPN Scanner · v1.6.3 (2026-08-24)</div>
+    <div class="fixed bottom-1 left-1.5 z-[1400] text-[9px] leading-none text-slate-400 font-bold pointer-events-none select-none">Pro LPN Scanner · v1.7.0 (2026-08-24)</div>
     <div id="quickTools" class="fixed z-[1500] flex flex-col gap-2" style="bottom:16px;right:12px">
         <button onclick="openHelp()" title="วิธีใช้งาน / คำอธิบาย" class="w-11 h-11 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-black shadow-lg text-lg opacity-90">?</button>
         <button onclick="toggleBigText()" id="bigTextBtn" title="ปรับตัวอักษรใหญ่" class="w-11 h-11 rounded-full bg-slate-700 hover:bg-slate-800 text-white font-black shadow-lg text-base opacity-90">ก+</button>
