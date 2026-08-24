@@ -310,6 +310,22 @@
             display: none !important;
         }
 
+        .shortage-excess-page {
+            background: #fff;
+            color: #111;
+            padding: 10mm 8mm;
+            font-family: Tahoma, Arial, sans-serif;
+        }
+        .shortage-excess-page table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        .shortage-excess-page th, .shortage-excess-page td { border: 1px solid #111; padding: 3px 4px; }
+        .shortage-excess-page .shortage-meta th { font-size: 10px; font-weight: 700; text-align: center; }
+        .shortage-excess-page .shortage-meta td { height: 30px; font-size: 10px; font-weight: 700; text-align: center; }
+        .shortage-excess-page .shortage-lines th { font-size: 9px; line-height: 1.25; text-align: center; }
+        .shortage-excess-page .shortage-lines td { height: 22px; font-size: 9px; }
+        .shortage-excess-page .barcode-grid {
+            background-image: repeating-linear-gradient(90deg, transparent 0, transparent 9px, #777 10px, transparent 11px);
+        }
+
         @media print {
             @page {
                 size: A4 landscape;
@@ -404,6 +420,15 @@
             .print-page:last-child {
                 page-break-after: auto !important;
                 break-after: auto !important;
+            }
+
+            .shortage-excess-page {
+                width: 100% !important;
+                min-height: 185mm !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                box-shadow: none !important;
+                border: none !important;
             }
 
             .print-page + .print-page {
@@ -904,7 +929,7 @@
             <div class="flex items-center justify-between gap-2">
                 <div class="min-w-0">
                     <div class="text-[10px] text-gray-300 font-bold">เมนูเอกสาร</div>
-                    <h2 class="text-lg font-black truncate">เอกสารใบคุมส่งสินค้า</h2>
+                    <h2 id="shippingDocumentTitle" class="text-lg font-black truncate">เอกสารใบคุมส่งสินค้า</h2>
                 </div>
                 <button onclick="closeShippingDocument()"
                     class="bg-red-600 hover:bg-red-500 text-white px-4 py-2.5 rounded-xl font-black text-sm shadow-lg shadow-red-950/30 flex items-center gap-1 shrink-0 border border-red-400/40 transition active:scale-95">
@@ -916,34 +941,39 @@
                 </button>
             </div>
             <div class="mt-3 bg-white/5 p-3 rounded-2xl border border-white/10 shadow-inner">
-                <span class="font-bold text-blue-100 text-xs md:text-sm flex items-center gap-2 mb-3">
+                <span id="shippingDocumentSubtitle" class="font-bold text-blue-100 text-xs md:text-sm flex items-center gap-2 mb-3">
                     📄 เอกสารใบคุมส่งสินค้า (สามารถแก้ไขตัวเลขในตารางได้ทุกช่อง)
                 </span>
-                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2.5">
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2.5">
                     <button onclick="openBookingBranchMove()" title="ย้ายทั้งสาขา หรือแบ่งบางส่วนเข้ารถคันนี้"
-                        class="group min-h-[58px] bg-gradient-to-br from-amber-400 to-orange-500 hover:from-amber-300 hover:to-orange-400 text-slate-950 font-black px-3 py-2.5 rounded-xl text-xs md:text-sm transition active:scale-95 shadow-lg shadow-orange-950/30 border border-amber-200 flex items-center justify-center gap-2">
+                        class="shipping-document-action group min-h-[58px] bg-gradient-to-br from-amber-400 to-orange-500 hover:from-amber-300 hover:to-orange-400 text-slate-950 font-black px-3 py-2.5 rounded-xl text-xs md:text-sm transition active:scale-95 shadow-lg shadow-orange-950/30 border border-amber-200 flex items-center justify-center gap-2">
                         <span class="text-xl group-hover:scale-110 transition">🚚</span><span class="leading-tight">จัดสาขาเข้ารถ<br><small class="font-bold opacity-75">ย้ายทั้งหมด / แบ่งบางส่วน</small></span>
                     </button>
                     <button onclick="openManageDocBranchesModal()" title="จัดการ ซ่อน/แสดง สาขาในเอกสารใบคุมส่งสินค้านี้"
-                        class="group min-h-[58px] bg-gradient-to-br from-indigo-500 to-purple-700 hover:from-indigo-400 hover:to-purple-600 text-white font-black px-3 py-2.5 rounded-xl text-xs md:text-sm transition active:scale-95 shadow-lg shadow-indigo-950/30 border border-indigo-300/60 flex items-center justify-center gap-2">
+                        class="shipping-document-action group min-h-[58px] bg-gradient-to-br from-indigo-500 to-purple-700 hover:from-indigo-400 hover:to-purple-600 text-white font-black px-3 py-2.5 rounded-xl text-xs md:text-sm transition active:scale-95 shadow-lg shadow-indigo-950/30 border border-indigo-300/60 flex items-center justify-center gap-2">
                         <span class="text-xl group-hover:scale-110 transition">👁️</span><span class="leading-tight">ซ่อน/แสดงสาขา<br><small id="docHiddenBranchesBtnLabel" class="font-bold text-indigo-100">จัดการจุดส่ง</small></span>
                     </button>
                     <button onclick="resetDocumentOverrides()" title="คืนค่าเป็นยอดสแกนจริงในระบบ"
-                        class="group min-h-[58px] bg-gradient-to-br from-slate-600 to-slate-700 hover:from-slate-500 hover:to-slate-600 text-white font-black px-3 py-2.5 rounded-xl text-xs md:text-sm transition active:scale-95 shadow-lg border border-slate-400/60 flex items-center justify-center gap-2">
+                        class="shipping-document-action group min-h-[58px] bg-gradient-to-br from-slate-600 to-slate-700 hover:from-slate-500 hover:to-slate-600 text-white font-black px-3 py-2.5 rounded-xl text-xs md:text-sm transition active:scale-95 shadow-lg border border-slate-400/60 flex items-center justify-center gap-2">
                         <span class="text-xl group-hover:-rotate-45 transition">↩️</span><span class="leading-tight">คืนยอดเดิม<br><small class="font-bold text-slate-300">จากระบบสแกน</small></span>
                     </button>
                     <button id="saveDocumentOverridesBtn" onclick="saveDocumentOverridesUI()" title="บันทึกยอดที่แก้ไขลงเครื่อง"
-                        class="group min-h-[58px] bg-gradient-to-br from-emerald-500 to-green-700 hover:from-emerald-400 hover:to-green-600 text-white font-black px-3 py-2.5 rounded-xl text-xs md:text-sm transition active:scale-95 shadow-lg shadow-green-950/30 border border-emerald-300/60 flex items-center justify-center gap-2">
+                        class="shipping-document-action group min-h-[58px] bg-gradient-to-br from-emerald-500 to-green-700 hover:from-emerald-400 hover:to-green-600 text-white font-black px-3 py-2.5 rounded-xl text-xs md:text-sm transition active:scale-95 shadow-lg shadow-green-950/30 border border-emerald-300/60 flex items-center justify-center gap-2">
                         <span class="text-xl group-hover:scale-110 transition">💾</span><span class="leading-tight">บันทึกยอดแก้ไข<br><small class="font-bold text-emerald-100">เก็บค่าที่ปรับแล้ว</small></span>
                     </button>
-                    <button onclick="printShippingDocument()" title="สั่งพิมพ์เอกสารใบคุมส่งสินค้า"
+                    <button id="shortageDocumentToggleBtn" onclick="toggleShortageExcessDocument()" title="เปิดเอกสารใบขาดเกิน แยกหนึ่งใบต่อสาขา"
+                        class="group min-h-[58px] bg-gradient-to-br from-fuchsia-500 to-purple-700 hover:from-fuchsia-400 hover:to-purple-600 text-white font-black px-3 py-2.5 rounded-xl shadow-lg shadow-purple-950/40 flex items-center justify-center gap-2 text-xs md:text-sm transition active:scale-95 border border-fuchsia-300/60">
+                        <span class="text-xl group-hover:scale-110 transition">📋</span>
+                        <span id="shortageDocumentToggleText" class="leading-tight">เปิดใบขาดเกิน<br><small class="font-bold text-fuchsia-100">หนึ่งใบต่อหนึ่งสาขา</small></span>
+                    </button>
+                    <button onclick="printCurrentDocument()" title="สั่งพิมพ์เอกสารที่กำลังแสดง"
                         class="group min-h-[58px] bg-gradient-to-br from-blue-500 to-indigo-700 hover:from-blue-400 hover:to-indigo-600 text-white font-black px-3 py-2.5 rounded-xl shadow-lg shadow-blue-950/40 flex items-center justify-center gap-2 text-xs md:text-sm transition active:scale-95 border border-blue-300/60 ring-2 ring-blue-400/20">
                         <svg class="w-6 h-6 group-hover:scale-110 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                 d="M6 9V2h12v7m-9 8h6m-7 4h8a2 2 0 002-2v-5H6v5a2 2 0 002 2zm12-12H4a2 2 0 00-2 2v4h4v-3h12v3h4v-4a2 2 0 00-2-2z">
                             </path>
                         </svg>
-                        <span class="leading-tight">พิมพ์เอกสาร<br><small class="font-bold text-blue-100">ใบคุมส่งสินค้า</small></span>
+                        <span id="currentDocumentPrintText" class="leading-tight">พิมพ์เอกสาร<br><small class="font-bold text-blue-100">ใบคุมส่งสินค้า</small></span>
                     </button>
                 </div>
             </div>
@@ -1162,6 +1192,19 @@
                     </div>
                 </div>
                 <svg class="w-5 h-5 text-gray-800 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M9 5l7 7-7 7"></path>
+                </svg>
+            </div>
+
+            <div class="mb-4 p-4 bg-fuchsia-600 hover:bg-fuchsia-700 text-white rounded-xl shadow-md border-b-4 border-purple-900 flex items-center justify-between cursor-pointer active:scale-95 transition" onclick="openShortageExcessDocument()">
+                <div class="flex items-center gap-3">
+                    <div class="bg-purple-800 text-white p-2.5 rounded-lg shrink-0 text-2xl">📋</div>
+                    <div>
+                        <h3 class="font-black text-lg leading-tight">เอกสารใบขาดเกิน (แยกรายสาขา)</h3>
+                        <p class="text-xs font-bold opacity-90 mt-0.5">ระบบสร้างหนึ่งใบต่อหนึ่งสาขา และสั่งพิมพ์ทั้งหมดได้ครั้งเดียว</p>
+                    </div>
+                </div>
+                <svg class="w-5 h-5 text-white shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M9 5l7 7-7 7"></path>
                 </svg>
             </div>
@@ -1629,6 +1672,8 @@
 
         let loggedInEmpId = ""; let loggedInEmpName = ""; let currentWave = ""; let allLpnsInWave = [];
         let currentBookingNo = ""; let currentLicensePlate = "";
+        let activeDocumentType = 'shipping';
+        let currentTransportMeta = { carrier: '', driver: '', plate: '' };
         let isAlertOpen = false; let selectedBranchCode = ""; let selectedBranchName = "";
         let employeeDB = JSON.parse(localStorage.getItem('proScannerEmpDB')) || {};
         let backgroundTasks = 0;
@@ -3124,6 +3169,37 @@
             return currentLicensePlate || '';
         }
 
+        async function loadCurrentTransportMeta() {
+            const requestedBooking = String(currentBookingNo || '').trim().toUpperCase();
+            if (!requestedBooking) {
+                currentTransportMeta = { carrier: '', driver: '', plate: currentLicensePlate || '' };
+                return currentTransportMeta;
+            }
+            try {
+                const response = await fetchWithTimeout(
+                    backendApiUrl + `/api/transport-meta?booking=${encodeURIComponent(requestedBooking)}`,
+                    { cache: 'no-store' },
+                    30000
+                );
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const meta = await response.json();
+                if (requestedBooking !== String(currentBookingNo || '').trim().toUpperCase()) return currentTransportMeta;
+                currentTransportMeta = {
+                    carrier: String(meta.carrier || ''),
+                    driver: String(meta.driver || ''),
+                    plate: String(meta.plate || currentLicensePlate || '')
+                };
+                if (!currentLicensePlate && currentTransportMeta.plate) currentLicensePlate = currentTransportMeta.plate;
+            } catch (e) {
+                currentTransportMeta = {
+                    carrier: currentTransportMeta.carrier || '',
+                    driver: currentTransportMeta.driver || getSenderNameForBooking(currentBookingNo, currentWave) || '',
+                    plate: currentLicensePlate || getLicensePlateForWave(currentWave, currentBookingNo) || ''
+                };
+            }
+            return currentTransportMeta;
+        }
+
         readCachedBookingSenderMap();
         loadBookingSenderMap().catch(() => { });
 
@@ -3404,11 +3480,56 @@
             return true;
         }
 
-        async function openShippingDocument(preferredBranchCode = '', bypassOtherDevices = false) {
+        function updateActiveDocumentHeader() {
+            const isShortage = activeDocumentType === 'shortage';
+            const title = document.getElementById('shippingDocumentTitle');
+            const subtitle = document.getElementById('shippingDocumentSubtitle');
+            const toggle = document.getElementById('shortageDocumentToggleText');
+            const printText = document.getElementById('currentDocumentPrintText');
+            document.querySelectorAll('.shipping-document-action').forEach(button => {
+                button.classList.toggle('hidden', isShortage);
+            });
+            if (title) title.textContent = isShortage ? 'เอกสารใบขาดเกิน' : 'เอกสารใบคุมส่งสินค้า';
+            if (subtitle) subtitle.textContent = isShortage
+                ? '📋 ใบขาดเกิน — ระบบสร้างหนึ่งใบต่อหนึ่งสาขา'
+                : '📄 เอกสารใบคุมส่งสินค้า (สามารถแก้ไขตัวเลขในตารางได้ทุกช่อง)';
+            if (toggle) toggle.innerHTML = isShortage
+                ? 'กลับใบคุมส่งสินค้า<br><small class="font-bold text-fuchsia-100">ดูยอดรวมทุกสาขา</small>'
+                : 'เปิดใบขาดเกิน<br><small class="font-bold text-fuchsia-100">หนึ่งใบต่อหนึ่งสาขา</small>';
+            if (printText) printText.innerHTML = isShortage
+                ? 'พิมพ์เอกสาร<br><small class="font-bold text-blue-100">ใบขาดเกินทุกสาขา</small>'
+                : 'พิมพ์เอกสาร<br><small class="font-bold text-blue-100">ใบคุมส่งสินค้า</small>';
+        }
+
+        function renderActiveDocument() {
+            updateActiveDocumentHeader();
+            if (activeDocumentType === 'shortage') renderShortageExcessDocument();
+            else renderShippingDocument();
+        }
+
+        function toggleShortageExcessDocument() {
+            activeDocumentType = activeDocumentType === 'shortage' ? 'shipping' : 'shortage';
+            renderActiveDocument();
+            if (activeDocumentType === 'shortage') {
+                loadCurrentTransportMeta().then(() => {
+                    const modal = document.getElementById('shippingDocumentModal');
+                    if (modal && !modal.classList.contains('hidden') && activeDocumentType === 'shortage') renderShortageExcessDocument();
+                }).catch(() => {});
+            }
+        }
+
+        function openShortageExcessDocument() {
+            currentTransportMeta = { carrier: '', driver: '', plate: currentLicensePlate || '' };
+            return openShippingDocument('', false, 'shortage');
+        }
+
+        async function openShippingDocument(preferredBranchCode = '', bypassOtherDevices = false, documentType = 'shipping') {
             if (!currentWave || allLpnsInWave.length === 0) {
                 showAlert('ยังไม่มีข้อมูล Wave', 'กรุณาเลือก Wave ก่อนเปิดเอกสารใบคุมส่งสินค้า');
                 return;
             }
+
+            activeDocumentType = documentType === 'shortage' ? 'shortage' : 'shipping';
 
             if (typeof submitAllUnsubmittedPallets === 'function') {
                 submitAllUnsubmittedPallets(false);
@@ -3417,7 +3538,8 @@
             // ⚡ เปิดหน้าเอกสารทันทีแบบ 0 วินาทีจากข้อมูลในเครื่อง ไม่ต้องรอโหลด
             document.getElementById('shippingDocumentModal').classList.remove('hidden');
             document.getElementById('shippingDocumentModal').classList.add('flex');
-            renderShippingDocument();
+            renderActiveDocument();
+            if (activeDocumentType === 'shortage') loadCurrentTransportMeta().then(renderActiveDocument).catch(() => {});
 
             // รันการตรวจสอบยอดและซิงค์กับเซิร์ฟเวอร์ส่วนกลางเบื้องหลังแบบ Non-blocking
             (async () => {
@@ -3425,7 +3547,7 @@
                     await verifyDocumentAgainstServer(bypassOtherDevices);
                     const modal = document.getElementById('shippingDocumentModal');
                     if (modal && !modal.classList.contains('hidden')) {
-                        renderShippingDocument();
+                        renderActiveDocument();
                         pushDocumentSummaryToServer(true).catch(() => {});
                     }
                 } catch (e) {
@@ -3439,7 +3561,7 @@
             loadBranchProvinceMap().then(() => {
                 const modal = document.getElementById('shippingDocumentModal');
                 if (modal && !modal.classList.contains('hidden')) {
-                    renderShippingDocument();
+                    renderActiveDocument();
                     pushDocumentSummaryToServer(true).catch(() => {});
                 }
             }).catch(() => { });
@@ -3447,7 +3569,7 @@
             loadBookingSenderMap(currentBookingNo).then(() => {
                 const modal = document.getElementById('shippingDocumentModal');
                 if (modal && !modal.classList.contains('hidden')) {
-                    renderShippingDocument();
+                    renderActiveDocument();
                 }
             }).catch(() => { });
         }
@@ -4303,6 +4425,113 @@
             return getDocumentBranches()
                 .filter(branch => getDocumentPalletCount(branch.code) === '')
                 .map(branch => branch.code);
+        }
+
+        function renderShortageExcessDocument() {
+            const content = document.getElementById('shippingDocumentContent');
+            if (!content) return;
+            const branches = getDocumentBranches();
+            const pages = branches.map(branch => {
+                const branchKey = normalizeBranchLookupCode(branch.code);
+                const waves = Array.from(new Set(allLpnsInWave
+                    .filter(item => normalizeBranchLookupCode(item.branch) === branchKey)
+                    .map(item => String(item.wave_no || '').replace(/\D/g, ''))
+                    .filter(Boolean)
+                    .map(wave => String(parseInt(wave, 10)))));
+                return {
+                    branch,
+                    wave: (waves.length ? waves : [String(currentWave || '').replace(/\D/g, '')])
+                        .filter(Boolean)
+                        .join(', ')
+                };
+            });
+
+            if (!pages.length) {
+                content.innerHTML = '<div class="bg-white rounded-2xl p-10 text-center font-black text-slate-600">ไม่พบสาขาสำหรับสร้างใบขาดเกิน</div>';
+                return;
+            }
+
+            const dateText = new Intl.DateTimeFormat('en-GB', {
+                timeZone: 'Asia/Bangkok', day: '2-digit', month: '2-digit', year: 'numeric'
+            }).format(new Date()).replace(/\s/g, '');
+            const carrier = currentTransportMeta.carrier || '';
+            const driver = currentTransportMeta.driver || getSenderNameForBooking(currentBookingNo, currentWave) || '';
+            const plate = currentTransportMeta.plate || currentLicensePlate || getLicensePlateForWave(currentWave, currentBookingNo) || '';
+            const blankRows = Array.from({ length: 20 }, (_, index) => `
+                <tr>
+                    <td class="text-center">${index + 1}</td>
+                    <td class="barcode-grid"></td>
+                    <td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+                </tr>`).join('');
+
+            content.innerHTML = pages.map((page, pageIndex) => {
+                const branchCode = normalizeBranchLookupCode(page.branch.code);
+                const branchName = getBranchNameOrFallback(page.branch.name, branchCode).trim();
+                return `
+                    <section class="print-page shortage-excess-page max-w-[1120px] w-full mx-auto shadow-xl border border-slate-300 rounded-sm">
+                        <div class="grid grid-cols-[1fr_260px] border border-black mb-2">
+                            <div class="py-3 px-4 text-center text-[15px] font-black border-r border-black">
+                                เอกสารการส่งมอบสินค้าขาด เกิน จากการจัดส่งสินค้า PTG Distribution Center (T-Park Wangnoi 1)
+                            </div>
+                            <div class="p-3 text-[10px] font-bold flex items-center">อ้างอิงใบส่งสินค้าเลขที่ : ....................................</div>
+                        </div>
+
+                        <table class="shortage-meta mb-2">
+                            <thead>
+                                <tr>
+                                    <th>วันที่จัดส่งสินค้า</th><th>Booking</th><th>ทะเบียนรถ</th><th>ชื่อขนส่ง</th><th>Carrier</th>
+                                    <th>ผู้ส่งสินค้า (สาขา)</th><th>ผู้รับสินค้า (ขนส่ง)</th><th>ผู้ตรวจนับ (DC)</th>
+                                    <th>WAVE</th><th>รหัสสาขา</th><th>ชื่อสาขา</th>
+                                </tr>
+                            </thead>
+                            <tbody><tr>
+                                <td>${escapeDocumentText(dateText)}</td>
+                                <td>${escapeDocumentText(currentBookingNo || '-')}</td>
+                                <td>${escapeDocumentText(plate || '-')}</td>
+                                <td>${escapeDocumentText(driver || '-')}</td>
+                                <td>${escapeDocumentText(carrier || '-')}</td>
+                                <td></td><td></td><td></td>
+                                <td>${escapeDocumentText(page.wave || '-')}</td>
+                                <td>${escapeDocumentText(branchCode)}</td>
+                                <td>${escapeDocumentText(branchName)}</td>
+                            </tr></tbody>
+                        </table>
+
+                        <table class="shortage-lines">
+                            <colgroup>
+                                <col style="width:4%"><col style="width:17%"><col style="width:31%">
+                                <col style="width:7%"><col style="width:7%"><col style="width:7%"><col style="width:7%"><col style="width:7%"><col style="width:13%">
+                            </colgroup>
+                            <thead>
+                                <tr>
+                                    <th rowspan="2">ลำดับ</th><th rowspan="2">บาร์โค้ดสินค้า</th><th rowspan="2">ชื่อสินค้า</th>
+                                    <th colspan="5">1. จำนวนสินค้าไม่ถูกต้อง ตรวจสอบจากเอกสาร</th>
+                                    <th>2. กรณีอื่น ๆ ที่ไม่รับสินค้า</th>
+                                </tr>
+                                <tr>
+                                    <th>จำนวนขาด<br>(ชิ้น)</th><th>จำนวนเกิน<br>(ชิ้น)</th><th>สินค้ามีจริงไม่ตรง<br>(ชิ้น)</th>
+                                    <th>สินค้าหมดอายุ<br>(ชิ้น)</th><th>สินค้าเสื่อมสภาพ<br>(ชิ้น)</th>
+                                    <th>กรณีสินค้าเสียหาย เช่น แตก บุบ รั่ว</th>
+                                </tr>
+                            </thead>
+                            <tbody>${blankRows}</tbody>
+                        </table>
+                        <div class="mt-2 text-right text-[9px] font-bold">หน้า ${pageIndex + 1} / ${pages.length}</div>
+                    </section>`;
+            }).join('');
+        }
+
+        function printCurrentDocument() {
+            if (activeDocumentType === 'shortage') printShortageExcessDocument();
+            else printShippingDocument();
+        }
+
+        function printShortageExcessDocument() {
+            renderShortageExcessDocument();
+            const originalTitle = document.title;
+            document.title = String.fromCharCode(8203);
+            window.print();
+            setTimeout(() => { document.title = originalTitle; }, 1000);
         }
 
         function printShippingDocument() {
@@ -6993,7 +7222,7 @@
             <button onclick="palletModalBack()" class="mt-2.5 w-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm">← กลับไปเลือกสาขา</button>
         </div>
     </div>
-    <div class="fixed bottom-1 left-1.5 z-[1400] text-[9px] leading-none text-slate-400 font-bold pointer-events-none select-none">Pro LPN Scanner · v1.7.2 (2026-08-24)</div>
+    <div class="fixed bottom-1 left-1.5 z-[1400] text-[9px] leading-none text-slate-400 font-bold pointer-events-none select-none">Pro LPN Scanner · v1.8.0 (2026-08-24)</div>
     <div id="quickTools" class="fixed z-[1500] flex flex-col gap-2" style="bottom:16px;right:12px">
         <button onclick="openHelp()" title="วิธีใช้งาน / คำอธิบาย" class="w-11 h-11 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-black shadow-lg text-lg opacity-90">?</button>
         <button onclick="toggleBigText()" id="bigTextBtn" title="ปรับตัวอักษรใหญ่" class="w-11 h-11 rounded-full bg-slate-700 hover:bg-slate-800 text-white font-black shadow-lg text-base opacity-90">ก+</button>
