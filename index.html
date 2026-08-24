@@ -2444,8 +2444,12 @@
         let manualSummaryTimer = null;
         let documentOverridesRevision = 0;
         let syncedDocumentOverridesRevision = 0;
-        function markDocumentOverridesDirty() {
+        const dirtyDocumentOverrideBranches = new Set();
+        function markDocumentOverridesDirty(branchCodes = []) {
             documentOverridesRevision += 1;
+            (Array.isArray(branchCodes) ? branchCodes : [branchCodes])
+                .filter(Boolean)
+                .forEach(code => dirtyDocumentOverrideBranches.add(normalizeBranchLookupCode(code)));
         }
         function getDocumentOverridesStorageKey() {
             return 'proScannerDocOverrides_' + (currentBookingNo || currentWave || 'default');
@@ -2493,7 +2497,7 @@
                 documentHiddenBranches.push(branchCode);
                 saveDocumentHiddenBranches();
             }
-            markDocumentOverridesDirty();
+            markDocumentOverridesDirty(branchCode);
             renderShippingDocument();
             updateManageDocBranchesModalContent();
             pushDocumentSummaryToServer(false, true, null, 'hide_branch');
@@ -2505,7 +2509,7 @@
             loadDocumentHiddenBranches();
             documentHiddenBranches = documentHiddenBranches.filter(c => c !== branchCode);
             saveDocumentHiddenBranches();
-            markDocumentOverridesDirty();
+            markDocumentOverridesDirty(branchCode);
             renderShippingDocument();
             updateManageDocBranchesModalContent();
             pushDocumentSummaryToServer(false, true, null, 'restore_branch');
@@ -2518,10 +2522,11 @@
                 showToast('ไม่มีสาขาที่ถูกซ่อนอยู่');
                 return;
             }
-            const count = documentHiddenBranches.length;
+            const restoredBranches = documentHiddenBranches.slice();
+            const count = restoredBranches.length;
             documentHiddenBranches = [];
             saveDocumentHiddenBranches();
-            markDocumentOverridesDirty();
+            markDocumentOverridesDirty(restoredBranches);
             renderShippingDocument();
             updateManageDocBranchesModalContent();
             pushDocumentSummaryToServer(false, true, null, 'restore_all_branches');
@@ -2648,7 +2653,14 @@
         let pushSummaryTimer = null;
         async function pushDocumentSummaryToServer(isImmediate = false, persistOverrides = false, branchCodes = null, reason = 'auto_snapshot') {
             const currentSummaries = collectDocumentSummariesForSync(branchCodes);
-            const sourceSummaries = currentSummaries.length ? currentSummaries : (latestDocumentSummaries || []);
+            let sourceSummaries = currentSummaries.length ? currentSummaries : (latestDocumentSummaries || []);
+            const sentDirtyBranches = persistOverrides ? new Set(dirtyDocumentOverrideBranches) : new Set();
+            if (persistOverrides) {
+                if (!sentDirtyBranches.size) return { status: 'skipped', reason: 'no_manual_changes' };
+                sourceSummaries = sourceSummaries.filter(summary =>
+                    sentDirtyBranches.has(normalizeBranchLookupCode(summary.branch))
+                );
+            }
             if (!sourceSummaries.length) return { status: 'skipped' };
             const enrichedSummaries = sourceSummaries.map(s => ({
                 ...s,
@@ -2672,6 +2684,7 @@
                 if (!response.ok) throw new Error(typeof body.detail === 'string' ? body.detail : `HTTP ${response.status}`);
                 if (persistOverrides) {
                     syncedDocumentOverridesRevision = Math.max(syncedDocumentOverridesRevision, sentRevision);
+                    sentDirtyBranches.forEach(branch => dirtyDocumentOverrideBranches.delete(branch));
                 }
                 console.log("✅ Document summary queued for both Google Sheets", reason);
                 return body;
@@ -2721,7 +2734,7 @@
                 documentOverrides[branchCode][field] = Math.max(0, parseInt(val) || 0);
             }
             saveDocumentOverrides();
-            markDocumentOverridesDirty();
+            markDocumentOverridesDirty(branchCode);
             renderShippingDocument();
             pushDocumentSummaryToServer(false, true, null, 'manual_total_edit');
         }
@@ -6980,7 +6993,7 @@
             <button onclick="palletModalBack()" class="mt-2.5 w-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm">← กลับไปเลือกสาขา</button>
         </div>
     </div>
-    <div class="fixed bottom-1 left-1.5 z-[1400] text-[9px] leading-none text-slate-400 font-bold pointer-events-none select-none">Pro LPN Scanner · v1.7.1 (2026-08-24)</div>
+    <div class="fixed bottom-1 left-1.5 z-[1400] text-[9px] leading-none text-slate-400 font-bold pointer-events-none select-none">Pro LPN Scanner · v1.7.2 (2026-08-24)</div>
     <div id="quickTools" class="fixed z-[1500] flex flex-col gap-2" style="bottom:16px;right:12px">
         <button onclick="openHelp()" title="วิธีใช้งาน / คำอธิบาย" class="w-11 h-11 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-black shadow-lg text-lg opacity-90">?</button>
         <button onclick="toggleBigText()" id="bigTextBtn" title="ปรับตัวอักษรใหญ่" class="w-11 h-11 rounded-full bg-slate-700 hover:bg-slate-800 text-white font-black shadow-lg text-base opacity-90">ก+</button>
