@@ -1860,22 +1860,22 @@
                 .finally(() => clearTimeout(id));
         }
 
-        async function fetchJobDataWithRetry(url, usedCache, showRetryToast = true) {
+        async function fetchJobDataWithRetry(url, usedCache, showRetryToast = true, timeoutMs = 45000, maxRetries = 2) {
             let res = null;
             let lastError = null;
-            // ลด timeout เหลือ 20 วินาที และรอระหว่าง retry เพียง 800ms เพื่อความไวขึ้น
-            for (let attempt = 0; attempt <= 2; attempt++) {
+            // Booking อาจต้องรวมข้อมูลหลาย Wave จึงต้องรอนานกว่า Wave ปกติ
+            for (let attempt = 0; attempt <= maxRetries; attempt++) {
                 try {
                     if (attempt > 0) {
                         await new Promise(r => setTimeout(r, attempt * 800));
-                        if (!usedCache && showRetryToast) showToast(`กำลังลองเชื่อมต่อใหม่ (${attempt}/2)...`);
+                        if (!usedCache && showRetryToast) showToast(`กำลังลองเชื่อมต่อใหม่ (${attempt}/${maxRetries})...`);
                     }
-                    res = await fetchWithTimeout(url, { cache: 'no-store' }, 20000);
+                    res = await fetchWithTimeout(url, { cache: 'no-store' }, timeoutMs);
                     lastError = null;
                     break;
                 } catch (err) {
                     lastError = err;
-                    if (attempt === 2) throw lastError;
+                    if (attempt === maxRetries) throw lastError;
                 }
             }
             return res;
@@ -5127,11 +5127,20 @@
             }
 
             try {
+                // ค้นหาปกติให้ใช้ Server cache ก่อน ห้าม force BigQuery ทุกครั้ง
+                // ปุ่มรีเฟรชในหน้าสาขายังคงใช้ force=true เมื่อต้องการข้อมูลสดจริง ๆ
                 const url = isWaveOnly
-                    ? backendApiUrl + `/api/check-wave?wave_no=${inputVal}&force=true&_ts=${Date.now()}`
-                    : backendApiUrl + `/api/check-booking?booking_no=${encodeURIComponent(inputVal)}&force=true&_ts=${Date.now()}`;
+                    ? backendApiUrl + `/api/check-wave?wave_no=${encodeURIComponent(inputVal)}&_ts=${Date.now()}`
+                    : backendApiUrl + `/api/check-booking?booking_no=${encodeURIComponent(inputVal)}&_ts=${Date.now()}`;
 
-                let res = await fetchJobDataWithRetry(url, usedCache);
+                // Booking รวมหลาย Wave: ให้เวลาสูงสุด 90 วินาที และไม่ยิงซ้ำถี่จน Server ทำงานซ้อน
+                let res = await fetchJobDataWithRetry(
+                    url,
+                    usedCache,
+                    true,
+                    isWaveOnly ? 45000 : 90000,
+                    isWaveOnly ? 2 : 1
+                );
                 if (requestId !== latestWaveLoadRequestId) return;
 
                 let lookupIsWaveOnly = isWaveOnly;
@@ -5143,8 +5152,8 @@
                         .filter(candidate => candidate !== inputVal || isWaveOnly);
 
                     for (const bookingCandidate of bookingCandidates) {
-                        const bookingUrl = backendApiUrl + `/api/check-booking?booking_no=${encodeURIComponent(bookingCandidate)}&force=true&_ts=${Date.now()}`;
-                        const bookingRes = await fetchJobDataWithRetry(bookingUrl, true, false);
+                        const bookingUrl = backendApiUrl + `/api/check-booking?booking_no=${encodeURIComponent(bookingCandidate)}&_ts=${Date.now()}`;
+                        const bookingRes = await fetchJobDataWithRetry(bookingUrl, true, false, 90000, 1);
                         if (requestId !== latestWaveLoadRequestId) return;
                         if (bookingRes.ok) {
                             res = bookingRes;
@@ -5161,8 +5170,8 @@
                     const sheetMeta = getMetaForWaveOrBooking(inputVal, inputVal);
                     if (sheetMeta && sheetMeta.waves && sheetMeta.waves.length > 0) {
                         const targetWave = sheetMeta.waves[0];
-                        const waveUrl = backendApiUrl + `/api/check-wave?wave_no=${encodeURIComponent(targetWave)}&force=true&_ts=${Date.now()}`;
-                        const waveRes = await fetchJobDataWithRetry(waveUrl, true, false);
+                        const waveUrl = backendApiUrl + `/api/check-wave?wave_no=${encodeURIComponent(targetWave)}&_ts=${Date.now()}`;
+                        const waveRes = await fetchJobDataWithRetry(waveUrl, true, false, 45000, 2);
                         if (requestId !== latestWaveLoadRequestId) return;
                         if (waveRes.ok) {
                             res = waveRes;
@@ -5196,7 +5205,7 @@
                     // เสนอให้ลองใหม่แทนแค่แสดง error
                     showConfirm(
                         '⚠️ เชื่อมต่อเซิร์ฟเวอร์ไม่ได้',
-                        `ไม่สามารถโหลดข้อมูล Wave/Booking ได้ (ลอง 3 ครั้งแล้ว)\n\nกรุณาตรวจสัญญาณ Wi-Fi แล้วลองใหม่อีกครั้ง`,
+                        `ระบบตอบช้ากว่าปกติและยังโหลดข้อมูลไม่สำเร็จ\n\nกรุณาลองอีกครั้ง หากยังพบปัญหาให้แจ้งเลข Wave/Booking แก่ผู้ดูแล`,
                         'ลองใหม่อีกครั้ง',
                         () => checkAndLoadWave()
                     );
@@ -7222,7 +7231,7 @@
             <button onclick="palletModalBack()" class="mt-2.5 w-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm">← กลับไปเลือกสาขา</button>
         </div>
     </div>
-    <div class="fixed bottom-1 left-1.5 z-[1400] text-[9px] leading-none text-slate-400 font-bold pointer-events-none select-none">Pro LPN Scanner · v1.8.0 (2026-08-24)</div>
+    <div class="fixed bottom-1 left-1.5 z-[1400] text-[9px] leading-none text-slate-400 font-bold pointer-events-none select-none">Pro LPN Scanner · v1.8.1 (2026-08-25)</div>
     <div id="quickTools" class="fixed z-[1500] flex flex-col gap-2" style="bottom:16px;right:12px">
         <button onclick="openHelp()" title="วิธีใช้งาน / คำอธิบาย" class="w-11 h-11 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-black shadow-lg text-lg opacity-90">?</button>
         <button onclick="toggleBigText()" id="bigTextBtn" title="ปรับตัวอักษรใหญ่" class="w-11 h-11 rounded-full bg-slate-700 hover:bg-slate-800 text-white font-black shadow-lg text-base opacity-90">ก+</button>
