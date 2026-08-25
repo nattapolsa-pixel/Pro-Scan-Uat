@@ -3446,8 +3446,8 @@
             // Booking ที่มี Wave เดียวก็ยังต้องโหลดผ่าน Booking เพื่อให้สาขาที่ย้าย/แบ่งเข้ามาแสดง
             const isBookingMode = !currentLookupIsWaveOnly;
             const url = isBookingMode
-                ? backendApiUrl + `/api/check-booking?booking_no=${encodeURIComponent(currentBookingNo)}&_ts=${Date.now()}`
-                : backendApiUrl + `/api/check-wave?wave_no=${encodeURIComponent(activeWavesList[0] || currentWave)}&_ts=${Date.now()}`;
+                ? backendApiUrl + `/api/check-booking?booking_no=${encodeURIComponent(currentBookingNo)}&force=true&_ts=${Date.now()}`
+                : backendApiUrl + `/api/check-wave?wave_no=${encodeURIComponent(activeWavesList[0] || currentWave)}&force=true&_ts=${Date.now()}`;
             const res = await fetchWithTimeout(url, { cache: 'no-store' }, 60000);
             if (!res.ok) throw new Error(`โหลดข้อมูลส่วนกลางไม่สำเร็จ (HTTP ${res.status})`);
             return { data: await res.json(), isWaveOnly: !isBookingMode };
@@ -6784,6 +6784,11 @@
 
             async function closeBranchWaves(waves, branchCode, completedAtIso) {
                 if (noSaveMode) return true;
+                // โหลดข้อมูลรวมล่าสุดจาก Server หลังทุกเครื่องส่งคิวหมดแล้ว
+                // เพื่อไม่ให้เครื่องที่กดปิดใช้ยอดเก่าของตัวเองและปิดเป็น 0
+                const latest = await fetchFreshCurrentJobData();
+                applyWaveDataToScreen(latest.data, latest.isWaveOnly);
+                saveCurrentWaveDataCache();
                 const branchWaveKeys = new Set(allLpnsInWave
                     .filter(item => (item.branch || 'Unknown') === branchCode)
                     .map(item => String(item.wave_no || '').replace(/\D/g, ''))
@@ -6793,6 +6798,10 @@
                 const wavesToClose = relevantWaves.length ? relevantWaves : waves.slice(0, 1);
                 const results = await Promise.all(wavesToClose.map(async waveNo => {
                     const branchSummary = getBranchSummaryData(branchCode, waveNo);
+                    if (Number(branchSummary.label_count || 0) > 0 && Number(branchSummary.total || 0) <= 0) {
+                        throw new Error(`Wave ${waveNo} สาขา ${branchCode} ยังมียอดรวม 0 — ระบบยังไม่ปิดสาขาเพื่อป้องกันยอดหาย กรุณาตรวจคิวส่งและรีเฟรชข้อมูล`);
+                    }
+                    let lastError = null;
                     for (let attempt = 0; attempt < 3; attempt++) {
                         try {
                             const res = await fetchWithTimeout(backendApiUrl + '/api/close-job', {
@@ -6807,11 +6816,20 @@
                                 })
                             }, 60000);
                             if (res.ok) return true;
-                            if (res.status >= 400 && res.status < 500) return false;
-                        } catch (e) { }
+                            let detail = '';
+                            try {
+                                const body = await res.json();
+                                detail = typeof body.detail === 'string' ? body.detail : '';
+                            } catch (e) { }
+                            lastError = new Error(detail || `Server ตอบกลับ HTTP ${res.status}`);
+                            if (res.status >= 400 && res.status < 500) throw lastError;
+                        } catch (e) {
+                            lastError = e;
+                            if (e && /ยอดรวมเป็น 0|ยังปิดสาขาไม่ได้/.test(String(e.message || ''))) throw e;
+                        }
                         if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 2000 * (attempt + 1)));
                     }
-                    return false;
+                    throw lastError || new Error(`ปิด Wave ${waveNo} ไม่สำเร็จ`);
                 }));
                 return results.every(Boolean);
             }
@@ -6841,10 +6859,6 @@
                     return;
                 }
 
-                allLpnsInWave.forEach(item => { if (item.branch === branchCodeToClose && item.status === 'Pending') item.status = 'ForceClosed'; });
-                updateDashboardUI();
-                saveCurrentWaveDataCache();
-
                 backToBranchSelect();
                 showToast('กำลังบังคับปิดงานสาขาเบื้องหลัง...');
                 backgroundTasks++;
@@ -6854,6 +6868,9 @@
                         const wavesToClose = activeWavesList.length ? activeWavesList : [currentWave].filter(Boolean);
                         const successAll = await closeBranchWaves(wavesToClose, branchCodeToClose, completedAtIso);
                         if (successAll) {
+                            allLpnsInWave.forEach(item => { if (item.branch === branchCodeToClose && item.status === 'Pending') item.status = 'ForceClosed'; });
+                            updateDashboardUI();
+                            saveCurrentWaveDataCache();
                             setBranchCompletionRecord(branchCodeToClose, completedAtIso, 'force_close');
                             renderBranchGrid();
                             renderShippingDocument();
@@ -7231,7 +7248,7 @@
             <button onclick="palletModalBack()" class="mt-2.5 w-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm">← กลับไปเลือกสาขา</button>
         </div>
     </div>
-    <div class="fixed bottom-1 left-1.5 z-[1400] text-[9px] leading-none text-slate-400 font-bold pointer-events-none select-none">Pro LPN Scanner · v1.8.1 (2026-08-25)</div>
+    <div class="fixed bottom-1 left-1.5 z-[1400] text-[9px] leading-none text-slate-400 font-bold pointer-events-none select-none">Pro LPN Scanner · v1.8.2 (2026-08-25)</div>
     <div id="quickTools" class="fixed z-[1500] flex flex-col gap-2" style="bottom:16px;right:12px">
         <button onclick="openHelp()" title="วิธีใช้งาน / คำอธิบาย" class="w-11 h-11 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-black shadow-lg text-lg opacity-90">?</button>
         <button onclick="toggleBigText()" id="bigTextBtn" title="ปรับตัวอักษรใหญ่" class="w-11 h-11 rounded-full bg-slate-700 hover:bg-slate-800 text-white font-black shadow-lg text-base opacity-90">ก+</button>
