@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>Pro LPN Scanner (Professional UI)</title>
+    <title>Pro Scanner UAT - Google Sheets</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     <style>
@@ -1050,8 +1050,10 @@
                 <img src="https://i.postimg.cc/L4qLLFNj/Black-White-Modern-Handwritten-Square-Studio-Logo-(15)-Photoroom-0.png"
                     alt="Pro LPN Scanner Logo" class="h-full w-auto object-contain">
             </div>
-            <h2 class="text-2xl font-black text-gray-800 mb-1">Pro LPN Scanner</h2>
-            <p class="text-gray-500 text-sm font-bold mb-5">กรุณาระบุรหัสพนักงานของคุณ</p>
+            <div class="mb-2 rounded-full bg-amber-100 px-4 py-1 text-sm font-black text-amber-900 border border-amber-300">UAT • ระบบทดสอบ</div>
+            <h2 class="text-2xl font-black text-gray-800 mb-1">Pro Scanner UAT</h2>
+            <p class="text-gray-500 text-sm font-bold mb-1">ข้อมูลเอกสารจาก Google Sheets</p>
+            <p class="text-red-600 text-xs font-black mb-5">พักการยิง Tote / LPN ชั่วคราว • ห้ามใช้แทน Production</p>
             <div class="flex flex-col gap-3 mt-2 w-full">
                 <input type="text" id="empInput" autocomplete="off"
                     class="w-full text-2xl p-3 border-2 border-gray-300 rounded-lg text-center uppercase bg-gray-50 focus:border-gray-800 focus:bg-white font-bold tracking-wider"
@@ -1067,6 +1069,7 @@
         class="hidden fixed inset-0 bg-gray-900 bg-opacity-80 flex items-center justify-center p-4 z-40">
         <div
             class="bg-white p-5 md:p-6 rounded-xl shadow-2xl w-full max-w-md border-t-8 border-blue-600 flex flex-col max-h-[90vh]">
+            <div class="mb-2 rounded-lg border border-amber-300 bg-amber-50 p-2 text-center text-xs font-black text-amber-900 shrink-0">🧪 UAT: ทดลองค้นหาและตรวจเอกสารจาก Google Sheets เท่านั้น</div>
             <h2 class="text-2xl font-bold text-gray-800 mb-2 shrink-0">เลือกงาน (Wave / Booking)</h2>
             <div class="flex flex-col gap-3 mt-2 shrink-0">
                 <div class="flex gap-2">
@@ -1178,6 +1181,11 @@
                 </button>
             </div>
             
+            <div class="mb-4 rounded-xl border-2 border-red-300 bg-red-50 p-3 text-red-900 shadow-sm">
+                <div class="font-black">🧪 UAT — พักการยิง Tote / LPN ชั่วคราว</div>
+                <div class="mt-1 text-xs font-bold">กดสาขาเพื่อเปิดดูเอกสารและตรวจยอดจาก Google Sheets โดยตรง ข้อมูลทดสอบแยกจาก Production</div>
+            </div>
+
             <!-- 📄 Banner เอกสารใบคุมส่งสินค้า สำหรับผู้ทำเอกสารและผู้ปฏิบัติงานที่สแกนเสร็จแล้ว -->
             <div id="branchDocumentBanner" class="mb-4 p-4 bg-amber-500 hover:bg-amber-600 text-gray-900 rounded-xl shadow-md border-b-4 border-amber-700 flex items-center justify-between cursor-pointer active:scale-95 transition" onclick="openShippingDocument()">
                 <div class="flex items-center gap-3">
@@ -1649,12 +1657,13 @@
     </div>
 
     <script>
-        const backendApiUrl = 'https://dc-scanner-api-nattapol.onrender.com';
+        const backendApiUrl = 'https://dc-scanner-api-uat-nattapol.onrender.com';
+        const SCAN_FEATURE_ENABLED = false;
         // ใส่ URL หน้าตรวจ QC ที่นี่เมื่อได้รับลิงก์จากหน้างาน (เว้นว่างไว้จะซ่อนปุ่มลิงก์)
         const QC_ACTION_URL = 'https://sce-wms.ptgenterprise.com/addon_rf/QC_V2';
         // 💡 เพิ่มบรรทัดนี้กลับมา เพื่อให้ระบบ Login ตรวจรหัสพนักงานได้
         const employeeApiUrl = 'https://script.google.com/macros/s/AKfycbybmW6N7TxfsHqEa-Fx6ayy8M8xfjKGmTYO27izmbEoLJmQRrFD3i9c0XogP0fG6tlG/exec';
-        const branchProvinceSheetId = '1-qmS7WmLjkbrDxcdo_Ep_FBRWMDpuQQoetKgJ9CQYMY';
+        const branchProvinceSheetId = '14kBtY2tdMXi3I9rbNleokmyJ_WWGRmKXPPU2VaVstZQ';
         const waveDataCachePrefix = 'proScannerWaveDataCache:';
         const waveDataCacheIndexKey = 'proScannerWaveDataCacheIndex';
         const waveDataCacheMaxItems = 8;
@@ -2918,7 +2927,7 @@
 
         function readCachedBranchProvinceMap() {
             try {
-                const cached = JSON.parse(localStorage.getItem('proScannerBranchProvinceMap')) || {};
+                const cached = JSON.parse(localStorage.getItem('proScannerUatBranchProvinceMap')) || {};
                 if (cached && cached.map && typeof cached.map === 'object') {
                     branchProvinceMap = cached.map;
                 }
@@ -2929,7 +2938,7 @@
 
         function saveBranchProvinceMap(map) {
             try {
-                localStorage.setItem('proScannerBranchProvinceMap', JSON.stringify({
+                localStorage.setItem('proScannerUatBranchProvinceMap', JSON.stringify({
                     updated_at: new Date().toISOString(),
                     map
                 }));
@@ -2942,9 +2951,9 @@
 
             rows.forEach(row => {
                 const cells = row.c || [];
-                const branchCode = normalizeBranchLookupCode(getSheetCellText(cells[1]));
-                const province = getSheetCellText(cells[4]);
-                const cmposCode = normalizeBranchLookupCode(getSheetCellText(cells[5]));
+                const branchCode = normalizeBranchLookupCode(getSheetCellText(cells[0]));
+                const province = getSheetCellText(cells[3]);
+                const cmposCode = '';
 
                 if (!branchCode || !province || branchCode === 'รหัสสาขา' || province === 'จังหวัด') return;
 
@@ -3002,7 +3011,7 @@
                     }
                 };
 
-                script.src = `https://docs.google.com/spreadsheets/d/${branchProvinceSheetId}/gviz/tq?sheet=Sheet1&tqx=out:json;responseHandler:${callbackName}`;
+                script.src = `https://docs.google.com/spreadsheets/d/${branchProvinceSheetId}/gviz/tq?sheet=Sheet3&tqx=out:json;responseHandler:${callbackName}`;
                 document.head.appendChild(script);
             }).finally(() => {
                 branchProvinceLoadPromise = null;
@@ -5336,6 +5345,11 @@
             let pendingBranchName = '';
 
             function selectBranch(code, name) {
+                if (!SCAN_FEATURE_ENABLED) {
+                    showToast('🧪 UAT: เปิดเอกสารสาขาแทนโหมดสแกน');
+                    openShippingDocument(code);
+                    return;
+                }
                 const existingPalletNos = getBranchScannedPalletNos(code);
                 if (existingPalletNos.length > 0) {
                     openPalletChoiceModal(code, name, existingPalletNos);
@@ -5601,7 +5615,7 @@
                 finishCorrectionAfterScan();
             }
 
-            function switchTab(mode) { const isScan = mode === 'scan'; document.getElementById('modeScan').classList.toggle('hidden', !isScan); document.getElementById('modeCombine').classList.toggle('hidden', isScan); document.getElementById('tabScan').className = `flex-1 py-3 font-bold flex items-center justify-center gap-2 ${isScan ? 'text-blue-700 border-b-4 border-blue-700' : 'border-b-4 border-transparent text-gray-500'}`; document.getElementById('tabCombine').className = `flex-1 py-3 font-bold flex items-center justify-center gap-2 ${!isScan ? 'text-purple-700 border-b-4 border-purple-700' : 'border-b-4 border-transparent text-gray-500'}`; syncBranchPalletCountInput(); if (selectedBranchCode !== "") { if (isScan) document.getElementById('lpnInput').focus(); else document.getElementById('masterInput').focus(); } }
+            function switchTab(mode) { if (!SCAN_FEATURE_ENABLED) { showAlert('UAT พักการสแกน', 'ระบบทดสอบรอบนี้เปิดเฉพาะการค้นหา Wave/Booking และหน้าเอกสารจาก Google Sheets'); return; } const isScan = mode === 'scan'; document.getElementById('modeScan').classList.toggle('hidden', !isScan); document.getElementById('modeCombine').classList.toggle('hidden', isScan); document.getElementById('tabScan').className = `flex-1 py-3 font-bold flex items-center justify-center gap-2 ${isScan ? 'text-blue-700 border-b-4 border-blue-700' : 'border-b-4 border-transparent text-gray-500'}`; document.getElementById('tabCombine').className = `flex-1 py-3 font-bold flex items-center justify-center gap-2 ${!isScan ? 'text-purple-700 border-b-4 border-purple-700' : 'border-b-4 border-transparent text-gray-500'}`; syncBranchPalletCountInput(); if (selectedBranchCode !== "") { if (isScan) document.getElementById('lpnInput').focus(); else document.getElementById('masterInput').focus(); } }
 
             // ==================== SCAN LOGIC ====================
             const lpnInput = document.getElementById('lpnInput'); const colorSection = document.getElementById('colorSelectionArea'); const qtySection = document.getElementById('qtySelectionArea'); const qtyInput = document.getElementById('qtyInput'); const colorQtyArea = document.getElementById('colorQtyArea'); const colorQtyInput = document.getElementById('colorQtyInput');
@@ -7248,7 +7262,7 @@
             <button onclick="palletModalBack()" class="mt-2.5 w-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm">← กลับไปเลือกสาขา</button>
         </div>
     </div>
-    <div class="fixed bottom-1 left-1.5 z-[1400] text-[9px] leading-none text-slate-400 font-bold pointer-events-none select-none">Pro LPN Scanner · v1.8.2 (2026-08-25)</div>
+    <div class="fixed bottom-1 left-1.5 z-[1400] rounded bg-amber-100 px-2 py-1 text-[10px] leading-none text-amber-900 font-black pointer-events-none select-none border border-amber-300">UAT • Google Sheets • Scan Hold</div>
     <div id="quickTools" class="fixed z-[1500] flex flex-col gap-2" style="bottom:16px;right:12px">
         <button onclick="openHelp()" title="วิธีใช้งาน / คำอธิบาย" class="w-11 h-11 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-black shadow-lg text-lg opacity-90">?</button>
         <button onclick="toggleBigText()" id="bigTextBtn" title="ปรับตัวอักษรใหญ่" class="w-11 h-11 rounded-full bg-slate-700 hover:bg-slate-800 text-white font-black shadow-lg text-base opacity-90">ก+</button>
