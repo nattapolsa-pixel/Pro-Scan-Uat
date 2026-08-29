@@ -3624,7 +3624,10 @@
             if (!wave) return showAlert('ยังไม่ได้กรอก Wave', 'กรุณากรอกเลข Wave ก่อนค้นหา');
             showLoading('กำลังโหลดสาขาและยอดนับ...');
             try {
-                const res = await fetchWithTimeout(backendApiUrl + `/api/wave-branch-options?wave_no=${encodeURIComponent(wave)}`, { cache: 'no-store' }, 60000);
+                // UAT อาจเพิ่งตื่น/เพิ่ง Deploy ทำให้คำขอแรกหลุดเป็น Failed to fetch
+                // ลองเชื่อมต่อใหม่อัตโนมัติ เฉพาะการค้นหา Wave สำหรับจัดสาขา
+                const url = backendApiUrl + `/api/wave-branch-options?wave_no=${encodeURIComponent(wave)}&_ts=${Date.now()}`;
+                const res = await fetchJobDataWithRetry(url, false, true, 90000, 2);
                 const data = await res.json();
                 if (!res.ok) throw new Error(typeof data.detail === 'string' ? data.detail : `HTTP ${res.status}`);
                 bookingBranchMovePreview = null;
@@ -3634,7 +3637,13 @@
                 choices.classList.remove('hidden');
                 document.getElementById('moveBranchPreview').classList.add('hidden');
                 document.getElementById('confirmMoveBranchBtn').disabled = true;
-            } catch (e) { bookingBranchMovePreview = null; showAlert('ตรวจสอบไม่สำเร็จ', e.message || String(e)); }
+            } catch (e) {
+                bookingBranchMovePreview = null;
+                const message = (e && (e.name === 'AbortError' || /failed to fetch|network/i.test(String(e.message || e))))
+                    ? 'เชื่อมต่อ Backend UAT ไม่สำเร็จ ระบบลองใหม่ให้แล้ว กรุณากดค้นหาอีกครั้ง'
+                    : (e.message || String(e));
+                showAlert('ตรวจสอบไม่สำเร็จ', message);
+            }
             finally { hideLoading(); }
         }
         function selectBranchForMove(index) {
