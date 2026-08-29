@@ -4343,16 +4343,31 @@
                 closeBookingBranchMove();
                 // ใช้ snapshot ปลายทางจากคำสั่งบันทึกโดยตรง เพื่อไม่ให้ GET ถัดไป
                 // ซึ่งอาจชน cache เก่า ทำให้ผู้ใช้เห็นว่ายังไม่ได้แบ่ง/ย้าย.
-                if (data.target_view && Array.isArray(data.target_view.lpn_list)) {
-                    applyWaveDataToScreen(data.target_view, false);
-                } else {
+                let refreshDelayed = Boolean(data.refresh_pending);
+                const refreshMovedDocument = async () => {
                     const latest = await fetchFreshCurrentJobData(true);
                     applyWaveDataToScreen(latest.data, latest.isWaveOnly);
+                    saveCurrentWaveDataCache();
+                    renderShippingDocument();
+                    shippingDocumentVerifiedAt = Date.now();
+                };
+                if (data.target_view && Array.isArray(data.target_view.lpn_list)) {
+                    applyWaveDataToScreen(data.target_view, false);
+                    saveCurrentWaveDataCache();
+                    renderShippingDocument();
+                    shippingDocumentVerifiedAt = Date.now();
+                } else {
+                    try {
+                        await refreshMovedDocument();
+                    } catch (refreshError) {
+                        refreshDelayed = true;
+                        console.warn('Branch move saved; document refresh will retry:', refreshError);
+                        setTimeout(() => refreshMovedDocument().catch(error => console.warn('Branch move refresh retry:', error)), 1500);
+                    }
                 }
-                saveCurrentWaveDataCache(); renderShippingDocument(); shippingDocumentVerifiedAt = Date.now();
-                showAlert(isSplit ? 'แบ่งยอดเข้ารถเรียบร้อย' : 'ย้ายสาขาเข้ารถเรียบร้อย', isSplit
+                showAlert(isSplit ? 'แบ่งยอดเข้ารถเรียบร้อย' : 'ย้ายสาขาเข้ารถเรียบร้อย', (isSplit
                     ? `${bookingBranchMovePreview.branch_code}\nสาขานี้อยู่ทั้ง ${data.source_booking} และ ${data.target_booking}\nBooking นี้รับเพิ่ม ${split.m + split.red + split.blue + split.green + split.black} กล่อง`
-                    : `${bookingBranchMovePreview.branch_code}\n${data.previous_booking || '-'} → ${data.target_booking}\nยอดเดิมถูกนำมาใช้ ไม่ต้องสแกนใหม่`, 'border-green-600', true);
+                    : `${bookingBranchMovePreview.branch_code}\n${data.previous_booking || '-'} → ${data.target_booking}\nยอดเดิมถูกนำมาใช้ ไม่ต้องสแกนใหม่`) + (refreshDelayed ? '\n\nบันทึกแล้ว ระบบกำลังดึงหน้าเอกสารให้ใหม่อัตโนมัติ' : ''), 'border-green-600', true);
             } catch (e) { showAlert('ย้ายสาขาไม่สำเร็จ', e.message || String(e)); }
             finally { hideLoading(); }
         }
