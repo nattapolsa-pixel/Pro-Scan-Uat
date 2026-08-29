@@ -2,7 +2,7 @@ services:
   - type: web
     name: pro-scanner-uat
     runtime: static
-    branch: codex/uat-google-sheets
+    branch: main
     buildCommand: ""
     staticPublishPath: .
     autoDeploy: true
