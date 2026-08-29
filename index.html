@@ -3604,7 +3604,7 @@
             document.getElementById('moveModeSplitBtn').className = `border-2 ${isSplit ? 'border-purple-600 bg-purple-50 text-purple-800' : 'border-slate-200 bg-white text-slate-700'} rounded-xl p-3 font-black text-sm`;
             document.getElementById('moveSplitFields').classList.toggle('hidden', !isSplit || !bookingBranchMovePreview || alreadyInTarget);
             document.getElementById('confirmMoveBranchBtn').textContent = alreadyInTarget
-                ? ((isHiddenHere || !isInCurrentDocument) ? 'นำสาขากลับมาแสดงในเอกสาร' : 'สาขานี้อยู่ในเอกสารแล้ว')
+                ? ((isHiddenHere || !isInCurrentDocument) ? 'นำสาขากลับมาแสดงในเอกสาร' : 'ยืนยันและซิงก์ข้อมูลสาขา')
                 : (isSplit ? 'ยืนยันแบ่งยอดเข้า Booking นี้' : 'ยืนยันย้ายทั้งสาขา');
         }
         function openBookingBranchMove() {
@@ -3672,7 +3672,9 @@
                 if (input) { input.value = 0; input.max = parseInt(totals[name.toLowerCase()]) || 0; }
             });
             document.getElementById('moveSplitFields').classList.toggle('hidden', bookingBranchMoveMode !== 'split' || alreadyInTarget);
-            document.getElementById('confirmMoveBranchBtn').disabled = alreadyInTarget && !isHiddenHere && isInCurrentDocument;
+            // เมื่อเลือกสาขาได้แล้วต้องยืนยันได้ทุกสถานะ การกดย้ำสาขาที่อยู่ใน
+            // Booking นี้แล้วจะเป็นการซิงก์ข้อมูลแบบ idempotent และไม่เพิ่มยอดซ้ำ
+            document.getElementById('confirmMoveBranchBtn').disabled = false;
             setBookingMoveMode(bookingBranchMoveMode);
         }
         async function confirmBookingBranchMove() {
@@ -3683,8 +3685,7 @@
             const isHiddenHere = documentHiddenBranches.some(code => normalizeBranchLookupCode(code) === normalizeBranchLookupCode(bookingBranchMovePreview.branch_code));
             const isInCurrentDocument = allLpnsInWave.some(item => normalizeBranchLookupCode(item.branch) === normalizeBranchLookupCode(bookingBranchMovePreview.branch_code));
             if (alreadyInTarget) {
-                if (!isHiddenHere && isInCurrentDocument) return showAlert('สาขานี้อยู่ในเอกสารแล้ว', `${bookingBranchMovePreview.branch_code}\nBooking ${currentBookingNo}`);
-                showLoading('กำลังนำสาขากลับมาแสดง...');
+                showLoading((isHiddenHere || !isInCurrentDocument) ? 'กำลังนำสาขากลับมาแสดง...' : 'กำลังยืนยันและซิงก์ข้อมูลสาขา...');
                 try {
                     restoreBranchInDocument(bookingBranchMovePreview.branch_code);
                     const latest = await fetchFreshCurrentJobData();
@@ -3692,9 +3693,9 @@
                     saveCurrentWaveDataCache();
                     renderShippingDocument();
                     closeBookingBranchMove();
-                    showAlert('นำสาขากลับมาแล้ว', `${bookingBranchMovePreview.branch_code}\nแสดงในเอกสาร Booking ${currentBookingNo} เรียบร้อย`, 'border-green-600', true);
+                    showAlert((isHiddenHere || !isInCurrentDocument) ? 'นำสาขากลับมาแล้ว' : 'ยืนยันข้อมูลเรียบร้อย', `${bookingBranchMovePreview.branch_code}\nซิงก์ข้อมูลใน Booking ${currentBookingNo} เรียบร้อย และไม่เพิ่มยอดซ้ำ`, 'border-green-600', true);
                 } catch (error) {
-                    showAlert('นำสาขากลับมาไม่สำเร็จ', error.message || String(error));
+                    showAlert('ยืนยันข้อมูลสาขาไม่สำเร็จ', error.message || String(error));
                 } finally { hideLoading(); }
                 return;
             }
