@@ -3858,8 +3858,9 @@
                 autoPalletCount = wavePalletNos.size;
             }
             if (bookingSplit) autoPalletCount = parseInt(bookingSplit.pallet) || 0;
-            // localStorage แยกตาม Booking อยู่แล้ว จึงต้องใช้ยอดที่ผู้ใช้แก้ได้แม้เป็นสาขาแบ่งเที่ยว
-            const ov = documentOverrides[bCode] || {};
+            // ยอดแบ่ง Booking เป็นยอดจัดสรรที่ backend ยืนยันแล้ว ห้ามนำ override
+            // เก่าของสาขา (ซึ่งอาจเป็นยอดเต็มก่อนแบ่ง) กลับมาทับยอดบางส่วน.
+            const ov = bookingSplit ? {} : (documentOverrides[bCode] || {});
             const mCount = (ov.m !== undefined && ov.m !== null && ov.m !== '') ? (parseInt(ov.m) || 0) : autoM;
             const redCount = (ov.red !== undefined && ov.red !== null && ov.red !== '') ? (parseInt(ov.red) || 0) : autoRed;
             const blueCount = (ov.blue !== undefined && ov.blue !== null && ov.blue !== '') ? (parseInt(ov.blue) || 0) : autoBlue;
