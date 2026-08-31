@@ -1662,7 +1662,7 @@
         const QC_ACTION_URL = 'https://sce-wms.ptgenterprise.com/addon_rf/QC_V2';
         // 💡 เพิ่มบรรทัดนี้กลับมา เพื่อให้ระบบ Login ตรวจรหัสพนักงานได้
         const employeeApiUrl = 'https://script.google.com/macros/s/AKfycbybmW6N7TxfsHqEa-Fx6ayy8M8xfjKGmTYO27izmbEoLJmQRrFD3i9c0XogP0fG6tlG/exec';
-        const waveDataCachePrefix = 'proScannerWaveDataCache:';
+        const waveDataCachePrefix = 'proScannerWaveDataCache:v2:';
         const waveDataCacheIndexKey = 'proScannerWaveDataCacheIndex';
         const waveDataCacheMaxItems = 8;
         const waveDataCacheTtlMs = 30 * 60 * 1000;
@@ -5164,7 +5164,16 @@
             const isWaveOnly = /^\d+$/.test(inputVal);
             const cacheKey = getWaveDataCacheKey(inputVal, isWaveOnly);
             currentWaveDataCacheKey = cacheKey;
-            const cachedData = getCachedWaveData(cacheKey);
+            let cachedData = getCachedWaveData(cacheKey);
+            if (cachedData && !isWaveOnly) {
+                const latestMeta = getMetaForWaveOrBooking(inputVal, inputVal) || {};
+                const expectedWaves = (latestMeta.waves || []).map(wave => String(parseInt(String(wave).replace(/\D/g, ''), 10)));
+                const cachedWaves = new Set((cachedData.waves || []).map(wave => String(parseInt(String(wave).replace(/\D/g, ''), 10))));
+                if (expectedWaves.some(wave => wave && !cachedWaves.has(wave))) {
+                    localStorage.removeItem(cacheKey);
+                    cachedData = null;
+                }
+            }
             let usedCache = false;
 
             if (cachedData) {
@@ -5196,6 +5205,15 @@
                 let lookupCacheKey = cacheKey;
                 let fallbackBookingNo = '';
 
+                // Booking ต้องครบทุก Wave ก่อนแสดง หากรอบแรกเจอ Member Data
+                // ที่กำลังอัปเดต ให้บังคับอ่าน Sheet ล่าสุดหนึ่งรอบทันที.
+                if (!res.ok && !isWaveOnly) {
+                    await new Promise(resolve => setTimeout(resolve, 800));
+                    const freshBookingUrl = backendApiUrl + `/api/check-booking?booking_no=${encodeURIComponent(inputVal)}&force=true&_ts=${Date.now()}`;
+                    res = await fetchJobDataWithRetry(freshBookingUrl, false, false, 90000, 1);
+                    if (requestId !== latestWaveLoadRequestId) return;
+                }
+
                 if (!res.ok) {
                     const bookingCandidates = getBookingLookupCandidates(inputVal)
                         .filter(candidate => candidate !== inputVal || isWaveOnly);
@@ -5215,7 +5233,9 @@
                     }
                 }
 
-                if (!res.ok) {
+                // ใช้ Wave fallback เฉพาะเมื่อผู้ใช้ค้นหาด้วยเลข Wave เท่านั้น
+                // ห้ามใช้ Wave แรกแทน Booking เพราะจะทำให้แสดงสาขาไม่ครบ.
+                if (!res.ok && isWaveOnly) {
                     const sheetMeta = getMetaForWaveOrBooking(inputVal, inputVal);
                     if (sheetMeta && sheetMeta.waves && sheetMeta.waves.length > 0) {
                         const targetWave = sheetMeta.waves[0];
