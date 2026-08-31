@@ -3490,12 +3490,11 @@
             return differences;
         }
 
-        async function fetchFreshCurrentJobData() {
+        async function fetchFreshCurrentJobData(force = false) {
             // Booking ที่มี Wave เดียวก็ยังต้องโหลดผ่าน Booking เพื่อให้สาขาที่ย้าย/แบ่งเข้ามาแสดง
             const isBookingMode = !currentLookupIsWaveOnly;
-            // UAT เอกสารไม่มีรายการ Scan ที่ต้องบังคับอ่าน Sheet ใหม่ทุกครั้ง
-            // ใช้ server cache และให้ปุ่มรีเฟรชเป็นผู้สั่ง force เพื่อไม่ดาวน์โหลด Sheet ทั้งก้อนซ้ำ
-            const refreshParam = SCAN_FEATURE_ENABLED ? '&force=true' : '';
+            // เมื่อสั่ง force=true ให้ส่งไปที่ backend เพื่อล้าง cache และดึงข้อมูลสาขาที่ย้าย/จัดเข้ามาใหม่ทันที
+            const refreshParam = (force || SCAN_FEATURE_ENABLED) ? '&force=true' : '';
             const url = isBookingMode
                 ? backendApiUrl + `/api/check-booking?booking_no=${encodeURIComponent(currentBookingNo)}${refreshParam}&_ts=${Date.now()}`
                 : backendApiUrl + `/api/check-wave?wave_no=${encodeURIComponent(activeWavesList[0] || currentWave)}${refreshParam}&_ts=${Date.now()}`;
@@ -3730,7 +3729,7 @@
                 showLoading((isHiddenHere || !isInCurrentDocument) ? 'กำลังนำสาขากลับมาแสดง...' : 'กำลังยืนยันและซิงก์ข้อมูลสาขา...');
                 try {
                     restoreBranchInDocument(bookingBranchMovePreview.branch_code);
-                    const latest = await fetchFreshCurrentJobData();
+                    const latest = await fetchFreshCurrentJobData(true);
                     applyWaveDataToScreen(latest.data, latest.isWaveOnly);
                     saveCurrentWaveDataCache();
                     renderShippingDocument();
@@ -3760,7 +3759,7 @@
                 const data = await res.json();
                 if (!res.ok) throw new Error(typeof data.detail === 'string' ? data.detail : `HTTP ${res.status}`);
                 closeBookingBranchMove();
-                const latest = await fetchFreshCurrentJobData(); applyWaveDataToScreen(latest.data, latest.isWaveOnly); saveCurrentWaveDataCache(); renderShippingDocument(); shippingDocumentVerifiedAt = Date.now();
+                const latest = await fetchFreshCurrentJobData(true); applyWaveDataToScreen(latest.data, latest.isWaveOnly); saveCurrentWaveDataCache(); renderShippingDocument(); shippingDocumentVerifiedAt = Date.now();
                 showAlert(isSplit ? 'แบ่งยอดเข้ารถเรียบร้อย' : 'ย้ายสาขาเข้ารถเรียบร้อย', isSplit
                     ? `${bookingBranchMovePreview.branch_code}\nสาขานี้อยู่ทั้ง ${data.source_booking} และ ${data.target_booking}\nBooking นี้รับเพิ่ม ${split.m + split.red + split.blue + split.green + split.black} กล่อง`
                     : `${bookingBranchMovePreview.branch_code}\n${data.previous_booking || '-'} → ${data.target_booking}\nยอดเดิมถูกนำมาใช้ ไม่ต้องสแกนใหม่`, 'border-green-600', true);
