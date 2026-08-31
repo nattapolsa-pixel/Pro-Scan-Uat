@@ -3000,7 +3000,7 @@
             if (branchProvinceLoaded) return Promise.resolve(branchProvinceMap);
             if (branchProvinceLoadPromise) return branchProvinceLoadPromise;
 
-            branchProvinceLoadPromise = new Promise((resolve, reject) => {
+            const loadFromLegacySheet = () => new Promise((resolve, reject) => {
                 const callbackName = `branchProvinceSheetCallback_${Date.now()}`;
                 const script = document.createElement('script');
                 let settled = false;
@@ -3036,7 +3036,38 @@
 
                 script.src = `https://docs.google.com/spreadsheets/d/${branchProvinceSheetId}/gviz/tq?sheet=Sheet3&tqx=out:json;responseHandler:${callbackName}`;
                 document.head.appendChild(script);
-            }).finally(() => {
+            });
+
+            branchProvinceLoadPromise = (async () => {
+                try {
+                    const response = await fetchWithTimeout(
+                        backendApiUrl + `/api/branch-provinces?_ts=${Date.now()}`,
+                        { cache: 'no-store' },
+                        20000
+                    );
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+                    const payload = await response.json();
+                    const rows = payload && payload.branches && typeof payload.branches === 'object'
+                        ? payload.branches
+                        : {};
+                    const nextMap = {};
+                    Object.entries(rows).forEach(([code, province]) => {
+                        const normalizedCode = normalizeBranchLookupCode(code);
+                        const provinceText = String(province || '').trim();
+                        if (normalizedCode && provinceText) nextMap[normalizedCode] = provinceText;
+                    });
+
+                    if (Object.keys(nextMap).length === 0) throw new Error('ไม่พบข้อมูลจังหวัดจาก Server');
+                    branchProvinceMap = nextMap;
+                    branchProvinceLoaded = true;
+                    saveBranchProvinceMap(nextMap);
+                    return branchProvinceMap;
+                } catch (backendError) {
+                    console.warn('โหลดจังหวัดผ่าน Server ไม่สำเร็จ กำลังใช้ทางสำรอง', backendError);
+                    return loadFromLegacySheet();
+                }
+            })().finally(() => {
                 branchProvinceLoadPromise = null;
             });
 
