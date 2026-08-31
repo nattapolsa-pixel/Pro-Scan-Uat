@@ -5311,7 +5311,12 @@
                         showToast('ยังใช้ข้อมูลที่โหลดไว้ก่อนหน้าอยู่', true);
                         return;
                     }
-                    showAlert('ข้อผิดพลาด', `ไม่พบ Wave/Booking สำหรับ [${inputVal}]\nถ้าเป็น Booking No. ให้ลองใส่เช่น B001-260755319 หรือ TRLHUB-20260808`);
+                    let errorDetail = '';
+                    try {
+                        const errJson = await res.json();
+                        if (errJson && errJson.detail) errorDetail = String(errJson.detail);
+                    } catch (e) {}
+                    showAlert('ข้อผิดพลาด', errorDetail || `ไม่พบ Wave/Booking สำหรับ [${inputVal}]\nถ้าเป็น Booking No. ให้ลองใส่เช่น B001-260755319 หรือ TRLHUB-20260808`);
                     document.getElementById('waveInput').value = '';
                     return;
                 }
