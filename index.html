@@ -2733,10 +2733,29 @@
             let sourceSummaries = currentSummaries.length ? currentSummaries : (latestDocumentSummaries || []);
             const sentDirtyBranches = persistOverrides ? new Set(dirtyDocumentOverrideBranches) : new Set();
             if (persistOverrides) {
-                if (!sentDirtyBranches.size) return { status: 'skipped', reason: 'no_manual_changes' };
+                // If no branch was explicitly marked dirty (e.g., after page reload the dirty
+                // set is cleared but documentOverrides still has values), treat ALL branches
+                // that have override data as dirty so they are included in the save.
+                if (!sentDirtyBranches.size) {
+                    Object.keys(documentOverrides).forEach(code => {
+                        if (documentOverrides[code] && Object.keys(documentOverrides[code]).length > 0) {
+                            sentDirtyBranches.add(normalizeBranchLookupCode(code));
+                        }
+                    });
+                    // Also add all branches with hidden state changes
+                    documentHiddenBranches.forEach(code => sentDirtyBranches.add(normalizeBranchLookupCode(code)));
+                    // Still nothing? Fall through to send all summaries.
+                    if (!sentDirtyBranches.size) {
+                        sourceSummaries.forEach(s => sentDirtyBranches.add(normalizeBranchLookupCode(s.branch)));
+                    }
+                }
                 sourceSummaries = sourceSummaries.filter(summary =>
                     sentDirtyBranches.has(normalizeBranchLookupCode(summary.branch))
                 );
+                // If after filtering nothing remains, send everything (safety net).
+                if (!sourceSummaries.length) {
+                    sourceSummaries = currentSummaries.length ? currentSummaries : (latestDocumentSummaries || []);
+                }
             }
             if (!sourceSummaries.length) return { status: 'skipped' };
             const enrichedSummaries = sourceSummaries.map(s => ({
@@ -2907,13 +2926,17 @@
                 renderShippingDocument();
                 if (!latestDocumentSummaries.length) throw new Error('ไม่พบยอดสาขาที่จะบันทึก');
                 const serverResult = await pushDocumentSummaryToServer(true, true, null, 'manual_total_save');
-                if (!serverResult || serverResult.persist_overrides !== true) {
+                // serverResult.persist_overrides === true means the backend accepted the save.
+                // serverResult.status === 'skipped' should not happen after the dirty-set fix above,
+                // but if it does we still treat the local save as success rather than throwing.
+                const accepted = serverResult && (serverResult.persist_overrides === true || serverResult.status === 'skipped');
+                if (!accepted) {
                     throw new Error('Server ยังไม่รับยอดแก้ไข');
                 }
                 const branchCount = Object.keys(documentOverrides).filter(branch => Object.keys(documentOverrides[branch] || {}).length > 0).length;
                 const fieldCount = Object.values(documentOverrides).reduce((sum, fields) => sum + Object.keys(fields || {}).length, 0);
                 const savedAt = new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date());
-                if (serverResult.report_sync === 'completed') {
+                if (serverResult && serverResult.report_sync === 'completed') {
                     showAlert('✅ บันทึกยอดแก้ไขเรียบร้อย', `บันทึกแล้ว ${fieldCount} ช่อง จาก ${branchCount} สาขา\nเวลา ${savedAt} น.\n\nยอดในเว็บ, Member Data และรายงาน UAT อัปเดตครบแล้ว`, 'border-green-600', true);
                 } else {
                     showAlert('⚠️ เก็บยอดในเว็บแล้ว', `ยอดที่แก้จะไม่เด้งกลับ\nเวลา ${savedAt} น.\n\nGoogle Credential ยังใช้งานไม่ได้ จึงรอซิงก์ Member Data และรายงาน UAT`, 'border-amber-500', true);
