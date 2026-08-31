@@ -2803,15 +2803,21 @@
 
         function updateDocumentFieldValue(branchCode, field, value) {
             if (!branchCode || !field) return;
+            const normCode = normalizeBranchLookupCode(branchCode);
             if (!documentOverrides[branchCode]) documentOverrides[branchCode] = {};
+            if (normCode && !documentOverrides[normCode]) documentOverrides[normCode] = documentOverrides[branchCode];
             const val = String(value ?? '').trim();
             if (val === '') {
                 delete documentOverrides[branchCode][field];
+                if (normCode && documentOverrides[normCode]) delete documentOverrides[normCode][field];
             } else {
-                documentOverrides[branchCode][field] = Math.max(0, parseInt(val) || 0);
+                const intVal = Math.max(0, parseInt(val) || 0);
+                documentOverrides[branchCode][field] = intVal;
+                if (normCode && documentOverrides[normCode]) documentOverrides[normCode][field] = intVal;
             }
             saveDocumentOverrides();
             markDocumentOverridesDirty(branchCode);
+            if (normCode && normCode !== branchCode) markDocumentOverridesDirty(normCode);
             // Do not re-render here. onchange fires while the user clicks Save;
             // replacing the document DOM at that moment cancels the click and
             // used to restore the old value. Keep the typed value and button alive.
@@ -3877,9 +3883,8 @@
                 autoPalletCount = wavePalletNos.size;
             }
             if (bookingSplit) autoPalletCount = parseInt(bookingSplit.pallet) || 0;
-            // ยอดแบ่ง Booking เป็นยอดจัดสรรที่ backend ยืนยันแล้ว ห้ามนำ override
-            // เก่าของสาขา (ซึ่งอาจเป็นยอดเต็มก่อนแบ่ง) กลับมาทับยอดบางส่วน.
-            const ov = bookingSplit ? {} : (documentOverrides[bCode] || {});
+            // โหลด override จาก localStorage / server (รองรับทั้งรหัสสาขาตรงและแบบ normalized)
+            const ov = documentOverrides[bCode] || documentOverrides[normalizeBranchLookupCode(bCode)] || {};
             const mCount = (ov.m !== undefined && ov.m !== null && ov.m !== '') ? (parseInt(ov.m) || 0) : autoM;
             const redCount = (ov.red !== undefined && ov.red !== null && ov.red !== '') ? (parseInt(ov.red) || 0) : autoRed;
             const blueCount = (ov.blue !== undefined && ov.blue !== null && ov.blue !== '') ? (parseInt(ov.blue) || 0) : autoBlue;
