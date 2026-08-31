@@ -5200,12 +5200,16 @@
                 let fallbackBookingNo = '';
 
                 // Booking ต้องครบทุก Wave ก่อนแสดง หากรอบแรกเจอ Member Data
-                // ที่กำลังอัปเดต ให้บังคับอ่าน Sheet ล่าสุดหนึ่งรอบทันที.
+                // ที่กำลังอัปเดต ให้รอและบังคับอ่าน Sheet ล่าสุดซ้ำ โดยหน้า
+                // เอกสารจะยังไม่เปิดจนกว่า Server ยืนยันว่าครบทุกสาขา.
                 if (!res.ok && !isWaveOnly) {
-                    await new Promise(resolve => setTimeout(resolve, 800));
-                    const freshBookingUrl = backendApiUrl + `/api/check-booking?booking_no=${encodeURIComponent(inputVal)}&force=true&_ts=${Date.now()}`;
-                    res = await fetchJobDataWithRetry(freshBookingUrl, false, false, 90000, 1);
-                    if (requestId !== latestWaveLoadRequestId) return;
+                    for (let completenessAttempt = 1; completenessAttempt <= 5 && !res.ok; completenessAttempt++) {
+                        showLoading(`ข้อมูล Booking กำลังเข้าระบบ รอข้อมูลครบ (${completenessAttempt}/5)...`);
+                        await new Promise(resolve => setTimeout(resolve, completenessAttempt * 1000));
+                        const freshBookingUrl = backendApiUrl + `/api/check-booking?booking_no=${encodeURIComponent(inputVal)}&force=true&_ts=${Date.now()}`;
+                        res = await fetchJobDataWithRetry(freshBookingUrl, false, false, 90000, 0);
+                        if (requestId !== latestWaveLoadRequestId) return;
+                    }
                 }
 
                 if (!res.ok) {
