@@ -5165,15 +5165,9 @@
             const cacheKey = getWaveDataCacheKey(inputVal, isWaveOnly);
             currentWaveDataCacheKey = cacheKey;
             let cachedData = getCachedWaveData(cacheKey);
-            if (cachedData && !isWaveOnly) {
-                const latestMeta = getMetaForWaveOrBooking(inputVal, inputVal) || {};
-                const expectedWaves = (latestMeta.waves || []).map(wave => String(parseInt(String(wave).replace(/\D/g, ''), 10)));
-                const cachedWaves = new Set((cachedData.waves || []).map(wave => String(parseInt(String(wave).replace(/\D/g, ''), 10))));
-                if (expectedWaves.some(wave => wave && !cachedWaves.has(wave))) {
-                    localStorage.removeItem(cacheKey);
-                    cachedData = null;
-                }
-            }
+            // Booking is an aggregate of several Waves. Never render its local
+            // cache before the server confirms every Wave is available.
+            if (!isWaveOnly) cachedData = null;
             let usedCache = false;
 
             if (cachedData) {
