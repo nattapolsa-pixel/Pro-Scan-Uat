@@ -1656,7 +1656,7 @@
     </div>
 
     <script>
-        const APP_VERSION = '1.2.4-uat';
+        const APP_VERSION = '1.2.5-uat';
         const backendApiUrl = 'https://backed-api-scan-uat.onrender.com';
         const SCAN_FEATURE_ENABLED = false;
         // ใส่ URL หน้าตรวจ QC ที่นี่เมื่อได้รับลิงก์จากหน้างาน (เว้นว่างไว้จะซ่อนปุ่มลิงก์)
@@ -3792,7 +3792,9 @@
         }
 
         function getBranchSummaryData(bCode, specificWave = null) {
-            loadDocumentOverrides();
+            // หมายเหตุ: ไม่ต้องเรียก loadDocumentOverrides() ที่นี่
+            // เพราะค่าใน memory อาจ updated กว่า localStorage (เช่น หลัง merge server overrides)
+            // loadDocumentOverrides ถูกเรียกที่ applyWaveDataToScreen และ saveDocumentOverridesUI แล้ว
             const specificWaveKey = specificWave ? String(parseInt(String(specificWave).replace(/\D/g, ''), 10)) : '';
             const branchItems = allLpnsInWave.filter(item => {
                 if ((item.branch || 'Unknown') !== bCode) return false;
@@ -5088,10 +5090,13 @@
                 // และทำให้ทุก Handheld เห็นยอดแก้ไขชุดเดียวกัน
                 // Never discard locally saved edits merely because the server
                 // temporarily cannot read Google Sheets or returns no rows.
-                const hasServerOverrides = Object.keys(serverOverrides).length > 0;
-                const mergedOverrides = (hasUnsavedLocalOverride || !hasServerOverrides)
-                    ? { ...documentOverrides }
-                    : {};
+                // Merge strategy: local values always win for fields the server doesn't have.
+                // Start with local overrides as the base, then layer server values on top.
+                // This way a successful save that hasn't propagated to server sheet yet
+                // won't cause the UI to snap back to old values on next data refresh.
+                const mergedOverrides = { ...documentOverrides };
+                // If server has no overrides at all AND there are no unsaved local changes,
+                // still keep local overrides (they were saved to server in a previous session).
                 const serverHidden = [];
                 for (const [bCode, ov] of Object.entries(serverOverrides)) {
                     if (ov) {
