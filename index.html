@@ -1049,7 +1049,7 @@
                 <img src="https://i.postimg.cc/L4qLLFNj/Black-White-Modern-Handwritten-Square-Studio-Logo-(15)-Photoroom-0.png"
                     alt="Pro LPN Scanner Logo" class="h-full w-auto object-contain">
             </div>
-            <div class="mb-2 rounded-full bg-amber-100 px-4 py-1 text-sm font-black text-amber-900 border border-amber-300">UAT v1.2.1 • ระบบทดสอบ</div>
+            <div class="mb-2 rounded-full bg-amber-100 px-4 py-1 text-sm font-black text-amber-900 border border-amber-300">UAT v1.2.2 • ระบบทดสอบ</div>
             <h2 class="text-2xl font-black text-gray-800 mb-1">Pro Scanner UAT</h2>
             <p class="text-gray-500 text-sm font-bold mb-1">ข้อมูลเอกสารจาก Google Sheets</p>
             <p class="text-red-600 text-xs font-black mb-5">พักการยิง Tote / LPN ชั่วคราว • ห้ามใช้แทน Production</p>
@@ -1656,7 +1656,7 @@
     </div>
 
     <script>
-        const APP_VERSION = '1.2.1-uat';
+        const APP_VERSION = '1.2.2-uat';
         const backendApiUrl = 'https://backed-api-scan-uat.onrender.com';
         const SCAN_FEATURE_ENABLED = false;
         // ใส่ URL หน้าตรวจ QC ที่นี่เมื่อได้รับลิงก์จากหน้างาน (เว้นว่างไว้จะซ่อนปุ่มลิงก์)
@@ -2812,8 +2812,19 @@
             }
             saveDocumentOverrides();
             markDocumentOverridesDirty(branchCode);
-            renderShippingDocument();
-            showToast('แก้ยอดแล้ว กรุณากด “บันทึกยอดแก้ไข” เพื่อยืนยันลง Google Sheets');
+            // Do not re-render here. onchange fires while the user clicks Save;
+            // replacing the document DOM at that moment cancels the click and
+            // used to restore the old value. Keep the typed value and button alive.
+            const row = document.querySelector(`input[data-branch="${CSS.escape(branchCode)}"]`)?.closest('tr');
+            if (row && field !== 'pallet') {
+                const boxFields = ['m', 'red', 'blue', 'green', 'black'];
+                const total = boxFields.reduce((sum, key) => {
+                    const input = row.querySelector(`input[data-field="${key}"]`);
+                    return sum + Math.max(0, parseInt(input && input.value) || 0);
+                }, 0);
+                const totalCell = row.querySelector('[data-document-total]');
+                if (totalCell) totalCell.textContent = String(total);
+            }
         }
         let genericConfirmCallback = null;
         let isConfirmOpen = false;
@@ -4046,7 +4057,7 @@
                         <td class="p-2 border-r border-slate-200 font-bold font-sans">
                             <input type="number" min="0" step="1" value="${mCount || ''}" placeholder="0"
                                 data-branch="${escapeDocumentText(bCode)}" data-field="m"
-                                onchange="updateDocumentFieldValue(this.dataset.branch, 'm', this.value)"
+                                oninput="updateDocumentFieldValue(this.dataset.branch, 'm', this.value)"
                                 onkeydown="if (event.key === 'Enter') this.blur()"
                                 class="no-print w-14 max-w-full text-center bg-white border border-slate-200 rounded-lg px-1 py-1 text-slate-900 font-black outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
                             <span class="print-only">${mCount || ''}</span>
@@ -4056,7 +4067,7 @@
                         <td class="p-2 border-r border-slate-200 font-bold font-sans">
                             <input type="number" min="0" step="1" value="${redCount || ''}" placeholder="0"
                                 data-branch="${escapeDocumentText(bCode)}" data-field="red"
-                                onchange="updateDocumentFieldValue(this.dataset.branch, 'red', this.value)"
+                                oninput="updateDocumentFieldValue(this.dataset.branch, 'red', this.value)"
                                 onkeydown="if (event.key === 'Enter') this.blur()"
                                 class="no-print w-14 max-w-full text-center bg-white border border-slate-200 rounded-lg px-1 py-1 text-red-600 font-black outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100">
                             <span class="print-only">${redCount || ''}</span>
@@ -4066,7 +4077,7 @@
                         <td class="p-2 border-r border-slate-200 font-bold font-sans">
                             <input type="number" min="0" step="1" value="${blueCount || ''}" placeholder="0"
                                 data-branch="${escapeDocumentText(bCode)}" data-field="blue"
-                                onchange="updateDocumentFieldValue(this.dataset.branch, 'blue', this.value)"
+                                oninput="updateDocumentFieldValue(this.dataset.branch, 'blue', this.value)"
                                 onkeydown="if (event.key === 'Enter') this.blur()"
                                 class="no-print w-14 max-w-full text-center bg-white border border-slate-200 rounded-lg px-1 py-1 text-blue-600 font-black outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
                             <span class="print-only">${blueCount || ''}</span>
@@ -4076,7 +4087,7 @@
                         <td class="p-2 border-r border-slate-200 font-bold font-sans">
                             <input type="number" min="0" step="1" value="${greenCount || ''}" placeholder="0"
                                 data-branch="${escapeDocumentText(bCode)}" data-field="green"
-                                onchange="updateDocumentFieldValue(this.dataset.branch, 'green', this.value)"
+                                oninput="updateDocumentFieldValue(this.dataset.branch, 'green', this.value)"
                                 onkeydown="if (event.key === 'Enter') this.blur()"
                                 class="no-print w-14 max-w-full text-center bg-white border border-slate-200 rounded-lg px-1 py-1 text-green-600 font-black outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100">
                             <span class="print-only">${greenCount || ''}</span>
@@ -4086,20 +4097,20 @@
                         <td class="p-2 border-r border-slate-200 font-bold font-sans">
                             <input type="number" min="0" step="1" value="${blackCount || ''}" placeholder="0"
                                 data-branch="${escapeDocumentText(bCode)}" data-field="black"
-                                onchange="updateDocumentFieldValue(this.dataset.branch, 'black', this.value)"
+                                oninput="updateDocumentFieldValue(this.dataset.branch, 'black', this.value)"
                                 onkeydown="if (event.key === 'Enter') this.blur()"
                                 class="no-print w-14 max-w-full text-center bg-white border border-slate-200 rounded-lg px-1 py-1 text-slate-800 font-black outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-100">
                             <span class="print-only">${blackCount || ''}</span>
                         </td>
                         
                         <!-- 📊 รวมกล่อง -->
-                        <td class="p-2 border-r border-slate-200 bg-slate-50/50 font-black text-slate-900 font-sans">${branchTotalBoxes}</td>
+                        <td data-document-total class="p-2 border-r border-slate-200 bg-slate-50/50 font-black text-slate-900 font-sans">${branchTotalBoxes}</td>
                         
                         <!-- 📦 พาเลท -->
                         <td class="p-2 border-r border-slate-200 font-black bg-slate-50/50 text-indigo-900 font-sans">
                             <input type="number" min="0" step="1" value="${branchPallets || ''}" placeholder="0"
                                 data-branch="${escapeDocumentText(bCode)}" data-field="pallet"
-                                onchange="updateDocumentFieldValue(this.dataset.branch, 'pallet', this.value)"
+                                oninput="updateDocumentFieldValue(this.dataset.branch, 'pallet', this.value)"
                                 onkeydown="if (event.key === 'Enter') this.blur()"
                                 class="no-print w-14 max-w-full text-center bg-white border border-slate-200 rounded-lg px-1 py-1 text-indigo-900 font-black outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100">
                             <span class="print-only">${branchPallets || '-'}</span>
@@ -7329,7 +7340,7 @@
             <button onclick="palletModalBack()" class="mt-2.5 w-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm">← กลับไปเลือกสาขา</button>
         </div>
     </div>
-    <div class="fixed bottom-1 left-1.5 z-[1400] rounded bg-amber-100 px-2 py-1 text-[10px] leading-none text-amber-900 font-black pointer-events-none select-none border border-amber-300">UAT v1.2.1 • Google Sheets • Scan Hold</div>
+    <div class="fixed bottom-1 left-1.5 z-[1400] rounded bg-amber-100 px-2 py-1 text-[10px] leading-none text-amber-900 font-black pointer-events-none select-none border border-amber-300">UAT v1.2.2 • Google Sheets • Scan Hold</div>
     <div id="quickTools" class="fixed z-[1500] flex flex-col gap-2" style="bottom:16px;right:12px">
         <button onclick="openHelp()" title="วิธีใช้งาน / คำอธิบาย" class="w-11 h-11 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-black shadow-lg text-lg opacity-90">?</button>
         <button onclick="toggleBigText()" id="bigTextBtn" title="ปรับตัวอักษรใหญ่" class="w-11 h-11 rounded-full bg-slate-700 hover:bg-slate-800 text-white font-black shadow-lg text-base opacity-90">ก+</button>
