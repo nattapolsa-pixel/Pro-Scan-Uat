@@ -1049,7 +1049,7 @@
                 <img src="https://i.postimg.cc/L4qLLFNj/Black-White-Modern-Handwritten-Square-Studio-Logo-(15)-Photoroom-0.png"
                     alt="Pro LPN Scanner Logo" class="h-full w-auto object-contain">
             </div>
-            <div class="mb-2 rounded-full bg-amber-100 px-4 py-1 text-sm font-black text-amber-900 border border-amber-300">UAT v1.2.2 • ระบบทดสอบ</div>
+            <div class="mb-2 rounded-full bg-amber-100 px-4 py-1 text-sm font-black text-amber-900 border border-amber-300">UAT v1.2.3 • ระบบทดสอบ</div>
             <h2 class="text-2xl font-black text-gray-800 mb-1">Pro Scanner UAT</h2>
             <p class="text-gray-500 text-sm font-bold mb-1">ข้อมูลเอกสารจาก Google Sheets</p>
             <p class="text-red-600 text-xs font-black mb-5">พักการยิง Tote / LPN ชั่วคราว • ห้ามใช้แทน Production</p>
@@ -1656,7 +1656,7 @@
     </div>
 
     <script>
-        const APP_VERSION = '1.2.2-uat';
+        const APP_VERSION = '1.2.3-uat';
         const backendApiUrl = 'https://backed-api-scan-uat.onrender.com';
         const SCAN_FEATURE_ENABLED = false;
         // ใส่ URL หน้าตรวจ QC ที่นี่เมื่อได้รับลิงก์จากหน้างาน (เว้นว่างไว้จะซ่อนปุ่มลิงก์)
@@ -2901,13 +2901,17 @@
                 renderShippingDocument();
                 if (!latestDocumentSummaries.length) throw new Error('ไม่พบยอดสาขาที่จะบันทึก');
                 const serverResult = await pushDocumentSummaryToServer(true, true, null, 'manual_total_save');
-                if (!serverResult || serverResult.persist_overrides !== true || serverResult.report_sync !== 'completed') {
-                    throw new Error('Server ยังบันทึกยอดลง Google Sheets ไม่ครบ');
+                if (!serverResult || serverResult.persist_overrides !== true) {
+                    throw new Error('Server ยังไม่รับยอดแก้ไข');
                 }
                 const branchCount = Object.keys(documentOverrides).filter(branch => Object.keys(documentOverrides[branch] || {}).length > 0).length;
                 const fieldCount = Object.values(documentOverrides).reduce((sum, fields) => sum + Object.keys(fields || {}).length, 0);
                 const savedAt = new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date());
-                showAlert('✅ บันทึกยอดแก้ไขเรียบร้อย', `บันทึกแล้ว ${fieldCount} ช่อง จาก ${branchCount} สาขา\nเวลา ${savedAt} น.\n\nยอดในเว็บ, Member Data และรายงาน UAT อัปเดตครบแล้ว`, 'border-green-600', true);
+                if (serverResult.report_sync === 'completed') {
+                    showAlert('✅ บันทึกยอดแก้ไขเรียบร้อย', `บันทึกแล้ว ${fieldCount} ช่อง จาก ${branchCount} สาขา\nเวลา ${savedAt} น.\n\nยอดในเว็บ, Member Data และรายงาน UAT อัปเดตครบแล้ว`, 'border-green-600', true);
+                } else {
+                    showAlert('⚠️ เก็บยอดในเว็บแล้ว', `ยอดที่แก้จะไม่เด้งกลับ\nเวลา ${savedAt} น.\n\nGoogle Credential ยังใช้งานไม่ได้ จึงรอซิงก์ Member Data และรายงาน UAT`, 'border-amber-500', true);
+                }
             } catch (e) {
                 showAlert('บันทึกยอดไม่สำเร็จ', `${e && e.message ? e.message : e}\n\nกรุณาลองกดบันทึกอีกครั้ง`, 'border-red-600', false);
             } finally {
@@ -7340,7 +7344,7 @@
             <button onclick="palletModalBack()" class="mt-2.5 w-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm">← กลับไปเลือกสาขา</button>
         </div>
     </div>
-    <div class="fixed bottom-1 left-1.5 z-[1400] rounded bg-amber-100 px-2 py-1 text-[10px] leading-none text-amber-900 font-black pointer-events-none select-none border border-amber-300">UAT v1.2.2 • Google Sheets • Scan Hold</div>
+    <div class="fixed bottom-1 left-1.5 z-[1400] rounded bg-amber-100 px-2 py-1 text-[10px] leading-none text-amber-900 font-black pointer-events-none select-none border border-amber-300">UAT v1.2.3 • Google Sheets • Scan Hold</div>
     <div id="quickTools" class="fixed z-[1500] flex flex-col gap-2" style="bottom:16px;right:12px">
         <button onclick="openHelp()" title="วิธีใช้งาน / คำอธิบาย" class="w-11 h-11 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-black shadow-lg text-lg opacity-90">?</button>
         <button onclick="toggleBigText()" id="bigTextBtn" title="ปรับตัวอักษรใหญ่" class="w-11 h-11 rounded-full bg-slate-700 hover:bg-slate-800 text-white font-black shadow-lg text-base opacity-90">ก+</button>
