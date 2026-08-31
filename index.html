@@ -3043,7 +3043,7 @@
                     const response = await fetchWithTimeout(
                         backendApiUrl + `/api/branch-provinces?_ts=${Date.now()}`,
                         { cache: 'no-store' },
-                        20000
+                        45000
                     );
                     if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
