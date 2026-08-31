@@ -3,6 +3,13 @@ services:
     name: pro-scanner-uat
     runtime: static
     branch: main
-    buildCommand: ""
+    buildCommand: npm ci && npm run build
     staticPublishPath: .
-    autoDeploy: true
+    autoDeployTrigger: commit
+    headers:
+      - path: /tailwind.min.css
+        name: Cache-Control
+        value: public, max-age=3600, stale-while-revalidate=86400
+      - path: /index.html
+        name: Cache-Control
+        value: no-cache

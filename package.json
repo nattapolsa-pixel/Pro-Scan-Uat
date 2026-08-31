@@ -1,0 +1,10 @@
+{
+  "name": "pro-scan-uat",
+  "private": true,
+  "scripts": {
+    "build": "tailwindcss -c tailwind.config.js -i tailwind.input.css -o tailwind.min.css --minify"
+  },
+  "devDependencies": {
+    "tailwindcss": "3.4.17"
+  }
+}

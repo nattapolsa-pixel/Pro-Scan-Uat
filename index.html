@@ -5,8 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Pro Scanner UAT - Google Sheets</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <link rel="stylesheet" href="/tailwind.min.css">
     <style>
         /* ==================== BASE RESET FOR HANDHELD ==================== */
         html, body {
@@ -2052,26 +2051,50 @@
         // ==================== 📸 CAMERA SCANNER LOGIC ====================
         let html5QrcodeScanner = null;
         let currentScanTargetId = null;
+        let html5QrcodeLibraryPromise = null;
 
-        function openScanner(targetInputId) {
+        function loadHtml5QrcodeLibrary() {
+            if (window.Html5QrcodeScanner) return Promise.resolve();
+            if (html5QrcodeLibraryPromise) return html5QrcodeLibraryPromise;
+            html5QrcodeLibraryPromise = new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = 'https://unpkg.com/html5-qrcode';
+                script.async = true;
+                script.onload = resolve;
+                script.onerror = () => reject(new Error('โหลดระบบกล้องไม่สำเร็จ'));
+                document.head.appendChild(script);
+            }).catch(error => {
+                html5QrcodeLibraryPromise = null;
+                throw error;
+            });
+            return html5QrcodeLibraryPromise;
+        }
+
+        async function openScanner(targetInputId) {
             currentScanTargetId = targetInputId;
             document.getElementById('scannerModal').classList.remove('hidden');
 
-            if (!html5QrcodeScanner) {
-                html5QrcodeScanner = new Html5QrcodeScanner(
-                    "reader",
-                    {
-                        fps: 15,
-                        qrbox: { width: 300, height: 100 },
-                        aspectRatio: 1.0,
-                        videoConstraints: {
-                            facingMode: "environment"
-                        }
-                    },
-                    false
-                );
+            try {
+                await loadHtml5QrcodeLibrary();
+                if (!html5QrcodeScanner) {
+                    html5QrcodeScanner = new Html5QrcodeScanner(
+                        "reader",
+                        {
+                            fps: 15,
+                            qrbox: { width: 300, height: 100 },
+                            aspectRatio: 1.0,
+                            videoConstraints: {
+                                facingMode: "environment"
+                            }
+                        },
+                        false
+                    );
+                }
+                html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+            } catch (error) {
+                closeScanner();
+                showAlert('เปิดกล้องไม่สำเร็จ', error && error.message ? error.message : String(error));
             }
-            html5QrcodeScanner.render(onScanSuccess, onScanFailure);
         }
 
         function closeScanner() {
@@ -2388,8 +2411,8 @@
             if (remaining > 0) throw new Error(`งานนี้ยังมี ${remaining} รายการที่ส่งไม่สำเร็จภายในเวลาที่กำหนด`);
             return true;
         }
-        // ⚡ Standard Plan: เซิร์ฟเวอร์ไม่หลับ → sync ทุก 5 วินาที (จาก 12 วินาที)
-        setInterval(processQueue, 5000);
+        // เปิด polling คิวเฉพาะเมื่อเปิดฟีเจอร์ Scan; UAT เอกสารไม่สร้างคิวนี้
+        if (SCAN_FEATURE_ENABLED) setInterval(processQueue, 5000);
 
         let isSharedStateRefreshing = false;
         async function refreshSharedBranchState() {
@@ -2419,8 +2442,8 @@
                 isSharedStateRefreshing = false;
             }
         }
-        // ⚡ Standard Plan: refresh สถานะสาขาทุก 30 วินาที (จาก 60 วินาที) เซิร์ฟเวอร์รองรับไปแล้ว
-        setInterval(refreshSharedBranchState, 30000);
+        // สถานะร่วมหลายเครื่องจำเป็นเฉพาะโหมด Scan
+        if (SCAN_FEATURE_ENABLED) setInterval(refreshSharedBranchState, 30000);
 
         window.addEventListener('beforeunload', function (e) {
             if (syncQueue.length > 0 || backgroundTasks > 0) {
@@ -2464,7 +2487,7 @@
         }
         window.addEventListener('online', updateSyncStatusUI);
         window.addEventListener('offline', updateSyncStatusUI);
-        setInterval(reportDeviceState, 45000);
+        if (SCAN_FEATURE_ENABLED) setInterval(reportDeviceState, 45000);
 
         // ==================== SHIPPING CONTROL DOCUMENT ====================
         function escapeDocumentText(value) {
@@ -3454,9 +3477,12 @@
         async function fetchFreshCurrentJobData() {
             // Booking ที่มี Wave เดียวก็ยังต้องโหลดผ่าน Booking เพื่อให้สาขาที่ย้าย/แบ่งเข้ามาแสดง
             const isBookingMode = !currentLookupIsWaveOnly;
+            // UAT เอกสารไม่มีรายการ Scan ที่ต้องบังคับอ่าน Sheet ใหม่ทุกครั้ง
+            // ใช้ server cache และให้ปุ่มรีเฟรชเป็นผู้สั่ง force เพื่อไม่ดาวน์โหลด Sheet ทั้งก้อนซ้ำ
+            const refreshParam = SCAN_FEATURE_ENABLED ? '&force=true' : '';
             const url = isBookingMode
-                ? backendApiUrl + `/api/check-booking?booking_no=${encodeURIComponent(currentBookingNo)}&force=true&_ts=${Date.now()}`
-                : backendApiUrl + `/api/check-wave?wave_no=${encodeURIComponent(activeWavesList[0] || currentWave)}&force=true&_ts=${Date.now()}`;
+                ? backendApiUrl + `/api/check-booking?booking_no=${encodeURIComponent(currentBookingNo)}${refreshParam}&_ts=${Date.now()}`
+                : backendApiUrl + `/api/check-wave?wave_no=${encodeURIComponent(activeWavesList[0] || currentWave)}${refreshParam}&_ts=${Date.now()}`;
             const res = await fetchWithTimeout(url, { cache: 'no-store' }, 60000);
             if (!res.ok) throw new Error(`โหลดข้อมูลส่วนกลางไม่สำเร็จ (HTTP ${res.status})`);
             return { data: await res.json(), isWaveOnly: !isBookingMode };
