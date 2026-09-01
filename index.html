@@ -1049,7 +1049,7 @@
                 <img src="https://i.postimg.cc/L4qLLFNj/Black-White-Modern-Handwritten-Square-Studio-Logo-(15)-Photoroom-0.png"
                     alt="Pro LPN Scanner Logo" class="h-full w-auto object-contain">
             </div>
-            <div class="mb-2 rounded-full bg-amber-100 px-4 py-1 text-sm font-black text-amber-900 border border-amber-300">UAT v1.2.4 • ระบบทดสอบ</div>
+            <div class="mb-2 rounded-full bg-amber-100 px-4 py-1 text-sm font-black text-amber-900 border border-amber-300">UAT v1.2.5 • ระบบทดสอบ</div>
             <h2 class="text-2xl font-black text-gray-800 mb-1">Pro Scanner UAT</h2>
             <p class="text-gray-500 text-sm font-bold mb-1">ข้อมูลเอกสารจาก Google Sheets</p>
             <p class="text-red-600 text-xs font-black mb-5">พักการยิง Tote / LPN ชั่วคราว • ห้ามใช้แทน Production</p>
@@ -5255,6 +5255,15 @@
                 let lookupCacheKey = cacheKey;
                 let fallbackBookingNo = '';
 
+                // Wave test/งานที่เพิ่งเพิ่มใน Member Data อาจยังไม่อยู่ใน Server
+                // cache รอบแรก ให้บังคับอ่าน Sheet ใหม่หนึ่งครั้งก่อนแจ้งว่าไม่พบ.
+                if (!res.ok && isWaveOnly) {
+                    showLoading('กำลังอัปเดตข้อมูล Wave ล่าสุดจาก Sheet...');
+                    const freshWaveUrl = backendApiUrl + `/api/check-wave?wave_no=${encodeURIComponent(inputVal)}&force=true&_ts=${Date.now()}`;
+                    res = await fetchJobDataWithRetry(freshWaveUrl, false, false, 45000, 0);
+                    if (requestId !== latestWaveLoadRequestId) return;
+                }
+
                 // Booking ต้องครบทุก Wave ก่อนแสดง หากรอบแรกเจอ Member Data
                 // ที่กำลังอัปเดต ให้รอและบังคับอ่าน Sheet ล่าสุดซ้ำ โดยหน้า
                 // เอกสารจะยังไม่เปิดจนกว่า Server ยืนยันว่าครบทุกสาขา.
@@ -7381,7 +7390,7 @@
             <button onclick="palletModalBack()" class="mt-2.5 w-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm">← กลับไปเลือกสาขา</button>
         </div>
     </div>
-    <div class="fixed bottom-1 left-1.5 z-[1400] rounded bg-amber-100 px-2 py-1 text-[10px] leading-none text-amber-900 font-black pointer-events-none select-none border border-amber-300">UAT v1.2.4 • Google Sheets • Scan Hold</div>
+    <div class="fixed bottom-1 left-1.5 z-[1400] rounded bg-amber-100 px-2 py-1 text-[10px] leading-none text-amber-900 font-black pointer-events-none select-none border border-amber-300">UAT v1.2.5 • Google Sheets • Scan Hold</div>
     <div id="quickTools" class="fixed z-[1500] flex flex-col gap-2" style="bottom:16px;right:12px">
         <button onclick="openHelp()" title="วิธีใช้งาน / คำอธิบาย" class="w-11 h-11 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-black shadow-lg text-lg opacity-90">?</button>
         <button onclick="toggleBigText()" id="bigTextBtn" title="ปรับตัวอักษรใหญ่" class="w-11 h-11 rounded-full bg-slate-700 hover:bg-slate-800 text-white font-black shadow-lg text-base opacity-90">ก+</button>
