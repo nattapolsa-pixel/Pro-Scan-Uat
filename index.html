@@ -1049,7 +1049,7 @@
                 <img src="https://i.postimg.cc/L4qLLFNj/Black-White-Modern-Handwritten-Square-Studio-Logo-(15)-Photoroom-0.png"
                     alt="Pro LPN Scanner Logo" class="h-full w-auto object-contain">
             </div>
-            <div class="mb-2 rounded-full bg-amber-100 px-4 py-1 text-sm font-black text-amber-900 border border-amber-300">UAT v1.2.5 • ระบบทดสอบ</div>
+            <div class="mb-2 rounded-full bg-amber-100 px-4 py-1 text-sm font-black text-amber-900 border border-amber-300">UAT v1.2.6 • ระบบทดสอบ</div>
             <h2 class="text-2xl font-black text-gray-800 mb-1">Pro Scanner UAT</h2>
             <p class="text-gray-500 text-sm font-bold mb-1">ข้อมูลเอกสารจาก Google Sheets</p>
             <p class="text-red-600 text-xs font-black mb-5">พักการยิง Tote / LPN ชั่วคราว • ห้ามใช้แทน Production</p>
@@ -1656,7 +1656,7 @@
     </div>
 
     <script>
-        const APP_VERSION = '1.2.5-uat';
+        const APP_VERSION = '1.2.6-uat';
         const backendApiUrl = 'https://backed-api-scan-uat.onrender.com';
         const SCAN_FEATURE_ENABLED = false;
         // ใส่ URL หน้าตรวจ QC ที่นี่เมื่อได้รับลิงก์จากหน้างาน (เว้นว่างไว้จะซ่อนปุ่มลิงก์)
@@ -3759,7 +3759,15 @@
                 const data = await res.json();
                 if (!res.ok) throw new Error(typeof data.detail === 'string' ? data.detail : `HTTP ${res.status}`);
                 closeBookingBranchMove();
-                const latest = await fetchFreshCurrentJobData(true); applyWaveDataToScreen(latest.data, latest.isWaveOnly); saveCurrentWaveDataCache(); renderShippingDocument(); shippingDocumentVerifiedAt = Date.now();
+                // ใช้ snapshot ปลายทางจากคำสั่งบันทึกโดยตรง เพื่อไม่ให้ GET ถัดไป
+                // ซึ่งอาจชน cache เก่า ทำให้ผู้ใช้เห็นว่ายังไม่ได้แบ่ง/ย้าย.
+                if (data.target_view && Array.isArray(data.target_view.lpn_list)) {
+                    applyWaveDataToScreen(data.target_view, false);
+                } else {
+                    const latest = await fetchFreshCurrentJobData(true);
+                    applyWaveDataToScreen(latest.data, latest.isWaveOnly);
+                }
+                saveCurrentWaveDataCache(); renderShippingDocument(); shippingDocumentVerifiedAt = Date.now();
                 showAlert(isSplit ? 'แบ่งยอดเข้ารถเรียบร้อย' : 'ย้ายสาขาเข้ารถเรียบร้อย', isSplit
                     ? `${bookingBranchMovePreview.branch_code}\nสาขานี้อยู่ทั้ง ${data.source_booking} และ ${data.target_booking}\nBooking นี้รับเพิ่ม ${split.m + split.red + split.blue + split.green + split.black} กล่อง`
                     : `${bookingBranchMovePreview.branch_code}\n${data.previous_booking || '-'} → ${data.target_booking}\nยอดเดิมถูกนำมาใช้ ไม่ต้องสแกนใหม่`, 'border-green-600', true);
@@ -3908,7 +3916,9 @@
             }
             if (bookingSplit) autoPalletCount = parseInt(bookingSplit.pallet) || 0;
             // โหลด override จาก localStorage / server (รองรับทั้งรหัสสาขาตรงและแบบ normalized)
-            const ov = documentOverrides[bCode] || documentOverrides[normalizeBranchLookupCode(bCode)] || {};
+            // Override เดิมเป็นยอดรวมระดับ Wave+สาขา จึงห้ามนำมาทับยอดที่
+            // จัดสรรเฉพาะ Booking หลังแบ่งรถ.
+            const ov = bookingSplit ? {} : (documentOverrides[bCode] || documentOverrides[normalizeBranchLookupCode(bCode)] || {});
             const mCount = (ov.m !== undefined && ov.m !== null && ov.m !== '') ? (parseInt(ov.m) || 0) : autoM;
             const redCount = (ov.red !== undefined && ov.red !== null && ov.red !== '') ? (parseInt(ov.red) || 0) : autoRed;
             const blueCount = (ov.blue !== undefined && ov.blue !== null && ov.blue !== '') ? (parseInt(ov.blue) || 0) : autoBlue;
@@ -7390,7 +7400,7 @@
             <button onclick="palletModalBack()" class="mt-2.5 w-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm">← กลับไปเลือกสาขา</button>
         </div>
     </div>
-    <div class="fixed bottom-1 left-1.5 z-[1400] rounded bg-amber-100 px-2 py-1 text-[10px] leading-none text-amber-900 font-black pointer-events-none select-none border border-amber-300">UAT v1.2.5 • Google Sheets • Scan Hold</div>
+    <div class="fixed bottom-1 left-1.5 z-[1400] rounded bg-amber-100 px-2 py-1 text-[10px] leading-none text-amber-900 font-black pointer-events-none select-none border border-amber-300">UAT v1.2.6 • Google Sheets • Scan Hold</div>
     <div id="quickTools" class="fixed z-[1500] flex flex-col gap-2" style="bottom:16px;right:12px">
         <button onclick="openHelp()" title="วิธีใช้งาน / คำอธิบาย" class="w-11 h-11 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-black shadow-lg text-lg opacity-90">?</button>
         <button onclick="toggleBigText()" id="bigTextBtn" title="ปรับตัวอักษรใหญ่" class="w-11 h-11 rounded-full bg-slate-700 hover:bg-slate-800 text-white font-black shadow-lg text-base opacity-90">ก+</button>
