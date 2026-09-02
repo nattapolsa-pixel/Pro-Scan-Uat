@@ -328,7 +328,7 @@
         @media print {
             @page {
                 size: A4 landscape;
-                margin: 8mm 6mm;
+                margin: 4mm;
             }
 
             html,
@@ -439,7 +439,7 @@
                 display: flex !important;
                 flex-direction: column !important;
                 width: 100%;
-                min-height: 186mm;
+                min-height: 197mm;
                 box-sizing: border-box;
                 background: #ffffff;
                 color: #000000;
@@ -643,7 +643,7 @@
 
             .print-title h1 {
                 margin: 0;
-                font-size: 24px;
+                font-size: 26px;
                 line-height: 1.2;
                 font-weight: 800;
                 color: #000000;
@@ -665,7 +665,7 @@
                 border-collapse: collapse !important;
                 table-layout: auto !important;
                 color: #000000 !important;
-                font-size: 13px !important;
+                font-size: 14px !important;
                 line-height: 1.25 !important;
             }
 
@@ -673,7 +673,7 @@
             .print-job-table td {
                 border: 1px solid #000000 !important;
                 padding: 4px 8px !important;
-                height: 24px !important;
+                height: 25px !important;
                 line-height: 1.25 !important;
                 vertical-align: middle !important;
                 color: #000000 !important;
@@ -980,7 +980,7 @@
         </header>
         <div class="flex-1 overflow-y-auto p-3 md:p-6 bg-gray-200">
             <div id="shippingDocumentContent"
-                class="max-w-5xl mx-auto min-h-full flex flex-col gap-6"></div>
+                class="w-full max-w-[1500px] mx-auto min-h-full flex flex-col gap-6"></div>
         </div>
     </div>
 
@@ -2515,6 +2515,8 @@
         let documentOverrides = {};
         let documentHiddenBranches = [];
         let latestDocumentSummaries = [];
+        let shippingDocumentBranchPage = 1;
+        const shippingDocumentBranchesPerPage = 15;
         let autoTotalsSyncTimer = null;
         let autoTotalsRetryTimer = null;
         const pendingAutoTotalsBranches = new Set();
@@ -4170,16 +4172,21 @@
                 `;
             });
 
-            let rowsHtml = activeRows.join('');
+            const branchPageCount = Math.max(1, Math.ceil(activeRows.length / shippingDocumentBranchesPerPage));
+            shippingDocumentBranchPage = Math.min(Math.max(1, shippingDocumentBranchPage), branchPageCount);
+            const branchPageStart = (shippingDocumentBranchPage - 1) * shippingDocumentBranchesPerPage;
+            const visibleRows = activeRows.slice(branchPageStart, branchPageStart + shippingDocumentBranchesPerPage);
+            let rowsHtml = visibleRows.join('');
 
             // Padding up to 15 rows for neat print alignment
             const minRows = 15;
-            const activeRowCount = branches.length;
+            const activeRowCount = visibleRows.length;
             if (activeRowCount < minRows) {
                 for (let i = activeRowCount + 1; i <= minRows; i++) {
+                    const rowNumber = branchPageStart + i;
                     rowsHtml += `
                         <tr class="hover:bg-slate-50 transition-colors text-center text-slate-700 opacity-60" style="height: 35px;">
-                            <td class="p-3 border-r border-slate-200 font-medium font-sans">${i}</td>
+                            <td class="p-3 border-r border-slate-200 font-medium font-sans">${rowNumber}</td>
                             <td class="p-3 border-r border-slate-200 font-bold font-sans">-</td>
                             <td class="p-3 border-r border-slate-200 font-bold font-sans">-</td>
                             <td class="p-3 border-r border-slate-200 text-left font-medium font-sans">-</td>
@@ -4198,6 +4205,17 @@
             }
 
             const totalPalletDisplay = allBranchesHavePalletCount ? String(totalPallets) : '-';
+
+            const branchPaginationHtml = branchPageCount > 1 ? `
+                <div class="no-print flex flex-wrap items-center justify-between gap-3 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3">
+                    <div class="text-sm font-black text-indigo-900">แสดงสาขา ${branchPageStart + 1}–${Math.min(branchPageStart + shippingDocumentBranchesPerPage, branches.length)} จาก ${branches.length} สาขา</div>
+                    <div class="flex items-center gap-2">
+                        <button onclick="changeShippingDocumentBranchPage(-1)" ${shippingDocumentBranchPage <= 1 ? 'disabled' : ''} class="rounded-lg border border-indigo-300 bg-white px-4 py-2 text-sm font-black text-indigo-800 disabled:cursor-not-allowed disabled:opacity-40">← ก่อนหน้า</button>
+                        <span class="min-w-[90px] text-center text-sm font-black text-indigo-900">หน้า ${shippingDocumentBranchPage} / ${branchPageCount}</span>
+                        <button onclick="changeShippingDocumentBranchPage(1)" ${shippingDocumentBranchPage >= branchPageCount ? 'disabled' : ''} class="rounded-lg border border-indigo-300 bg-white px-4 py-2 text-sm font-black text-indigo-800 disabled:cursor-not-allowed disabled:opacity-40">ถัดไป →</button>
+                    </div>
+                </div>
+            ` : '';
 
             const totalRow = `
                 <tr class="bg-slate-100 text-center font-black text-slate-900 border-t-2 border-slate-300">
@@ -4418,6 +4436,8 @@
 
                     ${hiddenBannerHtml}
 
+                    ${branchPaginationHtml}
+
                     <!-- Metadata Grid -->
                     <div class="grid grid-cols-1 md:grid-cols-5 gap-3 p-4 bg-slate-50 rounded-xl border border-slate-100 text-sm">
                         <div class="flex flex-col gap-1">
@@ -4506,6 +4526,13 @@
                     ${printPagesHtml}
                 </div>
             `;
+        }
+
+        function changeShippingDocumentBranchPage(delta) {
+            shippingDocumentBranchPage += Number(delta) || 0;
+            renderShippingDocument();
+            const content = document.getElementById('shippingDocumentContent');
+            if (content) content.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
 
         function filterBranchLpns() {
