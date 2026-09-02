@@ -1049,7 +1049,7 @@
                 <img src="https://i.postimg.cc/L4qLLFNj/Black-White-Modern-Handwritten-Square-Studio-Logo-(15)-Photoroom-0.png"
                     alt="Pro LPN Scanner Logo" class="h-full w-auto object-contain">
             </div>
-            <div class="mb-2 rounded-full bg-amber-100 px-4 py-1 text-sm font-black text-amber-900 border border-amber-300">UAT v1.2.6 • ระบบทดสอบ</div>
+            <div class="mb-2 rounded-full bg-amber-100 px-4 py-1 text-sm font-black text-amber-900 border border-amber-300">UAT v1.2.7 Free • ระบบทดสอบ</div>
             <h2 class="text-2xl font-black text-gray-800 mb-1">Pro Scanner UAT</h2>
             <p class="text-gray-500 text-sm font-bold mb-1">ข้อมูลเอกสารจาก Google Sheets</p>
             <p class="text-red-600 text-xs font-black mb-5">พักการยิง Tote / LPN ชั่วคราว • ห้ามใช้แทน Production</p>
@@ -1656,7 +1656,7 @@
     </div>
 
     <script>
-        const APP_VERSION = '1.2.6-uat';
+        const APP_VERSION = '1.2.7-uat-free';
         const backendApiUrl = 'https://backed-api-scan-uat.onrender.com';
         const SCAN_FEATURE_ENABLED = false;
         // ใส่ URL หน้าตรวจ QC ที่นี่เมื่อได้รับลิงก์จากหน้างาน (เว้นว่างไว้จะซ่อนปุ่มลิงก์)
@@ -1826,7 +1826,8 @@
         let backendReadyAt = 0;
         let backendReadyPromise = null;
         async function ensureBackendReady(showStatus = false) {
-            // ⚡ Standard Plan: ไม่มี Cold Start → ลด timeout เหลือ 8 วินาที, และ ready เร็วขึ้น มาก
+            // Free plan อาจ cold start หลังไม่มีคำขอ 15 นาที จึงรอการปลุก Server
+            // ใน promise เดียว ไม่ให้หลายเมนูยิงปลุกพร้อมกัน.
             if (Date.now() - backendReadyAt < 300000) return true; // cache 5 min
             if (backendReadyPromise) return backendReadyPromise;
             if (showStatus) updateSyncStatusUI('waking');
@@ -1834,10 +1835,10 @@
                 let lastError = null;
                 for (let attempt = 0; attempt < 2; attempt++) {
                     try {
-                        const res = await fetchWithTimeout(backendApiUrl + '/api/health', { cache: 'no-store' }, 8000);
+                        const res = await fetchWithTimeout(backendApiUrl + '/api/health', { cache: 'no-store' }, 75000);
                         if (res.ok) { backendReadyAt = Date.now(); return true; }
                     } catch (e) { lastError = e; }
-                    await new Promise(resolve => setTimeout(resolve, 500));
+                    await new Promise(resolve => setTimeout(resolve, 1000));
                 }
                 throw lastError || new Error('Server ยังไม่พร้อม');
             })().finally(() => { backendReadyPromise = null; updateSyncStatusUI(); });
@@ -1847,7 +1848,7 @@
         function keepAliveHeartbeat() {
             const ping = () => {
                 if (navigator.onLine) {
-                    // ⚡ Standard Plan: Server ไม่หลับ → ใช้ ping เพื่อเช็ค health เท่านั้น (ไม่ต้องปลุก)
+                    // ขณะหน้าเว็บเปิดอยู่ ping ทุก 10 นาทีเพื่อให้ Free instance พร้อมใช้งาน
                     fetchWithTimeout(backendApiUrl + '/api/health', { cache: 'no-store' }, 5000)
                         .then(() => { backendReadyAt = Date.now(); })
                         .catch(() => { });
@@ -1855,9 +1856,7 @@
             };
             ping();
             prefetchPendingWaves();
-            // ⚡ Standard: server อยู่เสมอ → ping ทุก 10 นาทีเพื่อตรวจ health check สั้นๆ
-            setInterval(ping, 600000); // 10 นาที (free คือ 4 นาที)
-            // ไม่ต้อง focus/visibility event สำหรับปลุก server อีกต่อไป
+            setInterval(ping, 600000);
         }
 
         // ✅ fetchWithTimeout: fetch พร้อม AbortController เพื่อไม่ให้ request ค้างนานโดยไม่จำกัด
@@ -7400,7 +7399,7 @@
             <button onclick="palletModalBack()" class="mt-2.5 w-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm">← กลับไปเลือกสาขา</button>
         </div>
     </div>
-    <div class="fixed bottom-1 left-1.5 z-[1400] rounded bg-amber-100 px-2 py-1 text-[10px] leading-none text-amber-900 font-black pointer-events-none select-none border border-amber-300">UAT v1.2.6 • Google Sheets • Scan Hold</div>
+    <div class="fixed bottom-1 left-1.5 z-[1400] rounded bg-amber-100 px-2 py-1 text-[10px] leading-none text-amber-900 font-black pointer-events-none select-none border border-amber-300">UAT v1.2.7 Free • Google Sheets • Scan Hold</div>
     <div id="quickTools" class="fixed z-[1500] flex flex-col gap-2" style="bottom:16px;right:12px">
         <button onclick="openHelp()" title="วิธีใช้งาน / คำอธิบาย" class="w-11 h-11 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-black shadow-lg text-lg opacity-90">?</button>
         <button onclick="toggleBigText()" id="bigTextBtn" title="ปรับตัวอักษรใหญ่" class="w-11 h-11 rounded-full bg-slate-700 hover:bg-slate-800 text-white font-black shadow-lg text-base opacity-90">ก+</button>
