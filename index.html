@@ -1050,7 +1050,7 @@
                 <img src="https://i.postimg.cc/L4qLLFNj/Black-White-Modern-Handwritten-Square-Studio-Logo-(15)-Photoroom-0.png"
                     alt="Pro LPN Scanner Logo" class="h-full w-auto object-contain">
             </div>
-            <div class="mb-2 rounded-full bg-amber-100 px-4 py-1 text-sm font-black text-amber-900 border border-amber-300">UAT v1.3.2 Free • Dashboard</div>
+            <div class="mb-2 rounded-full bg-amber-100 px-4 py-1 text-sm font-black text-amber-900 border border-amber-300">UAT v1.3.3 Free • Dashboard</div>
             <h2 class="text-2xl font-black text-gray-800 mb-1">Pro Scanner UAT</h2>
             <p class="text-gray-500 text-sm font-bold mb-1">ข้อมูลเอกสารจาก Google Sheets</p>
             <p class="text-red-600 text-xs font-black mb-5">พักการยิง Tote / LPN ชั่วคราว • ห้ามใช้แทน Production</p>
@@ -1169,7 +1169,15 @@
                             <button data-dashboard-days="30" onclick="setDashboardRange(30)" class="dashboard-range-btn rounded-lg px-3 py-2 text-xs font-black text-slate-600">30 วัน</button>
                         </div>
                     </div>
-                    <form onsubmit="applyDashboardFilters(event)" class="grid grid-cols-1 lg:grid-cols-[minmax(0,1.25fr)_minmax(210px,.75fr)_auto] gap-2 items-end border-t border-slate-100 pt-3">
+                    <form onsubmit="applyDashboardFilters(event)" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-[150px_150px_minmax(240px,1fr)_minmax(210px,.7fr)_auto] gap-2 items-end border-t border-slate-100 pt-3">
+                        <label class="block">
+                            <span class="mb-1 block text-[10px] font-black uppercase tracking-wide text-slate-500">วันที่เริ่มต้น</span>
+                            <input id="dashboardDateFrom" type="date" onchange="applyDashboardFilters()" class="w-full min-h-[42px] rounded-xl border border-slate-300 bg-white px-3 text-sm font-bold text-slate-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
+                        </label>
+                        <label class="block">
+                            <span class="mb-1 block text-[10px] font-black uppercase tracking-wide text-slate-500">วันที่สิ้นสุด</span>
+                            <input id="dashboardDateTo" type="date" onchange="applyDashboardFilters()" class="w-full min-h-[42px] rounded-xl border border-slate-300 bg-white px-3 text-sm font-bold text-slate-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
+                        </label>
                         <label class="block">
                             <span class="mb-1 block text-[10px] font-black uppercase tracking-wide text-slate-500">ค้นหา Booking / Wave / รหัสสาขา</span>
                             <input id="dashboardReferenceFilter" type="search" autocomplete="off" oninput="queueDashboardFilters()" placeholder="เช่น B001-260801486, 60697 หรือ MF03" class="w-full min-h-[42px] rounded-xl border border-slate-300 bg-white px-3 text-sm font-bold text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
@@ -1781,7 +1789,7 @@
     </div>
 
     <script>
-        const APP_VERSION = '1.3.2-uat-free';
+        const APP_VERSION = '1.3.3-uat-free';
         const backendApiUrl = 'https://backed-api-scan-uat.onrender.com';
         const SCAN_FEATURE_ENABLED = false;
         // ใส่ URL หน้าตรวจ QC ที่นี่เมื่อได้รับลิงก์จากหน้างาน (เว้นว่างไว้จะซ่อนปุ่มลิงก์)
@@ -1823,6 +1831,8 @@
         let dashboardLoadController = null;
         let dashboardReferenceQuery = '';
         let dashboardEmployeeFilter = '';
+        let dashboardDateFrom = '';
+        let dashboardDateTo = '';
         let dashboardFilterDebounceTimer = null;
         let dashboardLoadSequence = 0;
 
@@ -1871,6 +1881,8 @@
 
         function setDashboardRange(days) {
             dashboardRangeDays = [1, 7, 30].includes(Number(days)) ? Number(days) : 7;
+            dashboardDateFrom = '';
+            dashboardDateTo = '';
             document.querySelectorAll('.dashboard-range-btn').forEach(btn => {
                 const active = Number(btn.dataset.dashboardDays) === dashboardRangeDays;
                 btn.className = `dashboard-range-btn rounded-lg px-3 py-2 text-xs font-black transition ${active ? 'bg-slate-900 text-white shadow' : 'text-slate-600 hover:bg-white'}`;
@@ -1889,8 +1901,16 @@
             clearTimeout(dashboardFilterDebounceTimer);
             const queryInput = document.getElementById('dashboardReferenceFilter');
             const employeeSelect = document.getElementById('dashboardEmployeeFilter');
+            const dateFromInput = document.getElementById('dashboardDateFrom');
+            const dateToInput = document.getElementById('dashboardDateTo');
             dashboardReferenceQuery = String(queryInput ? queryInput.value : '').trim();
             dashboardEmployeeFilter = String(employeeSelect ? employeeSelect.value : '').trim().toUpperCase();
+            dashboardDateFrom = String(dateFromInput ? dateFromInput.value : '').trim();
+            dashboardDateTo = String(dateToInput ? dateToInput.value : '').trim();
+            if (dashboardDateFrom && dashboardDateTo && dashboardDateFrom > dashboardDateTo) {
+                showCustomAlert('วันที่ไม่ถูกต้อง', 'วันที่เริ่มต้นต้องไม่มากกว่าวันที่สิ้นสุด', 'warning');
+                return;
+            }
             loadPerformanceDashboard(true);
         }
 
@@ -1900,8 +1920,14 @@
             const employeeSelect = document.getElementById('dashboardEmployeeFilter');
             if (queryInput) queryInput.value = '';
             if (employeeSelect) employeeSelect.value = '';
+            const dateFromInput = document.getElementById('dashboardDateFrom');
+            const dateToInput = document.getElementById('dashboardDateTo');
+            if (dateFromInput) dateFromInput.value = '';
+            if (dateToInput) dateToInput.value = '';
             dashboardReferenceQuery = '';
             dashboardEmployeeFilter = '';
+            dashboardDateFrom = '';
+            dashboardDateTo = '';
             loadPerformanceDashboard(true);
         }
 
@@ -1941,6 +1967,8 @@
                 const params = new URLSearchParams({ days: String(dashboardRangeDays), _ts: String(Date.now()) });
                 if (dashboardReferenceQuery) params.set('q', dashboardReferenceQuery);
                 if (dashboardEmployeeFilter) params.set('employee', dashboardEmployeeFilter);
+                if (dashboardDateFrom) params.set('date_from', dashboardDateFrom);
+                if (dashboardDateTo) params.set('date_to', dashboardDateTo);
                 const response = await fetch(`${backendApiUrl}/api/dashboard?${params.toString()}`, {
                     cache: 'no-store', signal: dashboardLoadController.signal
                 });
@@ -1991,9 +2019,15 @@
         function renderDashboardFilters(filters, employeeOptions) {
             dashboardReferenceQuery = String(filters.q || '').trim();
             dashboardEmployeeFilter = String(filters.employee || '').trim().toUpperCase();
+            dashboardDateFrom = String(filters.date_from || '').trim();
+            dashboardDateTo = String(filters.date_to || '').trim();
             const queryInput = document.getElementById('dashboardReferenceFilter');
             const employeeSelect = document.getElementById('dashboardEmployeeFilter');
+            const dateFromInput = document.getElementById('dashboardDateFrom');
+            const dateToInput = document.getElementById('dashboardDateTo');
             if (queryInput && document.activeElement !== queryInput) queryInput.value = dashboardReferenceQuery;
+            if (dateFromInput) dateFromInput.value = dashboardDateFrom;
+            if (dateToInput) dateToInput.value = dashboardDateTo;
             if (employeeSelect) {
                 const selected = dashboardEmployeeFilter;
                 const uniqueOptions = new Map();
@@ -2011,6 +2045,7 @@
             const status = document.getElementById('dashboardFilterStatus');
             if (!status) return;
             const notes = [];
+            if (dashboardDateFrom && dashboardDateTo) notes.push(`วันที่ ${escapeDocumentText(dashboardDateFrom)} ถึง ${escapeDocumentText(dashboardDateTo)}`);
             if (dashboardReferenceQuery) notes.push(`กำลังค้นหา “${escapeDocumentText(dashboardReferenceQuery)}” ใน Booking / Wave / รหัสสาขา`);
             if (dashboardEmployeeFilter) notes.push(`กิจกรรมผู้ใช้: ${escapeDocumentText(dashboardEmployeeFilter)}`);
             status.innerHTML = notes.length
@@ -7898,7 +7933,7 @@
             <button onclick="palletModalBack()" class="mt-2.5 w-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm">← กลับไปเลือกสาขา</button>
         </div>
     </div>
-    <div class="fixed bottom-1 left-1.5 z-[1400] rounded bg-amber-100 px-2 py-1 text-[10px] leading-none text-amber-900 font-black pointer-events-none select-none border border-amber-300">UAT v1.3.2 Free • Dashboard • Scan Hold</div>
+    <div class="fixed bottom-1 left-1.5 z-[1400] rounded bg-amber-100 px-2 py-1 text-[10px] leading-none text-amber-900 font-black pointer-events-none select-none border border-amber-300">UAT v1.3.3 Free • Dashboard • Scan Hold</div>
     <div id="quickTools" class="fixed z-[1500] flex flex-col gap-2" style="bottom:16px;right:12px">
         <button onclick="openHelp()" title="วิธีใช้งาน / คำอธิบาย" class="w-11 h-11 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-black shadow-lg text-lg opacity-90">?</button>
         <button onclick="toggleBigText()" id="bigTextBtn" title="ปรับตัวอักษรใหญ่" class="w-11 h-11 rounded-full bg-slate-700 hover:bg-slate-800 text-white font-black shadow-lg text-base opacity-90">ก+</button>
