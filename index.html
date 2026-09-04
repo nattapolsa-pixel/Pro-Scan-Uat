@@ -1050,7 +1050,7 @@
                 <img src="https://i.postimg.cc/L4qLLFNj/Black-White-Modern-Handwritten-Square-Studio-Logo-(15)-Photoroom-0.png"
                     alt="Pro LPN Scanner Logo" class="h-full w-auto object-contain">
             </div>
-            <div class="mb-2 rounded-full bg-amber-100 px-4 py-1 text-sm font-black text-amber-900 border border-amber-300">UAT v1.3.1 Free • Dashboard</div>
+            <div class="mb-2 rounded-full bg-amber-100 px-4 py-1 text-sm font-black text-amber-900 border border-amber-300">UAT v1.3.2 Free • Dashboard</div>
             <h2 class="text-2xl font-black text-gray-800 mb-1">Pro Scanner UAT</h2>
             <p class="text-gray-500 text-sm font-bold mb-1">ข้อมูลเอกสารจาก Google Sheets</p>
             <p class="text-red-600 text-xs font-black mb-5">พักการยิง Tote / LPN ชั่วคราว • ห้ามใช้แทน Production</p>
@@ -1157,16 +1157,33 @@
         </header>
         <main class="flex-1 overflow-y-auto">
             <div class="max-w-[1600px] mx-auto p-3 md:p-6 space-y-5">
-                <section class="flex flex-col md:flex-row md:items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-                    <div>
-                        <div class="text-sm font-black text-slate-900">ภาพรวมการใช้งานระบบเอกสาร</div>
-                        <div class="text-xs font-bold text-slate-500">นับ Login, การค้นหา, เปิดเอกสาร, บันทึกยอด และพิมพ์ โดยไม่รวมการเปิด Dashboard ซ้ำใน KPI หลัก</div>
+                <section class="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm space-y-3">
+                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                        <div>
+                            <div class="text-sm font-black text-slate-900">ภาพรวมการใช้งานระบบเอกสาร</div>
+                            <div class="text-xs font-bold text-slate-500">นับ Login, การค้นหา, เปิดเอกสาร, บันทึกยอด และพิมพ์ โดยไม่รวมการเปิด Dashboard ซ้ำใน KPI หลัก</div>
+                        </div>
+                        <div class="inline-flex rounded-xl bg-slate-100 p-1 border border-slate-200 self-start md:self-auto">
+                            <button data-dashboard-days="1" onclick="setDashboardRange(1)" class="dashboard-range-btn rounded-lg px-3 py-2 text-xs font-black text-slate-600">วันนี้</button>
+                            <button data-dashboard-days="7" onclick="setDashboardRange(7)" class="dashboard-range-btn rounded-lg px-3 py-2 text-xs font-black bg-slate-900 text-white shadow">7 วัน</button>
+                            <button data-dashboard-days="30" onclick="setDashboardRange(30)" class="dashboard-range-btn rounded-lg px-3 py-2 text-xs font-black text-slate-600">30 วัน</button>
+                        </div>
                     </div>
-                    <div class="inline-flex rounded-xl bg-slate-100 p-1 border border-slate-200 self-start md:self-auto">
-                        <button data-dashboard-days="1" onclick="setDashboardRange(1)" class="dashboard-range-btn rounded-lg px-3 py-2 text-xs font-black text-slate-600">วันนี้</button>
-                        <button data-dashboard-days="7" onclick="setDashboardRange(7)" class="dashboard-range-btn rounded-lg px-3 py-2 text-xs font-black bg-slate-900 text-white shadow">7 วัน</button>
-                        <button data-dashboard-days="30" onclick="setDashboardRange(30)" class="dashboard-range-btn rounded-lg px-3 py-2 text-xs font-black text-slate-600">30 วัน</button>
-                    </div>
+                    <form onsubmit="applyDashboardFilters(event)" class="grid grid-cols-1 lg:grid-cols-[minmax(0,1.25fr)_minmax(210px,.75fr)_auto] gap-2 items-end border-t border-slate-100 pt-3">
+                        <label class="block">
+                            <span class="mb-1 block text-[10px] font-black uppercase tracking-wide text-slate-500">ค้นหา Booking / Wave / รหัสสาขา</span>
+                            <input id="dashboardReferenceFilter" type="search" autocomplete="off" oninput="queueDashboardFilters()" placeholder="เช่น B001-260801486, 60697 หรือ MF03" class="w-full min-h-[42px] rounded-xl border border-slate-300 bg-white px-3 text-sm font-bold text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
+                        </label>
+                        <label class="block">
+                            <span class="mb-1 block text-[10px] font-black uppercase tracking-wide text-slate-500">ผู้ใช้งาน</span>
+                            <select id="dashboardEmployeeFilter" onchange="applyDashboardFilters()" class="w-full min-h-[42px] rounded-xl border border-slate-300 bg-white px-3 text-sm font-bold text-slate-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"><option value="">ผู้ใช้งานทั้งหมด</option></select>
+                        </label>
+                        <div class="flex gap-2">
+                            <button type="submit" class="min-h-[42px] rounded-xl bg-blue-700 px-4 text-sm font-black text-white shadow-sm transition hover:bg-blue-800">กรองข้อมูล</button>
+                            <button type="button" onclick="clearDashboardFilters()" class="min-h-[42px] rounded-xl border border-slate-300 bg-white px-3 text-sm font-black text-slate-600 transition hover:bg-slate-50">ล้าง</button>
+                        </div>
+                    </form>
+                    <div id="dashboardFilterStatus" class="text-[11px] font-bold text-slate-500">แสดงข้อมูลทั้งหมดในช่วงเวลาที่เลือก</div>
                 </section>
 
                 <div id="dashboardLoadingState" class="rounded-2xl border border-blue-200 bg-blue-50 p-8 text-center text-blue-900 font-black animate-pulse">กำลังโหลดข้อมูล Dashboard...</div>
@@ -1764,7 +1781,7 @@
     </div>
 
     <script>
-        const APP_VERSION = '1.3.1-uat-free';
+        const APP_VERSION = '1.3.2-uat-free';
         const backendApiUrl = 'https://backed-api-scan-uat.onrender.com';
         const SCAN_FEATURE_ENABLED = false;
         // ใส่ URL หน้าตรวจ QC ที่นี่เมื่อได้รับลิงก์จากหน้างาน (เว้นว่างไว้จะซ่อนปุ่มลิงก์)
@@ -1804,6 +1821,10 @@
         let pendingWavesFetchPromise = null;
         let dashboardRangeDays = 7;
         let dashboardLoadController = null;
+        let dashboardReferenceQuery = '';
+        let dashboardEmployeeFilter = '';
+        let dashboardFilterDebounceTimer = null;
+        let dashboardLoadSequence = 0;
 
         const usageEventLabels = {
             LOGIN: 'เข้าสู่ระบบ', LOGOUT: 'ออกจากระบบ', SEARCH: 'ค้นหางาน',
@@ -1844,6 +1865,7 @@
             const modal = document.getElementById('performanceDashboardModal');
             modal.classList.add('hidden');
             modal.classList.remove('flex');
+            dashboardLoadSequence += 1;
             if (dashboardLoadController) dashboardLoadController.abort();
         }
 
@@ -1853,6 +1875,33 @@
                 const active = Number(btn.dataset.dashboardDays) === dashboardRangeDays;
                 btn.className = `dashboard-range-btn rounded-lg px-3 py-2 text-xs font-black transition ${active ? 'bg-slate-900 text-white shadow' : 'text-slate-600 hover:bg-white'}`;
             });
+            loadPerformanceDashboard(true);
+        }
+
+        function queueDashboardFilters() {
+            dashboardLoadSequence += 1;
+            clearTimeout(dashboardFilterDebounceTimer);
+            dashboardFilterDebounceTimer = setTimeout(() => applyDashboardFilters(), 500);
+        }
+
+        function applyDashboardFilters(event) {
+            if (event) event.preventDefault();
+            clearTimeout(dashboardFilterDebounceTimer);
+            const queryInput = document.getElementById('dashboardReferenceFilter');
+            const employeeSelect = document.getElementById('dashboardEmployeeFilter');
+            dashboardReferenceQuery = String(queryInput ? queryInput.value : '').trim();
+            dashboardEmployeeFilter = String(employeeSelect ? employeeSelect.value : '').trim().toUpperCase();
+            loadPerformanceDashboard(true);
+        }
+
+        function clearDashboardFilters() {
+            clearTimeout(dashboardFilterDebounceTimer);
+            const queryInput = document.getElementById('dashboardReferenceFilter');
+            const employeeSelect = document.getElementById('dashboardEmployeeFilter');
+            if (queryInput) queryInput.value = '';
+            if (employeeSelect) employeeSelect.value = '';
+            dashboardReferenceQuery = '';
+            dashboardEmployeeFilter = '';
             loadPerformanceDashboard(true);
         }
 
@@ -1878,6 +1927,7 @@
         }
 
         async function loadPerformanceDashboard(force = false) {
+            const requestId = ++dashboardLoadSequence;
             const loading = document.getElementById('dashboardLoadingState');
             const error = document.getElementById('dashboardErrorState');
             const content = document.getElementById('dashboardContent');
@@ -1888,15 +1938,20 @@
             dashboardLoadController = new AbortController();
             const timeout = setTimeout(() => dashboardLoadController.abort(), 45000);
             try {
-                const response = await fetch(`${backendApiUrl}/api/dashboard?days=${dashboardRangeDays}&_ts=${Date.now()}`, {
+                const params = new URLSearchParams({ days: String(dashboardRangeDays), _ts: String(Date.now()) });
+                if (dashboardReferenceQuery) params.set('q', dashboardReferenceQuery);
+                if (dashboardEmployeeFilter) params.set('employee', dashboardEmployeeFilter);
+                const response = await fetch(`${backendApiUrl}/api/dashboard?${params.toString()}`, {
                     cache: 'no-store', signal: dashboardLoadController.signal
                 });
                 let data = {};
                 try { data = await response.json(); } catch (e) { }
                 if (!response.ok || !data.success) throw new Error(data.detail || `HTTP ${response.status}`);
+                if (requestId !== dashboardLoadSequence) return;
                 renderPerformanceDashboard(data);
                 content.classList.remove('hidden');
             } catch (e) {
+                if (requestId !== dashboardLoadSequence) return;
                 if (e && e.name === 'AbortError' && document.getElementById('performanceDashboardModal').classList.contains('hidden')) return;
                 document.getElementById('dashboardErrorText').textContent = e && e.name === 'AbortError'
                     ? 'เซิร์ฟเวอร์ตอบช้ากว่า 45 วินาที กรุณากดลองอีกครั้ง'
@@ -1905,7 +1960,7 @@
                 if (!content.dataset.loaded) content.classList.add('hidden');
             } finally {
                 clearTimeout(timeout);
-                loading.classList.add('hidden');
+                if (requestId === dashboardLoadSequence) loading.classList.add('hidden');
             }
         }
 
@@ -1923,6 +1978,7 @@
             put('dashErrorCount', `ผิดพลาด ${formatDashboardNumber(summary.errors)} ครั้ง`);
             put('dashboardUpdatedAt', `อัปเดต ${formatDashboardDateTime(data.generated_at)} • ช่วง ${data.period_days} วัน`);
 
+            renderDashboardFilters(data.filters || {}, data.employee_options || []);
             renderDashboardOperations(data.operations || {});
             renderDashboardTrend(data.daily || []);
             renderDashboardEventMix(data.event_counts || {});
@@ -1930,6 +1986,36 @@
             renderDashboardRecentEvents(data.recent_events || []);
             renderDashboardSystem(data.system || {});
             document.getElementById('dashboardContent').dataset.loaded = 'true';
+        }
+
+        function renderDashboardFilters(filters, employeeOptions) {
+            dashboardReferenceQuery = String(filters.q || '').trim();
+            dashboardEmployeeFilter = String(filters.employee || '').trim().toUpperCase();
+            const queryInput = document.getElementById('dashboardReferenceFilter');
+            const employeeSelect = document.getElementById('dashboardEmployeeFilter');
+            if (queryInput && document.activeElement !== queryInput) queryInput.value = dashboardReferenceQuery;
+            if (employeeSelect) {
+                const selected = dashboardEmployeeFilter;
+                const uniqueOptions = new Map();
+                (employeeOptions || []).forEach(option => {
+                    const id = String(option && option.emp_id || '').trim();
+                    if (id) uniqueOptions.set(id.toUpperCase(), { id, name: String(option.emp_name || '').trim() });
+                });
+                if (selected && !uniqueOptions.has(selected)) uniqueOptions.set(selected, { id: selected, name: '' });
+                employeeSelect.innerHTML = '<option value="">ผู้ใช้งานทั้งหมด</option>' + [...uniqueOptions.values()].map(option => {
+                    const label = option.name ? `${option.name} (${option.id})` : option.id;
+                    return `<option value="${escapeDocumentText(option.id.toUpperCase())}">${escapeDocumentText(label)}</option>`;
+                }).join('');
+                employeeSelect.value = selected;
+            }
+            const status = document.getElementById('dashboardFilterStatus');
+            if (!status) return;
+            const notes = [];
+            if (dashboardReferenceQuery) notes.push(`กำลังค้นหา “${escapeDocumentText(dashboardReferenceQuery)}” ใน Booking / Wave / รหัสสาขา`);
+            if (dashboardEmployeeFilter) notes.push(`กิจกรรมผู้ใช้: ${escapeDocumentText(dashboardEmployeeFilter)}`);
+            status.innerHTML = notes.length
+                ? `<span class="inline-flex rounded-full bg-blue-50 px-2.5 py-1 text-blue-700">${notes.join(' • ')}</span>${dashboardEmployeeFilter ? '<span class="ml-2 text-slate-500">Filter ผู้ใช้งานมีผลเฉพาะสถิติการใช้งาน ไม่กระทบยอดกล่อง/TOTE</span>' : ''}`
+                : 'แสดงข้อมูลทั้งหมดในช่วงเวลาที่เลือก';
         }
 
         function renderDashboardOperations(operations) {
@@ -7812,7 +7898,7 @@
             <button onclick="palletModalBack()" class="mt-2.5 w-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm">← กลับไปเลือกสาขา</button>
         </div>
     </div>
-    <div class="fixed bottom-1 left-1.5 z-[1400] rounded bg-amber-100 px-2 py-1 text-[10px] leading-none text-amber-900 font-black pointer-events-none select-none border border-amber-300">UAT v1.3.1 Free • Dashboard • Scan Hold</div>
+    <div class="fixed bottom-1 left-1.5 z-[1400] rounded bg-amber-100 px-2 py-1 text-[10px] leading-none text-amber-900 font-black pointer-events-none select-none border border-amber-300">UAT v1.3.2 Free • Dashboard • Scan Hold</div>
     <div id="quickTools" class="fixed z-[1500] flex flex-col gap-2" style="bottom:16px;right:12px">
         <button onclick="openHelp()" title="วิธีใช้งาน / คำอธิบาย" class="w-11 h-11 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-black shadow-lg text-lg opacity-90">?</button>
         <button onclick="toggleBigText()" id="bigTextBtn" title="ปรับตัวอักษรใหญ่" class="w-11 h-11 rounded-full bg-slate-700 hover:bg-slate-800 text-white font-black shadow-lg text-base opacity-90">ก+</button>
