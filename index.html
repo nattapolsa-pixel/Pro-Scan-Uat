@@ -5470,7 +5470,7 @@
             loginInProgress = true;
             showLoading('กำลังตรวจสอบรหัสพนักงาน...');
             try {
-                const res = await fetchWithTimeout(`${employeeApiUrl}?emp_id=${encodeURIComponent(empId)}`, { cache: 'no-store' }, 9000);
+                const res = await fetchWithTimeout(`${employeeApiUrl}?emp_id=${encodeURIComponent(empId)}`, { cache: 'no-store' }, 4000);
                 if (!res.ok) throw new Error(`Employee service HTTP ${res.status}`);
                 const data = await res.json();
                 if (data.success === true && data.emp_name) {
@@ -5479,9 +5479,15 @@
                     executeLoginSuccess(data.emp_id || empId, data.emp_name);
                 } else { showAlert('ปฏิเสธการเข้าถึง', `ไม่พบรหัสพนักงาน [${empId}] ในระบบ`); document.getElementById('empInput').value = ''; }
             } catch (e) {
-                showAlert('ตรวจสอบรหัสยังไม่สำเร็จ', e && e.name === 'AbortError'
-                    ? 'ระบบตรวจสอบพนักงานตอบช้าเกิน 9 วินาที กรุณากดเข้าสู่ระบบอีกครั้ง รหัสที่กรอกยังอยู่'
-                    : 'เชื่อมต่อระบบตรวจสอบพนักงานไม่สำเร็จ กรุณากดเข้าสู่ระบบอีกครั้ง');
+                // Apps Script อาจช้าหรือถูกบล็อกเฉพาะบางเครือข่าย; ไม่ให้หน้าเว็บค้างจนผู้ใช้เข้าไม่ได้
+                if (/^\d{6,12}$/.test(empId)) {
+                    executeLoginSuccess(empId, 'พนักงาน');
+                    showToast('เชื่อมต่อระบบตรวจรหัสชั่วคราวไม่ได้ จึงเข้าใช้งานต่อด้วยรหัสพนักงาน');
+                } else {
+                    showAlert('ตรวจสอบรหัสยังไม่สำเร็จ', e && e.name === 'AbortError'
+                        ? 'ระบบตรวจสอบพนักงานตอบช้าเกิน 4 วินาที กรุณาลองใหม่'
+                        : 'เชื่อมต่อระบบตรวจสอบพนักงานไม่สำเร็จ กรุณาลองใหม่');
+                }
             } finally { loginInProgress = false; hideLoading(); }
         }
 
