@@ -1827,7 +1827,12 @@
         let activeDocumentType = 'shipping';
         let currentTransportMeta = { carrier: '', driver: '', plate: '' };
         let isAlertOpen = false; let selectedBranchCode = ""; let selectedBranchName = "";
-        let employeeDB = JSON.parse(localStorage.getItem('proScannerEmpDB')) || {};
+        let employeeDB = {};
+        try {
+            const savedEmployees = JSON.parse(localStorage.getItem('proScannerEmpDB'));
+            if (savedEmployees && typeof savedEmployees === 'object' && !Array.isArray(savedEmployees)) employeeDB = savedEmployees;
+        } catch (e) { /* Storage may be disabled or contain an incomplete cache. */ }
+        let loginInProgress = false;
         let backgroundTasks = 0;
         let activeWavesList = [];
         let branchProvinceMap = {};
@@ -5234,9 +5239,8 @@
             document.getElementById('empInput').focus();
             keepAliveHeartbeat();
             loadBranchProvinceMap().catch(() => { });
-            fetch(employeeApiUrl).then(res => res.json()).then(data => {
-                if (data.success && data.employees) { employeeDB = data.employees; localStorage.setItem('proScannerEmpDB', JSON.stringify(employeeDB)); }
-            }).catch(e => console.log(""));
+            // Fetch only the entered employee during login. Downloading the
+            // entire directory here competes with that request on fresh devices.
             if (syncQueue.length > 0) { updateSyncStatusUI('waking'); ensureBackendReady(true).then(processQueue).catch(updateSyncStatusUI); }
         };
 
@@ -5458,18 +5462,26 @@
 
         // ==================== LOGIN ====================
         async function processLogin() {
-            if (isAlertOpen) return;
+            if (isAlertOpen || loginInProgress) return;
             const empId = document.getElementById('empInput').value.trim();
             if (!empId) return showAlert('การแจ้งเตือน', 'กรุณาระบุรหัสพนักงานก่อนดำเนินการ');
             if (employeeDB[empId]) return executeLoginSuccess(empId, employeeDB[empId]);
+            loginInProgress = true;
             showLoading('กำลังตรวจสอบรหัสพนักงาน...');
             try {
-                const res = await fetch(`${employeeApiUrl}?emp_id=${encodeURIComponent(empId)}`);
+                const res = await fetchWithTimeout(`${employeeApiUrl}?emp_id=${encodeURIComponent(empId)}`, { cache: 'no-store' }, 20000);
+                if (!res.ok) throw new Error(`Employee service HTTP ${res.status}`);
                 const data = await res.json();
                 if (data.success === true && data.emp_name) {
-                    employeeDB[empId] = data.emp_name; localStorage.setItem('proScannerEmpDB', JSON.stringify(employeeDB)); executeLoginSuccess(data.emp_id, data.emp_name);
+                    employeeDB[empId] = data.emp_name;
+                    try { localStorage.setItem('proScannerEmpDB', JSON.stringify(employeeDB)); } catch (e) { /* Successful verification must not depend on storage. */ }
+                    executeLoginSuccess(data.emp_id || empId, data.emp_name);
                 } else { showAlert('ปฏิเสธการเข้าถึง', `ไม่พบรหัสพนักงาน [${empId}] ในระบบ`); document.getElementById('empInput').value = ''; }
-            } catch (e) { showAlert('ข้อผิดพลาดเครือข่าย', 'ไม่สามารถเชื่อมต่อกับฐานข้อมูลได้'); } finally { hideLoading(); }
+            } catch (e) {
+                showAlert('ตรวจสอบรหัสยังไม่สำเร็จ', e && e.name === 'AbortError'
+                    ? 'ระบบตรวจสอบพนักงานตอบช้าเกิน 20 วินาที กรุณากดเข้าสู่ระบบอีกครั้ง รหัสที่กรอกยังอยู่'
+                    : 'เชื่อมต่อระบบตรวจสอบพนักงานไม่สำเร็จ กรุณากดเข้าสู่ระบบอีกครั้ง');
+            } finally { loginInProgress = false; hideLoading(); }
         }
 
         function executeLoginSuccess(id, name) {
