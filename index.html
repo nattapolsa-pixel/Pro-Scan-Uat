@@ -1806,7 +1806,8 @@
         // ใส่ URL หน้าตรวจ QC ที่นี่เมื่อได้รับลิงก์จากหน้างาน (เว้นว่างไว้จะซ่อนปุ่มลิงก์)
         const QC_ACTION_URL = 'https://sce-wms.ptgenterprise.com/addon_rf/QC_V2';
         // 💡 เพิ่มบรรทัดนี้กลับมา เพื่อให้ระบบ Login ตรวจรหัสพนักงานได้
-        const employeeApiUrl = 'https://script.google.com/macros/s/AKfycbybmW6N7TxfsHqEa-Fx6ayy8M8xfjKGmTYO27izmbEoLJmQRrFD3i9c0XogP0fG6tlG/exec';
+        // ตรวจรหัสผ่าน Backend UAT เพื่อไม่ให้เครื่องใหม่ติด CORS/เครือข่ายของ Apps Script โดยตรง
+        const employeeApiUrl = backendApiUrl + '/api/employee';
         const waveDataCachePrefix = 'proScannerWaveDataCache:v2:';
         const waveDataCacheIndexKey = 'proScannerWaveDataCacheIndex';
         const waveDataCacheMaxItems = 8;
@@ -5469,7 +5470,7 @@
             loginInProgress = true;
             showLoading('กำลังตรวจสอบรหัสพนักงาน...');
             try {
-                const res = await fetchWithTimeout(`${employeeApiUrl}?emp_id=${encodeURIComponent(empId)}`, { cache: 'no-store' }, 20000);
+                const res = await fetchWithTimeout(`${employeeApiUrl}?emp_id=${encodeURIComponent(empId)}`, { cache: 'no-store' }, 9000);
                 if (!res.ok) throw new Error(`Employee service HTTP ${res.status}`);
                 const data = await res.json();
                 if (data.success === true && data.emp_name) {
@@ -5479,7 +5480,7 @@
                 } else { showAlert('ปฏิเสธการเข้าถึง', `ไม่พบรหัสพนักงาน [${empId}] ในระบบ`); document.getElementById('empInput').value = ''; }
             } catch (e) {
                 showAlert('ตรวจสอบรหัสยังไม่สำเร็จ', e && e.name === 'AbortError'
-                    ? 'ระบบตรวจสอบพนักงานตอบช้าเกิน 20 วินาที กรุณากดเข้าสู่ระบบอีกครั้ง รหัสที่กรอกยังอยู่'
+                    ? 'ระบบตรวจสอบพนักงานตอบช้าเกิน 9 วินาที กรุณากดเข้าสู่ระบบอีกครั้ง รหัสที่กรอกยังอยู่'
                     : 'เชื่อมต่อระบบตรวจสอบพนักงานไม่สำเร็จ กรุณากดเข้าสู่ระบบอีกครั้ง');
             } finally { loginInProgress = false; hideLoading(); }
         }
