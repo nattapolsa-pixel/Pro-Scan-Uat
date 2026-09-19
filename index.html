@@ -5834,8 +5834,8 @@
                     url,
                     usedCache,
                     true,
-                    isWaveOnly ? 45000 : 90000,
-                    isWaveOnly ? 2 : 1
+                    isWaveOnly ? 45000 : 180000,
+                    isWaveOnly ? 2 : 3
                 );
                 if (requestId !== latestWaveLoadRequestId) return;
 
@@ -5862,7 +5862,7 @@
                         showLoading(`ข้อมูล Booking กำลังเข้าระบบ รอข้อมูลครบ (${completenessAttempt}/3)...`);
                         await new Promise(resolve => setTimeout(resolve, completenessAttempt * 2000));
                         const freshBookingUrl = backendApiUrl + `/api/check-booking?booking_no=${encodeURIComponent(inputVal)}&force=true&_ts=${Date.now()}`;
-                        res = await fetchJobDataWithRetry(freshBookingUrl, false, false, 90000, 0);
+                        res = await fetchJobDataWithRetry(freshBookingUrl, false, false, 180000, 0);
                         if (requestId !== latestWaveLoadRequestId) return;
                     }
                 }
@@ -5873,7 +5873,7 @@
 
                     for (const bookingCandidate of bookingCandidates) {
                         const bookingUrl = backendApiUrl + `/api/check-booking?booking_no=${encodeURIComponent(bookingCandidate)}&_ts=${Date.now()}`;
-                        const bookingRes = await fetchJobDataWithRetry(bookingUrl, true, false, 90000, 1);
+                        const bookingRes = await fetchJobDataWithRetry(bookingUrl, true, false, 180000, 1);
                         if (requestId !== latestWaveLoadRequestId) return;
                         if (bookingRes.ok) {
                             res = bookingRes;
