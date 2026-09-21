@@ -1263,12 +1263,12 @@
                             <div class="rounded-full bg-white border border-amber-200 px-3 py-1.5 text-xs font-black text-amber-800">ใช้วันที่แก้ไขยอด</div>
                         </div>
                         <div class="p-4 space-y-4">
-                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
                                 <div class="rounded-xl bg-white border border-slate-200 p-3"><div class="text-[10px] font-black text-slate-500">สาขาที่นับยอดวันนั้น</div><div id="dashReviewedBranches" class="text-2xl font-black text-slate-900">0</div></div>
                                 <div class="rounded-xl bg-white border border-amber-200 p-3"><div class="text-[10px] font-black text-amber-700">แก้ยอดด้วยมือ</div><div id="dashCorrectedBranches" class="text-2xl font-black text-amber-900">0</div><div id="dashCorrectionRate" class="text-[10px] font-bold text-amber-700">0%</div></div>
-                                <div class="rounded-xl bg-white border border-emerald-200 p-3"><div class="text-[10px] font-black text-emerald-700">ลงถูกตั้งแต่แรก</div><div id="dashCorrectBranches" class="text-2xl font-black text-emerald-900">0</div></div>
+                                <div class="rounded-xl bg-white border border-amber-200 p-3"><div class="text-[10px] font-black text-amber-700">กล่องที่แก้ยอด</div><div id="dashCorrectedBoxes" class="text-2xl font-black text-amber-900">0</div><div id="dashCorrectedBoxAvg" class="text-[10px] font-bold text-amber-700">0 กล่อง/สาขา</div></div><div class="rounded-xl bg-white border border-emerald-200 p-3"><div class="text-[10px] font-black text-emerald-700">ลงถูกตั้งแต่แรก</div><div id="dashCorrectBranches" class="text-2xl font-black text-emerald-900">0</div></div>
                             </div>
-                            <div class="overflow-x-auto"><table class="w-full min-w-[620px] text-sm"><thead class="bg-white text-xs text-slate-600"><tr><th class="p-3 text-left">วันที่</th><th class="p-3 text-center">สาขาที่นับยอด</th><th class="p-3 text-center">แก้ยอดด้วยมือ</th><th class="p-3 text-center">ลงถูกตั้งแต่แรก</th><th class="p-3 text-center">อัตราแก้ไข</th></tr></thead><tbody id="dashboardCorrectionRows" class="divide-y divide-amber-100"></tbody></table></div>
+                            <div id="dashboardCorrectionChart" style="min-height:120px"></div><div class="overflow-x-auto"><table class="w-full text-sm" style="min-width:860px"><thead class="bg-white text-xs text-slate-600"><tr><th class="p-3 text-left">วันที่</th><th class="p-3 text-center">สาขาที่นับยอด</th><th class="p-3 text-center">แก้ยอดด้วยมือ</th><th class="p-3 text-center">กล่องที่แก้ยอด</th><th class="p-3 text-center">เฉลี่ย/สาขา</th><th class="p-3 text-center">ลงถูกตั้งแต่แรก</th><th class="p-3 text-center">อัตราแก้ไข</th></tr></thead><tbody id="dashboardCorrectionRows" class="divide-y divide-amber-100"></tbody></table></div>
                         </div>
                     </section>
 
@@ -1820,7 +1820,7 @@
 
     <script>
         // ⚠️ ต้องตรงกับ APP_VERSION ใน render.yaml ของ backend
-        const APP_VERSION = '1.8.5-free';
+        const APP_VERSION = '1.8.6-free';
         const backendApiUrl = 'https://backed-api-scan-uat.onrender.com';
         // ⚠️ ต้องตรงกับ SCAN_FEATURE_ENABLED ใน render.yaml ของ backend
         // false = hold การสแกน (backend จะตอบ 423 ให้ทุก endpoint ของการสแกน)
@@ -2134,24 +2134,80 @@
         function renderDashboardCorrections(corrections) {
             const summary = corrections.summary || {};
             const put = (id, value) => { const el = document.getElementById(id); if (el) el.textContent = value; };
+            const boxes = Number(summary.corrected_box_count || 0);
+            const branches = Number(summary.corrected_branch_count || 0);
             put('dashReviewedBranches', formatDashboardNumber(summary.reviewed_branch_count));
-            put('dashCorrectedBranches', formatDashboardNumber(summary.corrected_branch_count));
+            put('dashCorrectedBranches', formatDashboardNumber(branches));
+            put('dashCorrectedBoxes', formatDashboardNumber(boxes));
+            put('dashCorrectedBoxAvg', `${branches ? (boxes / branches).toFixed(1) : '0'} กล่อง/สาขา`);
             put('dashCorrectBranches', formatDashboardNumber(summary.correct_branch_count));
             put('dashCorrectionRate', `${Number(summary.correction_rate_pct || 0).toFixed(1)}% ของสาขาที่นับยอด`);
             // นิยามมาจาก backend ที่เป็นคนนับ หน้าเว็บจึงไม่ตั้งนิยามเองให้เพี้ยนกัน
             if (corrections.definition) put('dashCorrectionDefinition', corrections.definition);
-            const host = document.getElementById('dashboardCorrectionRows');
-            if (!host) return;
             const rows = corrections.daily || [];
             const active = rows.filter(row => Number(row.reviewed_branch_count) || Number(row.corrected_branch_count));
+            renderDashboardCorrectionChart(active.filter(row => Number(row.corrected_branch_count)));
+            const host = document.getElementById('dashboardCorrectionRows');
+            if (!host) return;
             if (!active.length) {
-                host.innerHTML = '<tr><td colspan="5" class="p-5 text-center text-xs font-bold text-slate-400">ยังไม่มีข้อมูลการแก้ไขยอดในช่วงนี้</td></tr>';
+                host.innerHTML = '<tr><td colspan="7" class="p-5 text-center text-xs font-bold text-slate-400">ยังไม่มีข้อมูลการแก้ไขยอดในช่วงนี้</td></tr>';
                 return;
             }
             host.innerHTML = active.map(row => {
                 const label = new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(`${row.date}T00:00:00+07:00`));
-                return `<tr><td class="p-3 font-black text-slate-700">${label}</td><td class="p-3 text-center font-bold">${formatDashboardNumber(row.reviewed_branch_count)}</td><td class="p-3 text-center font-black text-amber-800">${formatDashboardNumber(row.corrected_branch_count)}</td><td class="p-3 text-center font-black text-emerald-800">${formatDashboardNumber(row.correct_branch_count)}</td><td class="p-3 text-center font-bold text-slate-600">${Number(row.correction_rate_pct || 0).toFixed(1)}%</td></tr>`;
+                const rate = Number(row.correction_rate_pct || 0);
+                // 10%+ คือวันที่ควรตามดูย้อนหลัง จึงไล่สีตามความรุนแรง
+                const rateTone = rate >= 10 ? 'text-red-700' : (rate >= 5 ? 'text-amber-800' : 'text-slate-600');
+                return `<tr><td class="p-3 font-black text-slate-700">${label}</td>`
+                    + `<td class="p-3 text-center font-bold">${formatDashboardNumber(row.reviewed_branch_count)}</td>`
+                    + `<td class="p-3 text-center font-black text-amber-800">${formatDashboardNumber(row.corrected_branch_count)}</td>`
+                    + `<td class="p-3 text-center font-black text-amber-900">${formatDashboardNumber(row.corrected_box_count)}</td>`
+                    + `<td class="p-3 text-center font-bold text-slate-500">${Number(row.avg_box_per_corrected_branch || 0).toFixed(1)}</td>`
+                    + `<td class="p-3 text-center font-black text-emerald-800">${formatDashboardNumber(row.correct_branch_count)}</td>`
+                    + `<td class="p-3 text-center font-black ${rateTone}">${rate.toFixed(1)}%</td></tr>`;
             }).join('');
+        }
+
+        // กราฟรายวัน: แถบหนา = กล่องที่แก้ยอด, แถบบาง = สาขาที่แก้ยอด
+        // คนละหน่วยกัน แต่ละชุดจึงเทียบกับวันสูงสุดของตัวเอง และบอกค่าสูงสุดไว้ใน legend
+        //
+        // ขนาด/ระยะทั้งหมดเขียนเป็น inline style ไม่ใช้คลาสแบบ grid-cols-[...] เพราะหน้านี้
+        // โหลด tailwind.min.css ที่ build ไว้ล่วงหน้า คลาส arbitrary ที่เพิ่มใหม่จะไม่มีในไฟล์
+        // (ยืนยันแล้วว่าแม้ min-w-[620px] ใน markup เดิมก็ไม่มีผลจริง)
+        function renderDashboardCorrectionChart(rows) {
+            const host = document.getElementById('dashboardCorrectionChart');
+            if (!host) return;
+            if (!rows.length) {
+                host.innerHTML = '<div style="padding:32px 0;text-align:center" class="text-xs font-bold text-slate-400">ยังไม่มีการแก้ไขยอดในช่วงนี้</div>';
+                return;
+            }
+            const maxBoxes = Math.max(1, ...rows.map(row => Number(row.corrected_box_count) || 0));
+            const maxBranch = Math.max(1, ...rows.map(row => Number(row.corrected_branch_count) || 0));
+            const track = 'height:HPX;border-radius:5px;background:#f1f5f9;overflow:hidden';
+            const bars = rows.map(row => {
+                const label = new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', day: 'numeric', month: 'short' }).format(new Date(`${row.date}T00:00:00+07:00`));
+                const dayBoxes = Number(row.corrected_box_count) || 0;
+                const dayBranches = Number(row.corrected_branch_count) || 0;
+                const rate = Number(row.correction_rate_pct || 0);
+                const boxPct = dayBoxes / maxBoxes * 100;
+                const branchPct = dayBranches / maxBranch * 100;
+                return '<div style="display:grid;grid-template-columns:54px 1fr 120px;align-items:center;gap:8px">'
+                    + `<div class="text-[10px] font-black text-slate-600">${label}</div>`
+                    + '<div>'
+                    + `<div style="${track.replace('HPX', '14px')}" title="กล่องที่แก้ยอด ${formatDashboardNumber(dayBoxes)}"><div style="height:100%;border-radius:5px;background:#d97706;width:${boxPct}%"></div></div>`
+                    + `<div style="${track.replace('HPX', '8px')};margin-top:4px" title="สาขาที่แก้ยอด ${formatDashboardNumber(dayBranches)}"><div style="height:100%;border-radius:5px;background:#64748b;width:${branchPct}%"></div></div>`
+                    + '</div>'
+                    + `<div style="text-align:right;line-height:1.35" class="text-[10px] font-black text-amber-900">${formatDashboardNumber(dayBoxes)} กล่อง`
+                    + `<br><span class="font-bold text-slate-500">${formatDashboardNumber(dayBranches)} สาขา · ${rate.toFixed(1)}%</span></div>`
+                    + '</div>';
+            }).join('');
+            const chip = (color, text) => `<span style="display:inline-flex;align-items:center;gap:4px" class="text-[10px] font-black text-slate-600">`
+                + `<i style="width:10px;height:10px;border-radius:2px;background:${color};display:inline-block"></i>${text}</span>`;
+            host.innerHTML = '<div style="display:flex;flex-wrap:wrap;column-gap:16px;row-gap:4px;margin-bottom:12px">'
+                + chip('#d97706', `กล่องที่แก้ยอด · วันสูงสุด ${formatDashboardNumber(maxBoxes)} กล่อง`)
+                + chip('#64748b', `สาขาที่แก้ยอด · วันสูงสุด ${formatDashboardNumber(maxBranch)} สาขา`)
+                + '<span class="text-[10px] font-bold text-slate-400">แต่ละแถบเทียบกับวันสูงสุดของชุดตัวเอง คนละหน่วย</span></div>'
+                + `<div style="display:flex;flex-direction:column;gap:10px;min-width:420px;max-height:340px;overflow-y:auto;padding-right:4px">${bars}</div>`;
         }
 
         function renderDashboardOperationsChart(rows) {
