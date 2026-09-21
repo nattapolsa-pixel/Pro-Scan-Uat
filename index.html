@@ -1805,7 +1805,7 @@
 
     <script>
         // ⚠️ ต้องตรงกับ APP_VERSION ใน render.yaml ของ backend
-        const APP_VERSION = '1.4.2-free';
+        const APP_VERSION = '1.8.4-free';
         const backendApiUrl = 'https://backed-api-scan-uat.onrender.com';
         // ⚠️ ต้องตรงกับ SCAN_FEATURE_ENABLED ใน render.yaml ของ backend
         // false = hold การสแกน (backend จะตอบ 423 ให้ทุก endpoint ของการสแกน)
@@ -4248,6 +4248,13 @@
         async function loadWaveBranchesForMove() {
             const wave = document.getElementById('moveWaveInput').value.replace(/\D/g, '');
             if (!wave) return showAlert('ยังไม่ได้กรอก Wave', 'กรุณากรอกเลข Wave ก่อนค้นหา');
+            // ห้ามใช้สาขาจากการค้นหาครั้งก่อน หาก Wave ใหม่โหลดไม่สำเร็จ
+            bookingBranchMovePreview = null;
+            window.bookingBranchMoveOptions = [];
+            document.getElementById('moveBranchChoices').classList.add('hidden');
+            document.getElementById('moveBranchPreview').classList.add('hidden');
+            document.getElementById('moveSplitFields').classList.add('hidden');
+            document.getElementById('confirmMoveBranchBtn').disabled = true;
             showLoading('กำลังโหลดสาขาและยอดนับ...');
             try {
                 // UAT อาจเพิ่งตื่น/เพิ่ง Deploy ทำให้คำขอแรกหลุดเป็น Failed to fetch
