@@ -18,9 +18,16 @@
     <!-- ปลุก Render Free ทันทีที่ HTML ถูก parse โดยไม่รอ JS ทั้งไฟล์หรือรอผู้ใช้ล็อกอิน
          ระหว่างที่คนพิมพ์รหัสพนักงาน เครื่องก็ตื่นไปแล้ว -->
     <script>
-        window.__earlyWake = fetch('https://backed-api-scan-uat.onrender.com/api/health', {
-            cache: 'no-store', mode: 'cors', keepalive: true
-        }).then(r => r.ok).catch(() => false);
+        // ping นี้ไม่มี AbortController ได้ (ยังไม่มี JS ส่วนอื่นโหลด) จึงต้องคุมด้วย
+        // Promise.race แทน มิฉะนั้นถ้า socket ค้าง (Wi-Fi หน้างานสลับ AP / captive portal
+        // ที่ไม่ส่ง RST) ensureBackendReady() ที่ await ค่านี้จะค้างจนถึง timeout ของเบราว์เซอร์
+        // (Android Chrome ~5 นาที) โดยที่ timeout 60/90 วิ ของหน้าค้นหาไม่ได้เริ่มนับเลย
+        window.__earlyWake = Promise.race([
+            fetch('https://backed-api-scan-uat.onrender.com/api/health', {
+                cache: 'no-store', mode: 'cors', keepalive: true
+            }).then(r => r.ok).catch(() => false),
+            new Promise(resolve => setTimeout(() => resolve(false), 8000))
+        ]);
     </script>
     <style>
         /* ==================== BASE RESET FOR HANDHELD ==================== */
@@ -1063,7 +1070,7 @@
         <div
             class="bg-white p-6 md:p-8 rounded-xl shadow-2xl w-full max-w-md border-t-8 border-gray-800 text-center flex flex-col items-center">
             <div class="mb-4 flex justify-center items-center h-28 w-auto">
-                <img src="https://i.postimg.cc/L4qLLFNj/Black-White-Modern-Handwritten-Square-Studio-Logo-(15)-Photoroom-0.png"
+                <img loading="lazy" decoding="async" src="https://i.postimg.cc/L4qLLFNj/Black-White-Modern-Handwritten-Square-Studio-Logo-(15)-Photoroom-0.png"
                     alt="Pro LPN Scanner Logo" class="h-full w-auto object-contain">
             </div>
             <h2 class="text-2xl font-black text-gray-800 mb-1">Pro Scanner</h2>
@@ -1798,7 +1805,7 @@
 
     <script>
         // ⚠️ ต้องตรงกับ APP_VERSION ใน render.yaml ของ backend
-        const APP_VERSION = '1.4.0-free';
+        const APP_VERSION = '1.4.1-free';
         const backendApiUrl = 'https://backed-api-scan-uat.onrender.com';
         // ⚠️ ต้องตรงกับ SCAN_FEATURE_ENABLED ใน render.yaml ของ backend
         // false = hold การสแกน (backend จะตอบ 423 ให้ทุก endpoint ของการสแกน)
@@ -1840,6 +1847,8 @@
         let branchProvinceLoaded = false;
         let branchProvinceLoadPromise = null;
         let latestWaveLoadRequestId = 0;
+        // งาน prefetch เบื้องหลังต้องหลบเมื่อผู้ใช้กำลังค้นหาจริง (worker มีตัวเดียว)
+        let userSearchInFlight = false;
         let currentLookupIsWaveOnly = true;
         let branchRefreshInProgress = false;
         let currentWaveDataCacheKey = '';
@@ -2349,12 +2358,24 @@
             if (showStatus) updateSyncStatusUI('waking');
             backendReadyPromise = (async () => {
                 let lastError = null;
-                for (let attempt = 0; attempt < 2; attempt++) {
+                // Render Free ตอบ "ไม่พร้อม" แบบเร็ว ๆ (503/502) ระหว่างที่เครื่องกำลังตื่น
+                // ซึ่งเอกสาร Render บอกว่าใช้เวลาราวหนึ่งนาที ถ้าลองแค่ 2 ครั้งห่าง 1 วิ
+                // ด่านนี้จะสรุปว่า "ไม่พร้อม" ในสองวินาที ทั้งที่รออีกหน่อยก็ใช้งานได้
+                // จึงต้องไล่รอจนครบงบเวลา ไม่ใช่นับจำนวนครั้ง
+                const deadline = Date.now() + 75000;
+                let wait = 1500;
+                while (Date.now() < deadline) {
                     try {
-                        const res = await fetchWithTimeout(backendApiUrl + '/api/health', { cache: 'no-store' }, 75000);
+                        const remaining = deadline - Date.now();
+                        const res = await fetchWithTimeout(backendApiUrl + '/api/health',
+                            { cache: 'no-store' }, Math.max(5000, Math.min(20000, remaining)));
                         if (res.ok) { backendReadyAt = Date.now(); return true; }
+                        lastError = new Error(`HTTP ${res.status}`);
+                        if (showStatus) updateSyncStatusUI('waking');
                     } catch (e) { lastError = e; }
-                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    if (Date.now() + wait >= deadline) break;
+                    await new Promise(resolve => setTimeout(resolve, wait));
+                    wait = Math.min(8000, Math.round(wait * 1.6));
                 }
                 throw lastError || new Error('Server ยังไม่พร้อม');
             })().finally(() => { backendReadyPromise = null; updateSyncStatusUI(); });
@@ -2365,8 +2386,11 @@
             const ping = () => {
                 if (navigator.onLine) {
                     // ขณะหน้าเว็บเปิดอยู่ ping ทุก 10 นาทีเพื่อให้ Free instance พร้อมใช้งาน
+                    // ต้องเช็ค res.ok ด้วย: เดิม .then() รับทุก response รวมทั้ง 503 ของ worker
+                    // ที่กำลังรีสตาร์ท แล้วจดว่า "พร้อม" ไว้ 5 นาที ทำให้ ensureBackendReady()
+                    // ตอบพร้อมทันทีทั้งที่เซิร์ฟเวอร์ตายอยู่ — ด่านกันที่หน้าค้นหาจะถูกข้ามไปเลย
                     fetchWithTimeout(backendApiUrl + '/api/health', { cache: 'no-store' }, 5000)
-                        .then(() => { backendReadyAt = Date.now(); })
+                        .then(res => { if (res && res.ok) backendReadyAt = Date.now(); })
                         .catch(() => { });
                 }
             };
@@ -2381,6 +2405,14 @@
             const id = setTimeout(() => controller.abort(), timeoutMs);
             return fetch(url, { ...options, signal: controller.signal })
                 .finally(() => clearTimeout(id));
+        }
+
+        // 502/503/504 = worker ตายหรือกำลังรีสตาร์ท, 429 = Render edge กันไว้เพราะยิงถี่เกิน
+        // ทั้งสามอย่างนี้ "ยิงซ้ำทันที" มีแต่ทำให้แย่ลง เพราะ backend มี worker ตัวเดียว
+        // ที่ทุกเครื่องใช้ร่วมกัน ต่างจาก 404 ที่หมายถึงไม่พบข้อมูลจริง ๆ
+        function isServerUnavailable(res) {
+            if (!res) return true;
+            return res.status === 429 || res.status === 502 || res.status === 503 || res.status === 504;
         }
 
         async function fetchJobDataWithRetry(url, usedCache, showRetryToast = true, timeoutMs = 45000, maxRetries = 2) {
@@ -4218,7 +4250,10 @@
                 // UAT อาจเพิ่งตื่น/เพิ่ง Deploy ทำให้คำขอแรกหลุดเป็น Failed to fetch
                 // ลองเชื่อมต่อใหม่อัตโนมัติ เฉพาะการค้นหา Wave สำหรับจัดสาขา
                 const url = backendApiUrl + `/api/wave-branch-options?wave_no=${encodeURIComponent(wave)}&_ts=${Date.now()}`;
-                const res = await fetchJobDataWithRetry(url, false, true, 90000, 2);
+                // 45 วิ x 2 ครั้ง ไม่ใช่ 90 x 3: endpoint นี้วัดได้ 2.1 วิ การตั้ง 90x3
+                // ทำให้คนกดปุ่มยืนรอได้ถึง 4.5 นาทีเวลาเซิร์ฟเวอร์ไม่พร้อม
+                const res = await fetchJobDataWithRetry(url, false, true, 45000, 1);
+                if (isServerUnavailable(res)) throw new Error(`เซิร์ฟเวอร์ยังไม่พร้อม (HTTP ${res.status}) รอสักครู่แล้วลองใหม่`);
                 const data = await res.json();
                 if (!res.ok) throw new Error(typeof data.detail === 'string' ? data.detail : `HTTP ${res.status}`);
                 bookingBranchMovePreview = null;
@@ -5236,14 +5271,24 @@
         }
 
         // ==================== UI Helper ====================
-        window.onload = () => {
-            document.getElementById('empInput').focus();
+        // DOMContentLoaded ไม่ใช่ window.onload: onload รอ subresource ทุกตัวเสร็จก่อน
+        // รวมถึงโลโก้จาก i.postimg.cc (โดเมนภายนอก) ถ้า Wi-Fi หน้างานช้าหรือบล็อกโดเมนนั้น
+        // เคอร์เซอร์จะไม่ไปอยู่ในช่องรหัสพนักงานเลย ทั้งที่หน้าเว็บวาดเสร็จแล้ว
+        // — นี่คืออาการ "เปิดเว็บแล้วพิมพ์ไม่ได้ ต้องรอ"
+        function startPageWork() {
+            const emp = document.getElementById('empInput');
+            if (emp) emp.focus();
             keepAliveHeartbeat();
             loadBranchProvinceMap().catch(() => { });
             // Fetch only the entered employee during login. Downloading the
             // entire directory here competes with that request on fresh devices.
             if (syncQueue.length > 0) { updateSyncStatusUI('waking'); ensureBackendReady(true).then(processQueue).catch(updateSyncStatusUI); }
-        };
+        }
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', startPageWork, { once: true });
+        } else {
+            startPageWork();
+        }
 
         function showLoading(message = 'กำลังประมวลผล...') {
             const text = document.getElementById('loadingOverlayText');
@@ -5569,29 +5614,41 @@
             return pendingWavesFetchPromise;
         }
 
+        let prefetchWavesInFlight = false;
         async function prefetchWavesDetails(waves) {
             if (!waves || waves.length === 0) return;
-            // Prefetch เพียง 3 Wave แรก และรอห่างกัน 3 วินาที เพื่อไม่กิน bandwidth
-            const toFetch = waves.slice(0, 3);
-            for (let i = 0; i < toFetch.length; i++) {
-                const w = toFetch[i];
-                if (!w || !w.wave_no) continue;
-                const waveNo = w.wave_no;
-                const cacheKey = getWaveDataCacheKey(waveNo, true);
-                const cached = getCachedWaveData(cacheKey);
-                if (cached) continue;
+            // มีสองที่ที่เรียกฟังก์ชันนี้ (keepAliveHeartbeat กับ loadPendingWaves) และ
+            // เดิมไม่มีตัวกัน จึงยิง check-wave ซ้อนกันได้หลายรายการตอนล็อกอิน
+            // แย่งเวลา worker ตัวเดียวกับตอนที่ผู้ใช้กำลังจะค้นหาจริง
+            if (prefetchWavesInFlight || userSearchInFlight) return;
+            prefetchWavesInFlight = true;
+            try {
+                // Prefetch เพียง 3 Wave แรก และรอห่างกัน 3 วินาที เพื่อไม่กิน bandwidth
+                const toFetch = waves.slice(0, 3);
+                for (let i = 0; i < toFetch.length; i++) {
+                    const w = toFetch[i];
+                    if (!w || !w.wave_no) continue;
+                    const waveNo = w.wave_no;
+                    const cacheKey = getWaveDataCacheKey(waveNo, true);
+                    const cached = getCachedWaveData(cacheKey);
+                    if (cached) continue;
 
-                await new Promise(resolve => setTimeout(resolve, i === 0 ? 2000 : 3000));
-                if (document.hidden) break; // หยุด prefetch ถ้าผู้ใช้พับแท็บ
-                
-                try {
-                    const url = backendApiUrl + `/api/check-wave?wave_no=${waveNo}`;
-                    const res = await fetchWithTimeout(url, { cache: 'no-store' }, 15000);
-                    if (res.ok) {
-                        const data = await res.json();
-                        saveWaveDataCache(cacheKey, data);
-                    }
-                } catch (e) {}
+                    await new Promise(resolve => setTimeout(resolve, i === 0 ? 2000 : 3000));
+                    if (document.hidden) break; // หยุด prefetch ถ้าผู้ใช้พับแท็บ
+                    // ผู้ใช้เริ่มค้นหาแล้ว: งาน prefetch ต้องหลบให้คำขอจริงทันที
+                    if (userSearchInFlight) break;
+
+                    try {
+                        const url = backendApiUrl + `/api/check-wave?wave_no=${waveNo}`;
+                        const res = await fetchWithTimeout(url, { cache: 'no-store' }, 15000);
+                        if (res.ok) {
+                            const data = await res.json();
+                            saveWaveDataCache(cacheKey, data);
+                        }
+                    } catch (e) {}
+                }
+            } finally {
+                prefetchWavesInFlight = false;
             }
         }
 
@@ -5614,19 +5671,14 @@
             }
 
             try {
-                const shouldForceFresh = forceRefresh || Boolean(cachedData && !cachedData.cache_is_fresh);
-                const data = await fetchPendingWavesFresh(shouldForceFresh);
+                // force=true เฉพาะเมื่อผู้ใช้กดรีเฟรชเอง
+                // เดิมส่ง force ทุกครั้งที่ cache ในเครื่องเกิน 5 นาที แล้วถ้า server
+                // ตอบ stale ก็ยิง force รอบสอง = เปิดหน้าเว็บครั้งเดียวสั่งจัดอันดับ
+                // Wave ใหม่ทั้ง 28,000 Wave สองรอบ ทั้งที่ server รีเฟรชเบื้องหลังเองอยู่แล้ว
+                const data = await fetchPendingWavesFresh(forceRefresh);
                 renderPendingWaves(data);
                 if (data && data.waves) {
                     prefetchWavesDetails(data.waves.slice(0, 5));
-                }
-                if (data && data.stale && !shouldForceFresh) {
-                    fetchPendingWavesFresh(true).then(newData => {
-                        renderPendingWaves(newData);
-                        if (newData && newData.waves) {
-                            prefetchWavesDetails(newData.waves.slice(0, 5));
-                        }
-                    }).catch(() => { });
                 }
             } catch (e) {
                 if (!cachedData) {
@@ -5805,6 +5857,7 @@
             const lookupStartedAt = performance.now();
 
             const requestId = ++latestWaveLoadRequestId;
+            userSearchInFlight = true;
             const isWaveOnly = /^\d+$/.test(inputVal);
             const cacheKey = getWaveDataCacheKey(inputVal, isWaveOnly);
             currentWaveDataCacheKey = cacheKey;
@@ -5829,13 +5882,29 @@
                     ? backendApiUrl + `/api/check-wave?wave_no=${encodeURIComponent(inputVal)}&_ts=${Date.now()}`
                     : backendApiUrl + `/api/check-booking?booking_no=${encodeURIComponent(inputVal)}&_ts=${Date.now()}`;
 
-                // Booking รวมหลาย Wave: ให้เวลาสูงสุด 90 วินาที และไม่ยิงซ้ำถี่จน Server ทำงานซ้อน
+                // เวลารอตั้งจากที่วัดบนเครื่องจริง: Wave อุ่น 0.1-0.3 วิ, Booking อุ่น 3.4 วิ,
+                // แต่ request แรกหลัง deploy/รีสตาร์ท ต้องรอโหลด Member Data ครั้งเดียว
+                // วัดได้ 39.9 วิ จึงเผื่อไว้ 60/90 วิ
+                // เดิมตั้ง 180 วิ x 4 รอบ + completeness 3 รอบ = ผู้ใช้ยืนรอได้ถึง ~13 นาที
+                // ก่อนจะเห็นข้อความ ซึ่งคือสิ่งที่หน้างานเจอ
+                if (!usedCache) {
+                    try { await ensureBackendReady(true); }
+                    catch (e) {
+                        hideLoading();
+                        showConfirm('เซิร์ฟเวอร์ยังไม่พร้อม',
+                            'ยังติดต่อเซิร์ฟเวอร์ไม่ได้\n\nตรวจสัญญาณ Wi-Fi แล้วกดลองใหม่ ข้อมูลใน Google Sheets ไม่ได้หายไป',
+                            'ลองใหม่อีกครั้ง', () => checkAndLoadWave());
+                        return;
+                    }
+                    if (requestId !== latestWaveLoadRequestId) return;
+                    showLoading(isWaveOnly ? 'กำลังค้นหาและโหลดข้อมูล Wave...' : 'กำลังค้นหาและโหลดข้อมูล Booking...');
+                }
                 let res = await fetchJobDataWithRetry(
                     url,
                     usedCache,
                     true,
-                    isWaveOnly ? 45000 : 180000,
-                    isWaveOnly ? 2 : 3
+                    isWaveOnly ? 60000 : 90000,
+                    1
                 );
                 if (requestId !== latestWaveLoadRequestId) return;
 
@@ -5843,27 +5912,41 @@
                 let lookupCacheKey = cacheKey;
                 let fallbackBookingNo = '';
 
-                // Wave test/งานที่เพิ่งเพิ่มใน Member Data อาจยังไม่อยู่ใน Server
-                // cache รอบแรก ให้บังคับอ่าน Sheet ใหม่หนึ่งครั้งก่อนแจ้งว่าไม่พบ.
-                if (!res.ok && isWaveOnly) {
-                    showLoading('กำลังอัปเดตข้อมูล Wave ล่าสุดจาก Sheet...');
-                    const freshWaveUrl = backendApiUrl + `/api/check-wave?wave_no=${encodeURIComponent(inputVal)}&force=true&_ts=${Date.now()}`;
-                    res = await fetchJobDataWithRetry(freshWaveUrl, false, false, 45000, 0);
-                    if (requestId !== latestWaveLoadRequestId) return;
+                // เซิร์ฟเวอร์ล่ม/กำลังรีสตาร์ท/ถูก rate limit ไม่ใช่ "ไม่พบข้อมูล"
+                // การไล่ ladder ต่อในสถานะนี้มีแต่ทำให้ worker ตัวเดียวตายซ้ำ
+                if (isServerUnavailable(res)) {
+                    if (usedCache) { showToast('เซิร์ฟเวอร์ไม่พร้อม ใช้ข้อมูลที่โหลดไว้ก่อนหน้าอยู่', true); return; }
+                    hideLoading();
+                    trackUsageEvent('SEARCH', { status: 'SERVER_DOWN', duration_ms: performance.now() - lookupStartedAt, detail: `HTTP ${res ? res.status : 0}` });
+                    showConfirm('เซิร์ฟเวอร์ยังไม่พร้อม',
+                        `ระบบกำลังรีสตาร์ท (สถานะ ${res ? res.status : 'ไม่ตอบ'})\n\nรอประมาณ 30 วินาทีแล้วกดลองใหม่ ข้อมูลใน Google Sheets ไม่ได้หายไป`,
+                        'ลองใหม่อีกครั้ง', () => checkAndLoadWave());
+                    return;
                 }
 
-                // Booking ต้องครบทุก Wave ก่อนแสดง หากรอบแรกเจอ Member Data
-                // ที่กำลังอัปเดต ให้รอและบังคับอ่าน Sheet ล่าสุดซ้ำ โดยหน้า
-                // เอกสารจะยังไม่เปิดจนกว่า Server ยืนยันว่าครบทุกสาขา.
-                // แต่ละรอบสั่ง force=true ซึ่งทำให้ Server อ่าน Member Data ใหม่จริง
-                // จึงลดจาก 5 รอบเหลือ 3 รอบ และเว้นห่างขึ้น (2/4/6 วิ) ให้ Sheet มีเวลาเข้าข้อมูล
-                if (!res.ok && !isWaveOnly) {
-                    for (let completenessAttempt = 1; completenessAttempt <= 3 && !res.ok; completenessAttempt++) {
-                        showLoading(`ข้อมูล Booking กำลังเข้าระบบ รอข้อมูลครบ (${completenessAttempt}/3)...`);
-                        await new Promise(resolve => setTimeout(resolve, completenessAttempt * 2000));
-                        const freshBookingUrl = backendApiUrl + `/api/check-booking?booking_no=${encodeURIComponent(inputVal)}&force=true&_ts=${Date.now()}`;
-                        res = await fetchJobDataWithRetry(freshBookingUrl, false, false, 180000, 0);
-                        if (requestId !== latestWaveLoadRequestId) return;
+                // Wave/Booking ที่เพิ่งเพิ่มใน Member Data: backend อ่าน Wave นั้น
+                // ตรงจาก Sheet ให้เองแล้ว (fetch_member_history_rows_for_wave)
+                // จึงไม่ต้องสั่ง force=true ซึ่งเดิมทำให้ต้องโหลดทั้งชีท 144,000 แถว
+                // แล้ว worker ถูก OOM kill ตอบ 502 (วัดแล้วว่าตายจริงทุกครั้ง)
+                // 404 = ยังไม่เห็น Wave/Booking นี้, 409 = Booking มีหลาย Wave และ
+                // Member Data ยังทยอยเข้า (backend เป็นฝ่ายบอกเองว่ายังไม่ครบ)
+                // ทั้งสองกรณีรอสั้น ๆ แล้วถามซ้ำได้ แต่ห้ามสั่ง force
+                for (let attempt = 1; attempt <= 2 && !res.ok && (res.status === 404 || res.status === 409); attempt++) {
+                    showLoading(res.status === 409
+                        ? `ข้อมูล Booking กำลังเข้าระบบ รอข้อมูลครบ (${attempt}/2)...`
+                        : 'กำลังอ่านข้อมูลล่าสุดจาก Sheet...');
+                    await new Promise(resolve => setTimeout(resolve, attempt * 1500));
+                    const retryUrl = isWaveOnly
+                        ? backendApiUrl + `/api/check-wave?wave_no=${encodeURIComponent(inputVal)}&_ts=${Date.now()}`
+                        : backendApiUrl + `/api/check-booking?booking_no=${encodeURIComponent(inputVal)}&_ts=${Date.now()}`;
+                    res = await fetchJobDataWithRetry(retryUrl, false, false, isWaveOnly ? 60000 : 90000, 0);
+                    if (requestId !== latestWaveLoadRequestId) return;
+                    if (isServerUnavailable(res)) {
+                        if (usedCache) { showToast('เซิร์ฟเวอร์ไม่พร้อม ใช้ข้อมูลที่โหลดไว้ก่อนหน้าอยู่', true); return; }
+                        hideLoading();
+                        showConfirm('เซิร์ฟเวอร์ยังไม่พร้อม', 'ระบบกำลังรีสตาร์ท รอประมาณ 30 วินาทีแล้วกดลองใหม่',
+                            'ลองใหม่อีกครั้ง', () => checkAndLoadWave());
+                        return;
                     }
                 }
 
@@ -5873,8 +5956,9 @@
 
                     for (const bookingCandidate of bookingCandidates) {
                         const bookingUrl = backendApiUrl + `/api/check-booking?booking_no=${encodeURIComponent(bookingCandidate)}&_ts=${Date.now()}`;
-                        const bookingRes = await fetchJobDataWithRetry(bookingUrl, true, false, 180000, 1);
+                        const bookingRes = await fetchJobDataWithRetry(bookingUrl, true, false, 90000, 0);
                         if (requestId !== latestWaveLoadRequestId) return;
+                        if (isServerUnavailable(bookingRes)) break;
                         if (bookingRes.ok) {
                             res = bookingRes;
                             lookupIsWaveOnly = false;
@@ -5893,7 +5977,7 @@
                     if (sheetMeta && sheetMeta.waves && sheetMeta.waves.length > 0) {
                         const targetWave = sheetMeta.waves[0];
                         const waveUrl = backendApiUrl + `/api/check-wave?wave_no=${encodeURIComponent(targetWave)}&_ts=${Date.now()}`;
-                        const waveRes = await fetchJobDataWithRetry(waveUrl, true, false, 45000, 2);
+                        const waveRes = await fetchJobDataWithRetry(waveUrl, true, false, 60000, 0);
                         if (requestId !== latestWaveLoadRequestId) return;
                         if (waveRes.ok) {
                             res = waveRes;
@@ -5955,6 +6039,7 @@
                     showToast('เชื่อมต่อช้า ใช้ข้อมูลที่โหลดไว้ก่อนหน้าอยู่', true);
                 }
             } finally {
+                if (requestId === latestWaveLoadRequestId) userSearchInFlight = false;
                 if (!usedCache) hideLoading();
             }
         }
