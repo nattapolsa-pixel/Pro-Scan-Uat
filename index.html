@@ -1805,7 +1805,7 @@
 
     <script>
         // ⚠️ ต้องตรงกับ APP_VERSION ใน render.yaml ของ backend
-        const APP_VERSION = '1.4.1-free';
+        const APP_VERSION = '1.4.2-free';
         const backendApiUrl = 'https://backed-api-scan-uat.onrender.com';
         // ⚠️ ต้องตรงกับ SCAN_FEATURE_ENABLED ใน render.yaml ของ backend
         // false = hold การสแกน (backend จะตอบ 423 ให้ทุก endpoint ของการสแกน)
@@ -1837,7 +1837,10 @@
         let isAlertOpen = false; let selectedBranchCode = ""; let selectedBranchName = "";
         let employeeDB = {};
         try {
-            const savedEmployees = JSON.parse(localStorage.getItem('proScannerEmpDB'));
+            // v2: ชื่อในช่อง "เจ้าหน้าที่" มาจากแท็บรายชื่อพนักงานผ่าน /api/employee แล้ว
+        // เครื่องที่เคยล็อกอินเก็บชื่อเดิมไว้ถาวร (บางรหัสได้คำว่า "พนักงาน")
+        // เปลี่ยน key จึงทำให้ทุกเครื่องถามใหม่ครั้งเดียวแล้วได้ชื่อ-นามสกุลจริง
+        const savedEmployees = JSON.parse(localStorage.getItem('proScannerEmpDB:v2'));
             if (savedEmployees && typeof savedEmployees === 'object' && !Array.isArray(savedEmployees)) employeeDB = savedEmployees;
         } catch (e) { /* Storage may be disabled or contain an incomplete cache. */ }
         let loginInProgress = false;
@@ -5520,7 +5523,7 @@
                 const data = await res.json();
                 if (data.success === true && data.emp_name) {
                     employeeDB[empId] = data.emp_name;
-                    try { localStorage.setItem('proScannerEmpDB', JSON.stringify(employeeDB)); } catch (e) { /* Successful verification must not depend on storage. */ }
+                    try { localStorage.setItem('proScannerEmpDB:v2', JSON.stringify(employeeDB)); } catch (e) { /* Successful verification must not depend on storage. */ }
                     executeLoginSuccess(data.emp_id || empId, data.emp_name);
                 } else { showAlert('ปฏิเสธการเข้าถึง', `ไม่พบรหัสพนักงาน [${empId}] ในระบบ`); document.getElementById('empInput').value = ''; }
             } catch (e) {
