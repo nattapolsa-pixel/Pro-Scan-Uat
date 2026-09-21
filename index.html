@@ -4332,10 +4332,7 @@
             if (!loadedWave) return showAlert('ยังไม่ได้ค้นหา Wave', 'กรุณากด ค้นหาสาขาใน Wave นี้ ก่อนเลือกสาขา');
             if (typedWave && Number(typedWave) !== Number(loadedWave)) {
                 return showAlert('เลข Wave ไม่ตรงกับรายการ',
-                    `รายการสาขานี้มาจาก Wave ${loadedWave}
-แต่ช่อง Wave เป็น ${typedWave}
-
-กรุณากดค้นหาอีกครั้งก่อนเลือกสาขา`);
+                    `รายการสาขานี้มาจาก Wave ${loadedWave}\nแต่ช่อง Wave เป็น ${typedWave}\n\nกรุณากดค้นหาอีกครั้งก่อนเลือกสาขา`);
             }
             bookingBranchMovePreview = { ...item, wave_no: loadedWave };
             loadDocumentHiddenBranches();
