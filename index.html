@@ -1259,16 +1259,16 @@
 
                     <section class="rounded-2xl border border-amber-200 bg-amber-50/40 shadow-sm overflow-hidden">
                         <div class="px-4 py-3 border-b border-amber-100 flex flex-col md:flex-row md:items-center justify-between gap-2">
-                            <div><h3 class="font-black text-slate-900">สรุปการแก้ไขยอดจากเดิมรายวัน</h3><p class="text-xs font-bold text-slate-600">นับเฉพาะสาขาที่มียอดเดิมและถูกแก้ไขจริง ไม่รวมเพิ่มจุด/ย้ายสาขา/แบ่งบางส่วน</p></div>
+                            <div><h3 class="font-black text-slate-900">ความถูกต้องของการลงยอดรายวัน</h3><p id="dashCorrectionDefinition" class="text-xs font-bold text-slate-600">นับสาขาที่พนักงานกดบันทึกแก้ยอดกล่องเองในเอกสาร ไม่รวมซ่อน/แสดงสาขา ย้ายทั้งสาขา แบ่งบางส่วน</p></div>
                             <div class="rounded-full bg-white border border-amber-200 px-3 py-1.5 text-xs font-black text-amber-800">ใช้วันที่แก้ไขยอด</div>
                         </div>
                         <div class="p-4 space-y-4">
                             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                <div class="rounded-xl bg-white border border-slate-200 p-3"><div class="text-[10px] font-black text-slate-500">สาขาที่ตรวจ/ปิด</div><div id="dashReviewedBranches" class="text-2xl font-black text-slate-900">0</div></div>
-                                <div class="rounded-xl bg-white border border-amber-200 p-3"><div class="text-[10px] font-black text-amber-700">แก้ไขยอดจากเดิม</div><div id="dashCorrectedBranches" class="text-2xl font-black text-amber-900">0</div><div id="dashCorrectionRate" class="text-[10px] font-bold text-amber-700">0%</div></div>
+                                <div class="rounded-xl bg-white border border-slate-200 p-3"><div class="text-[10px] font-black text-slate-500">สาขาที่นับยอดวันนั้น</div><div id="dashReviewedBranches" class="text-2xl font-black text-slate-900">0</div></div>
+                                <div class="rounded-xl bg-white border border-amber-200 p-3"><div class="text-[10px] font-black text-amber-700">แก้ยอดด้วยมือ</div><div id="dashCorrectedBranches" class="text-2xl font-black text-amber-900">0</div><div id="dashCorrectionRate" class="text-[10px] font-bold text-amber-700">0%</div></div>
                                 <div class="rounded-xl bg-white border border-emerald-200 p-3"><div class="text-[10px] font-black text-emerald-700">ลงถูกตั้งแต่แรก</div><div id="dashCorrectBranches" class="text-2xl font-black text-emerald-900">0</div></div>
                             </div>
-                            <div class="overflow-x-auto"><table class="w-full min-w-[620px] text-sm"><thead class="bg-white text-xs text-slate-600"><tr><th class="p-3 text-left">วันที่</th><th class="p-3 text-center">ตรวจ/ปิดสาขา</th><th class="p-3 text-center">แก้ไขยอด</th><th class="p-3 text-center">ลงถูก</th><th class="p-3 text-center">อัตราแก้ไข</th></tr></thead><tbody id="dashboardCorrectionRows" class="divide-y divide-amber-100"></tbody></table></div>
+                            <div class="overflow-x-auto"><table class="w-full min-w-[620px] text-sm"><thead class="bg-white text-xs text-slate-600"><tr><th class="p-3 text-left">วันที่</th><th class="p-3 text-center">สาขาที่นับยอด</th><th class="p-3 text-center">แก้ยอดด้วยมือ</th><th class="p-3 text-center">ลงถูกตั้งแต่แรก</th><th class="p-3 text-center">อัตราแก้ไข</th></tr></thead><tbody id="dashboardCorrectionRows" class="divide-y divide-amber-100"></tbody></table></div>
                         </div>
                     </section>
 
@@ -2137,7 +2137,9 @@
             put('dashReviewedBranches', formatDashboardNumber(summary.reviewed_branch_count));
             put('dashCorrectedBranches', formatDashboardNumber(summary.corrected_branch_count));
             put('dashCorrectBranches', formatDashboardNumber(summary.correct_branch_count));
-            put('dashCorrectionRate', `${Number(summary.correction_rate_pct || 0).toFixed(1)}% ของสาขาที่ตรวจ`);
+            put('dashCorrectionRate', `${Number(summary.correction_rate_pct || 0).toFixed(1)}% ของสาขาที่นับยอด`);
+            // นิยามมาจาก backend ที่เป็นคนนับ หน้าเว็บจึงไม่ตั้งนิยามเองให้เพี้ยนกัน
+            if (corrections.definition) put('dashCorrectionDefinition', corrections.definition);
             const host = document.getElementById('dashboardCorrectionRows');
             if (!host) return;
             const rows = corrections.daily || [];
