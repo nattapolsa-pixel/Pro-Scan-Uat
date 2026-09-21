@@ -1260,7 +1260,7 @@
                     <section class="rounded-2xl border border-amber-200 bg-amber-50/40 shadow-sm overflow-hidden">
                         <div class="px-4 py-3 border-b border-amber-100 flex flex-col md:flex-row md:items-center justify-between gap-2">
                             <div><h3 class="font-black text-slate-900">ความถูกต้องของการลงยอดรายวัน</h3><p id="dashCorrectionDefinition" class="text-xs font-bold text-slate-600">นับสาขาที่พนักงานกดบันทึกแก้ยอดกล่องเองในเอกสาร ไม่รวมซ่อน/แสดงสาขา ย้ายทั้งสาขา แบ่งบางส่วน</p></div>
-                            <div class="rounded-full bg-white border border-amber-200 px-3 py-1.5 text-xs font-black text-amber-800">ใช้วันที่แก้ไขยอด</div>
+                            <div style="display:flex;align-items:center;gap:8px"><button id="dashCorrectionExportBtn" onclick="exportDashboardCorrections()" style="display:inline-flex;align-items:center;gap:6px;border:0;border-radius:10px;padding:8px 14px;background:#047857;color:#fff;font-weight:800;font-size:12px;cursor:pointer;white-space:nowrap"><span style="font-size:14px">⬇</span><span id="dashCorrectionExportLabel">ดาวน์โหลด Excel</span></button><div class="rounded-full bg-white border border-amber-200 px-3 py-1.5 text-xs font-black text-amber-800" style="white-space:nowrap">ใช้วันที่แก้ไขยอด</div></div>
                         </div>
                         <div class="p-4 space-y-4">
                             <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -1268,7 +1268,7 @@
                                 <div class="rounded-xl bg-white border border-amber-200 p-3"><div class="text-[10px] font-black text-amber-700">แก้ยอดด้วยมือ</div><div id="dashCorrectedBranches" class="text-2xl font-black text-amber-900">0</div><div id="dashCorrectionRate" class="text-[10px] font-bold text-amber-700">0%</div></div>
                                 <div class="rounded-xl bg-white border border-amber-200 p-3"><div class="text-[10px] font-black text-amber-700">กล่องที่แก้ยอด</div><div id="dashCorrectedBoxes" class="text-2xl font-black text-amber-900">0</div><div id="dashCorrectedBoxAvg" class="text-[10px] font-bold text-amber-700">0 กล่อง/สาขา</div></div><div class="rounded-xl bg-white border border-emerald-200 p-3"><div class="text-[10px] font-black text-emerald-700">ลงถูกตั้งแต่แรก</div><div id="dashCorrectBranches" class="text-2xl font-black text-emerald-900">0</div></div>
                             </div>
-                            <div id="dashboardCorrectionChart" style="min-height:120px"></div><div class="overflow-x-auto"><table class="w-full text-sm" style="min-width:860px"><thead class="bg-white text-xs text-slate-600"><tr><th class="p-3 text-left">วันที่</th><th class="p-3 text-center">สาขาที่นับยอด</th><th class="p-3 text-center">แก้ยอดด้วยมือ</th><th class="p-3 text-center">กล่องที่แก้ยอด</th><th class="p-3 text-center">เฉลี่ย/สาขา</th><th class="p-3 text-center">ลงถูกตั้งแต่แรก</th><th class="p-3 text-center">อัตราแก้ไข</th></tr></thead><tbody id="dashboardCorrectionRows" class="divide-y divide-amber-100"></tbody></table></div>
+                            <div id="dashboardCorrectionChart" style="min-height:120px"></div><div class="overflow-x-auto"><table class="w-full text-sm" style="min-width:860px"><thead class="bg-white text-xs text-slate-600"><tr><th class="p-3 text-left">วันที่</th><th class="p-3 text-center">สาขาที่นับยอด</th><th class="p-3 text-center">แก้ยอดด้วยมือ</th><th class="p-3 text-center">กล่องที่แก้ยอด</th><th class="p-3 text-center">เฉลี่ย/สาขา</th><th class="p-3 text-center">ลงถูกตั้งแต่แรก</th><th class="p-3 text-center">อัตราแก้ไข</th></tr></thead><tbody id="dashboardCorrectionRows" class="divide-y divide-amber-100"></tbody></table></div><div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;padding-top:10px"><div style="display:flex;align-items:center;gap:6px"><span class="text-[10px] font-black text-slate-500">แสดง</span><select id="dashCorrectionPageSize" onchange="setDashboardCorrectionPageSize(this.value)" style="border:1px solid #cbd5e1;border-radius:8px;padding:4px 8px;font-size:12px;font-weight:800;color:#334155;background:#fff"><option value="10" selected>10 แถว</option><option value="20">20 แถว</option><option value="30">30 แถว</option><option value="0">ทั้งหมด</option></select><span id="dashCorrectionRangeLabel" class="text-[10px] font-bold text-slate-500"></span></div><div style="display:flex;align-items:center;gap:6px"><button id="dashCorrectionPrev" onclick="moveDashboardCorrectionPage(-1)" style="border:1px solid #cbd5e1;border-radius:8px;padding:4px 12px;font-size:12px;font-weight:800;background:#fff;color:#334155;cursor:pointer">ก่อนหน้า</button><span id="dashCorrectionPageLabel" class="text-[10px] font-black text-slate-600"></span><button id="dashCorrectionNext" onclick="moveDashboardCorrectionPage(1)" style="border:1px solid #cbd5e1;border-radius:8px;padding:4px 12px;font-size:12px;font-weight:800;background:#fff;color:#334155;cursor:pointer">ถัดไป</button></div></div>
                         </div>
                     </section>
 
@@ -1820,7 +1820,7 @@
 
     <script>
         // ⚠️ ต้องตรงกับ APP_VERSION ใน render.yaml ของ backend
-        const APP_VERSION = '1.8.6-free';
+        const APP_VERSION = '1.8.7-free';
         const backendApiUrl = 'https://backed-api-scan-uat.onrender.com';
         // ⚠️ ต้องตรงกับ SCAN_FEATURE_ENABLED ใน render.yaml ของ backend
         // false = hold การสแกน (backend จะตอบ 423 ให้ทุก endpoint ของการสแกน)
@@ -2131,6 +2131,12 @@
             insights.innerHTML = insightRows.map(([icon, label, value]) => `<div class="flex items-center gap-3 rounded-lg bg-white border border-slate-200 p-3"><div class="text-xl">${icon}</div><div class="min-w-0 flex-1"><div class="text-[10px] font-black text-slate-500">${label}</div><div class="font-black text-slate-900">${value}</div></div></div>`).join('');
         }
 
+        // การ์ด "ความถูกต้องของการลงยอดรายวัน"
+        // ขนาด/ระยะทั้งหมดเขียนเป็น inline style หรือ SVG ไม่ใช้คลาสแบบ grid-cols-[...]
+        // เพราะหน้านี้โหลด tailwind.min.css ที่ build ไว้ล่วงหน้า คลาส arbitrary ที่เพิ่มใหม่
+        // จะไม่มีในไฟล์ (ยืนยันแล้วว่าแม้ min-w-[620px] ใน markup เดิมก็ไม่มีผลจริง)
+        let dashboardCorrectionData = { daily: [], summary: {}, page: 1, pageSize: 10 };
+
         function renderDashboardCorrections(corrections) {
             const summary = corrections.summary || {};
             const put = (id, value) => { const el = document.getElementById(id); if (el) el.textContent = value; };
@@ -2144,70 +2150,327 @@
             put('dashCorrectionRate', `${Number(summary.correction_rate_pct || 0).toFixed(1)}% ของสาขาที่นับยอด`);
             // นิยามมาจาก backend ที่เป็นคนนับ หน้าเว็บจึงไม่ตั้งนิยามเองให้เพี้ยนกัน
             if (corrections.definition) put('dashCorrectionDefinition', corrections.definition);
-            const rows = corrections.daily || [];
-            const active = rows.filter(row => Number(row.reviewed_branch_count) || Number(row.corrected_branch_count));
-            renderDashboardCorrectionChart(active.filter(row => Number(row.corrected_branch_count)));
+            const rows = (corrections.daily || []).filter(row => Number(row.reviewed_branch_count) || Number(row.corrected_branch_count));
+            dashboardCorrectionData.daily = rows;
+            dashboardCorrectionData.summary = summary;
+            dashboardCorrectionData.page = 1;
+            renderDashboardCorrectionChart(rows.filter(row => Number(row.corrected_branch_count)));
+            renderDashboardCorrectionTable();
+        }
+
+        function dashboardCorrectionDayLabel(date, withYear) {
+            const options = { timeZone: 'Asia/Bangkok', day: 'numeric', month: 'short' };
+            if (withYear) options.year = 'numeric';
+            return new Intl.DateTimeFormat('th-TH', options).format(new Date(`${date}T00:00:00+07:00`));
+        }
+
+        function setDashboardCorrectionPageSize(value) {
+            dashboardCorrectionData.pageSize = Math.max(0, parseInt(value, 10) || 0);
+            dashboardCorrectionData.page = 1;
+            renderDashboardCorrectionTable();
+        }
+
+        function moveDashboardCorrectionPage(delta) {
+            dashboardCorrectionData.page += delta;
+            renderDashboardCorrectionTable();
+        }
+
+        function renderDashboardCorrectionTable() {
             const host = document.getElementById('dashboardCorrectionRows');
             if (!host) return;
-            if (!active.length) {
+            // ใหม่สุดขึ้นก่อน: หน้าแรกต้องเป็นวันล่าสุด ไม่ใช่ต้นช่วง
+            const rows = dashboardCorrectionData.daily.slice().reverse();
+            const size = dashboardCorrectionData.pageSize;
+            const total = rows.length;
+            const pages = size ? Math.max(1, Math.ceil(total / size)) : 1;
+            dashboardCorrectionData.page = Math.min(Math.max(1, dashboardCorrectionData.page), pages);
+            const page = dashboardCorrectionData.page;
+            const start = size ? (page - 1) * size : 0;
+            const shown = size ? rows.slice(start, start + size) : rows;
+            const setText = (id, value) => { const el = document.getElementById(id); if (el) el.textContent = value; };
+            const setDisabled = (id, flag) => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                el.disabled = flag;
+                el.style.opacity = flag ? '0.4' : '1';
+                el.style.cursor = flag ? 'default' : 'pointer';
+            };
+            setText('dashCorrectionRangeLabel', total ? `${start + 1}-${start + shown.length} จาก ${total} วัน` : '');
+            setText('dashCorrectionPageLabel', total ? `หน้า ${page}/${pages}` : '');
+            setDisabled('dashCorrectionPrev', page <= 1);
+            setDisabled('dashCorrectionNext', page >= pages);
+            if (!total) {
                 host.innerHTML = '<tr><td colspan="7" class="p-5 text-center text-xs font-bold text-slate-400">ยังไม่มีข้อมูลการแก้ไขยอดในช่วงนี้</td></tr>';
                 return;
             }
-            host.innerHTML = active.map(row => {
-                const label = new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(`${row.date}T00:00:00+07:00`));
+            host.innerHTML = shown.map(row => {
                 const rate = Number(row.correction_rate_pct || 0);
                 // 10%+ คือวันที่ควรตามดูย้อนหลัง จึงไล่สีตามความรุนแรง
-                const rateTone = rate >= 10 ? 'text-red-700' : (rate >= 5 ? 'text-amber-800' : 'text-slate-600');
-                return `<tr><td class="p-3 font-black text-slate-700">${label}</td>`
+                const tone = rate >= 10 ? '#b91c1c' : (rate >= 5 ? '#92400e' : '#475569');
+                const tint = rate >= 10 ? '#fef2f2' : (rate >= 5 ? '#fffbeb' : '#f1f5f9');
+                const chip = `<span style="display:inline-block;min-width:54px;padding:2px 8px;border-radius:999px;font-weight:800;color:${tone};background:${tint}">${rate.toFixed(1)}%</span>`;
+                return `<tr><td class="p-3 font-black text-slate-700">${dashboardCorrectionDayLabel(row.date, true)}</td>`
                     + `<td class="p-3 text-center font-bold">${formatDashboardNumber(row.reviewed_branch_count)}</td>`
                     + `<td class="p-3 text-center font-black text-amber-800">${formatDashboardNumber(row.corrected_branch_count)}</td>`
                     + `<td class="p-3 text-center font-black text-amber-900">${formatDashboardNumber(row.corrected_box_count)}</td>`
                     + `<td class="p-3 text-center font-bold text-slate-500">${Number(row.avg_box_per_corrected_branch || 0).toFixed(1)}</td>`
                     + `<td class="p-3 text-center font-black text-emerald-800">${formatDashboardNumber(row.correct_branch_count)}</td>`
-                    + `<td class="p-3 text-center font-black ${rateTone}">${rate.toFixed(1)}%</td></tr>`;
+                    + `<td class="p-3 text-center">${chip}</td></tr>`;
             }).join('');
         }
 
-        // กราฟรายวัน: แถบหนา = กล่องที่แก้ยอด, แถบบาง = สาขาที่แก้ยอด
-        // คนละหน่วยกัน แต่ละชุดจึงเทียบกับวันสูงสุดของตัวเอง และบอกค่าสูงสุดไว้ใน legend
-        //
-        // ขนาด/ระยะทั้งหมดเขียนเป็น inline style ไม่ใช้คลาสแบบ grid-cols-[...] เพราะหน้านี้
-        // โหลด tailwind.min.css ที่ build ไว้ล่วงหน้า คลาส arbitrary ที่เพิ่มใหม่จะไม่มีในไฟล์
-        // (ยืนยันแล้วว่าแม้ min-w-[620px] ใน markup เดิมก็ไม่มีผลจริง)
+        // แท่ง = กล่องที่แก้ยอด (แกนซ้าย), เส้น = อัตราแก้ไข % (แกนขวา)
         function renderDashboardCorrectionChart(rows) {
             const host = document.getElementById('dashboardCorrectionChart');
             if (!host) return;
             if (!rows.length) {
-                host.innerHTML = '<div style="padding:32px 0;text-align:center" class="text-xs font-bold text-slate-400">ยังไม่มีการแก้ไขยอดในช่วงนี้</div>';
+                host.innerHTML = '<div style="padding:34px 0;text-align:center" class="text-xs font-bold text-slate-400">ยังไม่มีการแก้ไขยอดในช่วงนี้</div>';
                 return;
             }
+            const W = 960, H = 250, L = 54, R = 48, T = 14, B = 32;
+            const plotH = H - T - B, plotW = W - L - R;
             const maxBoxes = Math.max(1, ...rows.map(row => Number(row.corrected_box_count) || 0));
-            const maxBranch = Math.max(1, ...rows.map(row => Number(row.corrected_branch_count) || 0));
-            const track = 'height:HPX;border-radius:5px;background:#f1f5f9;overflow:hidden';
-            const bars = rows.map(row => {
-                const label = new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', day: 'numeric', month: 'short' }).format(new Date(`${row.date}T00:00:00+07:00`));
-                const dayBoxes = Number(row.corrected_box_count) || 0;
-                const dayBranches = Number(row.corrected_branch_count) || 0;
-                const rate = Number(row.correction_rate_pct || 0);
-                const boxPct = dayBoxes / maxBoxes * 100;
-                const branchPct = dayBranches / maxBranch * 100;
-                return '<div style="display:grid;grid-template-columns:54px 1fr 120px;align-items:center;gap:8px">'
-                    + `<div class="text-[10px] font-black text-slate-600">${label}</div>`
-                    + '<div>'
-                    + `<div style="${track.replace('HPX', '14px')}" title="กล่องที่แก้ยอด ${formatDashboardNumber(dayBoxes)}"><div style="height:100%;border-radius:5px;background:#d97706;width:${boxPct}%"></div></div>`
-                    + `<div style="${track.replace('HPX', '8px')};margin-top:4px" title="สาขาที่แก้ยอด ${formatDashboardNumber(dayBranches)}"><div style="height:100%;border-radius:5px;background:#64748b;width:${branchPct}%"></div></div>`
-                    + '</div>'
-                    + `<div style="text-align:right;line-height:1.35" class="text-[10px] font-black text-amber-900">${formatDashboardNumber(dayBoxes)} กล่อง`
-                    + `<br><span class="font-bold text-slate-500">${formatDashboardNumber(dayBranches)} สาขา · ${rate.toFixed(1)}%</span></div>`
-                    + '</div>';
+            const maxRate = Math.max(5, ...rows.map(row => Number(row.correction_rate_pct) || 0));
+            const topBoxes = Math.ceil(maxBoxes / 500) * 500 || 500;
+            const topRate = Math.ceil(maxRate / 5) * 5;
+            const step = plotW / rows.length;
+            const barW = Math.max(4, Math.min(24, step * 0.5));
+            const cx = index => L + step * (index + 0.5);
+            const yBox = value => T + plotH - (value / topBoxes) * plotH;
+            const yRate = value => T + plotH - (value / topRate) * plotH;
+            const grid = [0, 0.25, 0.5, 0.75, 1].map(ratio => {
+                const y = T + plotH - ratio * plotH;
+                return `<line x1="${L}" y1="${y}" x2="${W - R}" y2="${y}" stroke="#e2e8f0"/>`
+                    + `<text x="${L - 8}" y="${y + 3.5}" text-anchor="end" font-size="10" fill="#94a3b8">${formatDashboardNumber(Math.round(topBoxes * ratio))}</text>`
+                    + `<text x="${W - R + 8}" y="${y + 3.5}" font-size="10" fill="#b45309">${Math.round(topRate * ratio)}%</text>`;
             }).join('');
-            const chip = (color, text) => `<span style="display:inline-flex;align-items:center;gap:4px" class="text-[10px] font-black text-slate-600">`
-                + `<i style="width:10px;height:10px;border-radius:2px;background:${color};display:inline-block"></i>${text}</span>`;
-            host.innerHTML = '<div style="display:flex;flex-wrap:wrap;column-gap:16px;row-gap:4px;margin-bottom:12px">'
-                + chip('#d97706', `กล่องที่แก้ยอด · วันสูงสุด ${formatDashboardNumber(maxBoxes)} กล่อง`)
-                + chip('#64748b', `สาขาที่แก้ยอด · วันสูงสุด ${formatDashboardNumber(maxBranch)} สาขา`)
-                + '<span class="text-[10px] font-bold text-slate-400">แต่ละแถบเทียบกับวันสูงสุดของชุดตัวเอง คนละหน่วย</span></div>'
-                + `<div style="display:flex;flex-direction:column;gap:10px;min-width:420px;max-height:340px;overflow-y:auto;padding-right:4px">${bars}</div>`;
+            const labelEvery = Math.max(1, Math.ceil(rows.length / 12));
+            const bars = rows.map((row, index) => {
+                const boxes = Number(row.corrected_box_count) || 0;
+                const y = yBox(boxes);
+                const label = dashboardCorrectionDayLabel(row.date, false);
+                const tip = `${label} · ${formatDashboardNumber(boxes)} กล่อง · ${formatDashboardNumber(row.corrected_branch_count)} สาขา · ${Number(row.correction_rate_pct || 0).toFixed(1)}%`;
+                const tick = index % labelEvery === 0
+                    ? `<text x="${cx(index)}" y="${H - 12}" text-anchor="middle" font-size="10" fill="#64748b">${label}</text>` : '';
+                return `<g><title>${tip}</title><rect x="${cx(index) - barW / 2}" y="${y}" width="${barW}" height="${Math.max(1, T + plotH - y)}" rx="3" fill="url(#corrBarFill)"/></g>${tick}`;
+            }).join('');
+            const line = rows.map((row, index) => `${cx(index).toFixed(1)},${yRate(Number(row.correction_rate_pct) || 0).toFixed(1)}`).join(' ');
+            const dots = rows.map((row, index) => `<circle cx="${cx(index).toFixed(1)}" cy="${yRate(Number(row.correction_rate_pct) || 0).toFixed(1)}" r="2.6" fill="#fff" stroke="#b45309" stroke-width="2"/>`).join('');
+            const chip = (color, text) => `<span style="display:inline-flex;align-items:center;gap:5px" class="text-[10px] font-black text-slate-600"><i style="width:10px;height:10px;border-radius:2px;background:${color};display:inline-block"></i>${text}</span>`;
+            host.innerHTML = '<div style="display:flex;flex-wrap:wrap;column-gap:16px;row-gap:4px;margin-bottom:4px">'
+                + chip('#d97706', 'กล่องที่แก้ยอด · แกนซ้าย')
+                + chip('#b45309', 'อัตราแก้ไข % · แกนขวา')
+                + '<span class="text-[10px] font-bold text-slate-400">ชี้ที่แท่งเพื่อดูรายละเอียดของวันนั้น</span></div>'
+                + `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">`
+                + '<defs><linearGradient id="corrBarFill" x1="0" y1="0" x2="0" y2="1">'
+                + '<stop offset="0%" stop-color="#fbbf24"/><stop offset="100%" stop-color="#d97706"/></linearGradient></defs>'
+                + grid + bars
+                + `<polyline points="${line}" fill="none" stroke="#b45309" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`
+                + dots
+                + `<line x1="${L}" y1="${T + plotH}" x2="${W - R}" y2="${T + plotH}" stroke="#cbd5e1"/></svg>`;
+        }
+
+        // ---- ตัวเขียนไฟล์ .xlsx ขนาดเล็กในตัวเอง ----
+        // หน้านี้ไม่โหลดสคริปต์ภายนอกเลยแม้แต่ตัวเดียว (ดู <head>) จึงไม่ดึงไลบรารีจาก CDN
+        // เข้ามาเพื่อเรื่องนี้ .xlsx คือไฟล์ ZIP ที่บรรจุ XML และ ZIP อนุญาตให้เก็บแบบไม่บีบอัด
+        // (method 0 / STORE) ได้ ทำให้เขียนเองได้ครบโดยไม่ต้องมีตัวบีบอัด
+        let dashboardXlsxCrcTable = null;
+
+        function dashboardXlsxCrc32(bytes) {
+            if (!dashboardXlsxCrcTable) {
+                dashboardXlsxCrcTable = new Int32Array(256);
+                for (let i = 0; i < 256; i++) {
+                    let c = i;
+                    for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+                    dashboardXlsxCrcTable[i] = c;
+                }
+            }
+            let crc = -1;
+            for (let i = 0; i < bytes.length; i++) crc = (crc >>> 8) ^ dashboardXlsxCrcTable[(crc ^ bytes[i]) & 255];
+            return (crc ^ -1) >>> 0;
+        }
+
+        function dashboardXlsxZip(files) {
+            const encoder = new TextEncoder();
+            const u16 = value => [value & 255, (value >> 8) & 255];
+            const u32 = value => [value & 255, (value >> 8) & 255, (value >> 16) & 255, (value >>> 24) & 255];
+            // เวลา/วันที่แบบ DOS คงที่ ไม่ต้องพึ่งนาฬิกาเครื่อง และ 0 เป็นวันที่ที่ไม่ถูกต้อง
+            const dosTime = (12 << 11), dosDate = ((2026 - 1980) << 9) | (9 << 5) | 21;
+            const chunks = [], directory = [];
+            let offset = 0;
+            files.forEach(file => {
+                const name = encoder.encode(file.name);
+                const data = typeof file.data === 'string' ? encoder.encode(file.data) : file.data;
+                const crc = dashboardXlsxCrc32(data);
+                const header = [].concat([80, 75, 3, 4], u16(20), u16(0), u16(0), u16(dosTime), u16(dosDate),
+                    u32(crc), u32(data.length), u32(data.length), u16(name.length), u16(0));
+                chunks.push(new Uint8Array(header), name, data);
+                directory.push({ name, crc, size: data.length, offset });
+                offset += header.length + name.length + data.length;
+            });
+            const centralChunks = [];
+            let centralSize = 0;
+            directory.forEach(entry => {
+                const header = [].concat([80, 75, 1, 2], u16(20), u16(20), u16(0), u16(0), u16(dosTime), u16(dosDate),
+                    u32(entry.crc), u32(entry.size), u32(entry.size), u16(entry.name.length),
+                    u16(0), u16(0), u16(0), u16(0), u32(0), u32(entry.offset));
+                centralChunks.push(new Uint8Array(header), entry.name);
+                centralSize += header.length + entry.name.length;
+            });
+            const end = [].concat([80, 75, 5, 6], u16(0), u16(0), u16(directory.length), u16(directory.length),
+                u32(centralSize), u32(offset), u16(0));
+            return new Blob(chunks.concat(centralChunks, [new Uint8Array(end)]),
+                { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        }
+
+        function dashboardXlsxColumn(index) {
+            let name = '', n = index + 1;
+            while (n > 0) { name = String.fromCharCode(65 + ((n - 1) % 26)) + name; n = Math.floor((n - 1) / 26); }
+            return name;
+        }
+
+        function dashboardXlsxEscape(value) {
+            return String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
+        function dashboardXlsxSheetXml(rows, widths) {
+            const cols = (widths || []).length
+                ? '<cols>' + widths.map((width, i) => `<col min="${i + 1}" max="${i + 1}" width="${width}" customWidth="1"/>`).join('') + '</cols>'
+                : '';
+            const body = rows.map((row, r) => {
+                const cells = row.map((value, c) => {
+                    const ref = dashboardXlsxColumn(c) + (r + 1);
+                    const style = r === 0 ? ' s="1"' : '';
+                    if (value === null || value === undefined || value === '') return `<c r="${ref}"${style}/>`;
+                    if (typeof value === 'number' && isFinite(value)) return `<c r="${ref}"${style}><v>${value}</v></c>`;
+                    return `<c r="${ref}"${style} t="inlineStr"><is><t>${dashboardXlsxEscape(value)}</t></is></c>`;
+                }).join('');
+                return `<row r="${r + 1}">${cells}</row>`;
+            }).join('');
+            return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+                + '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+                + '<sheetViews><sheetView workbookViewId="0">'
+                + '<pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>'
+                + cols + '<sheetData>' + body + '</sheetData></worksheet>';
+        }
+
+        function dashboardXlsxBlob(sheets) {
+            const main = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+            const styles = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+                + '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+                + '<fonts count="2"><font><sz val="11"/><name val="Calibri"/></font>'
+                + '<font><b/><color rgb="FFFFFFFF"/><sz val="11"/><name val="Calibri"/></font></fonts>'
+                + '<fills count="3"><fill><patternFill patternType="none"/></fill>'
+                + '<fill><patternFill patternType="gray125"/></fill>'
+                + '<fill><patternFill patternType="solid"><fgColor rgb="FFB45309"/><bgColor indexed="64"/></patternFill></fill></fills>'
+                + '<borders count="1"><border/></borders>'
+                + '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
+                + '<cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
+                + '<xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1">'
+                + '<alignment horizontal="center" vertical="center"/></xf></cellXfs>'
+                + '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
+            const contentTypes = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+                + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+                + '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+                + '<Default Extension="xml" ContentType="application/xml"/>'
+                + '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+                + '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'
+                + sheets.map((sheet, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')
+                + '</Types>';
+            const rootRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+                + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+                + `<Relationship Id="rId1" Type="${main}/officeDocument" Target="xl/workbook.xml"/></Relationships>`;
+            const workbook = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+                + `<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="${main}"><sheets>`
+                + sheets.map((sheet, i) => `<sheet name="${dashboardXlsxEscape(sheet.name)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('')
+                + '</sheets></workbook>';
+            const workbookRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+                + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+                + sheets.map((sheet, i) => `<Relationship Id="rId${i + 1}" Type="${main}/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join('')
+                + `<Relationship Id="rId${sheets.length + 1}" Type="${main}/styles" Target="styles.xml"/></Relationships>`;
+            const files = [
+                { name: '[Content_Types].xml', data: contentTypes },
+                { name: '_rels/.rels', data: rootRels },
+                { name: 'xl/workbook.xml', data: workbook },
+                { name: 'xl/_rels/workbook.xml.rels', data: workbookRels },
+                { name: 'xl/styles.xml', data: styles }
+            ].concat(sheets.map((sheet, i) => ({
+                name: `xl/worksheets/sheet${i + 1}.xml`,
+                data: dashboardXlsxSheetXml(sheet.rows, sheet.widths)
+            })));
+            return dashboardXlsxZip(files);
+        }
+
+        async function exportDashboardCorrections() {
+            const button = document.getElementById('dashCorrectionExportBtn');
+            const label = document.getElementById('dashCorrectionExportLabel');
+            const restore = () => { if (button) button.disabled = false; if (label) label.textContent = 'ดาวน์โหลด Excel'; };
+            if (button) button.disabled = true;
+            if (label) label.textContent = 'กำลังสร้างไฟล์...';
+            try {
+                // ใช้ตัวกรองเดียวกับที่หน้า Dashboard กำลังแสดง ไฟล์จึงตรงกับสิ่งที่เห็นบนจอ
+                const params = new URLSearchParams({ days: String(dashboardRangeDays) });
+                if (dashboardReferenceQuery) params.set('q', dashboardReferenceQuery);
+                if (dashboardDateFrom) params.set('date_from', dashboardDateFrom);
+                if (dashboardDateTo) params.set('date_to', dashboardDateTo);
+                const response = await fetchWithTimeout(`${backendApiUrl}/api/corrections-export?${params.toString()}`, { cache: 'no-store' }, 120000);
+                const data = await response.json();
+                if (!response.ok) throw new Error(typeof data.detail === 'string' ? data.detail : `HTTP ${response.status}`);
+                const summary = data.summary || {};
+                const period = `${data.date_from} ถึง ${data.date_to}`;
+                const overview = {
+                    name: 'ภาพรวม',
+                    widths: [34, 22],
+                    rows: [
+                        ['หัวข้อ', 'ค่า'],
+                        ['ช่วงข้อมูล', period],
+                        ['ตัวกรอง Booking/Wave/สาขา', data.query || 'ทั้งหมด'],
+                        ['สาขาที่นับยอด', Number(summary.reviewed_branch_count || 0)],
+                        ['สาขาที่แก้ยอดด้วยมือ', Number(summary.corrected_branch_count || 0)],
+                        ['กล่องที่แก้ยอด', Number(summary.corrected_box_count || 0)],
+                        ['ลงถูกตั้งแต่แรก', Number(summary.correct_branch_count || 0)],
+                        ['อัตราแก้ไข (%)', Number(summary.correction_rate_pct || 0)],
+                        ['นิยาม', data.definition || ''],
+                        ['หมายเหตุ', 'กล่องที่แก้ยอด = ยอดกล่องรวมของสาขาที่ถูกแก้ ไม่ใช่ผลต่างก่อน-หลัง เพราะระบบไม่เก็บยอดก่อนแก้']
+                    ]
+                };
+                const daily = {
+                    name: 'รายวัน',
+                    widths: [13, 16, 18, 16, 14, 18, 14],
+                    rows: [['วันที่', 'สาขาที่นับยอด', 'สาขาที่แก้ยอด', 'กล่องที่แก้ยอด', 'เฉลี่ย/สาขา', 'ลงถูกตั้งแต่แรก', 'อัตราแก้ไข (%)']]
+                        .concat((data.daily || []).map(row => [
+                            row.date, Number(row.reviewed_branch_count || 0), Number(row.corrected_branch_count || 0),
+                            Number(row.corrected_box_count || 0), Number(row.avg_box_per_corrected_branch || 0),
+                            Number(row.correct_branch_count || 0), Number(row.correction_rate_pct || 0)
+                        ]))
+                };
+                const branches = {
+                    name: 'รายสาขา',
+                    widths: [12, 17, 10, 18, 12, 34, 8, 8, 10, 8, 8, 11, 9, 20, 12],
+                    rows: [['วันที่', 'เวลาบันทึก', 'Wave', 'Booking', 'รหัสสาขา', 'ชื่อสาขา',
+                        'M', 'แดง', 'น้ำเงิน', 'เขียว', 'ดำ', 'รวมกล่อง', 'พาเลท', 'เหตุผล', 'รหัสพนักงาน']]
+                        .concat((data.branches || []).map(row => [
+                            row.date, row.saved_at, row.wave_no, row.booking_no || '', row.branch_code, row.branch_name || '',
+                            Number(row.m || 0), Number(row.red || 0), Number(row.blue || 0), Number(row.green || 0),
+                            Number(row.black || 0), Number(row.total || 0), Number(row.pallet || 0),
+                            row.reason || '', row.emp_id || ''
+                        ]))
+                };
+                const blob = dashboardXlsxBlob([overview, daily, branches]);
+                const url = URL.createObjectURL(blob);
+                const anchor = document.createElement('a');
+                anchor.href = url;
+                anchor.download = `ความถูกต้องการลงยอด_${data.date_from}_${data.date_to}.xlsx`;
+                document.body.appendChild(anchor);
+                anchor.click();
+                anchor.remove();
+                setTimeout(() => URL.revokeObjectURL(url), 4000);
+                showToast(`ดาวน์โหลดแล้ว ${formatDashboardNumber((data.branches || []).length)} รายการ`);
+            } catch (error) {
+                showAlert('ดาวน์โหลด Excel ไม่สำเร็จ', (error && error.message) || String(error));
+            } finally {
+                restore();
+            }
         }
 
         function renderDashboardOperationsChart(rows) {
