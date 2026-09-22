@@ -1066,22 +1066,37 @@
         </div>
     </div>
 
-    <div id="loginModal" class="fixed inset-0 bg-gray-900 bg-opacity-90 flex items-center justify-center p-4 z-50">
-        <div
-            class="bg-white p-6 md:p-8 rounded-xl shadow-2xl w-full max-w-md border-t-8 border-gray-800 text-center flex flex-col items-center">
-            <div class="mb-4 flex justify-center items-center h-28 w-auto">
+    <div id="loginModal" class="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-slate-950 p-4">
+        <div class="pointer-events-none absolute -left-24 -top-24 h-72 w-72 rounded-full bg-blue-500/20 blur-3xl"></div>
+        <div class="pointer-events-none absolute -bottom-32 -right-20 h-80 w-80 rounded-full bg-teal-400/20 blur-3xl"></div>
+        <div class="pointer-events-none absolute left-1/2 top-1/4 h-24 w-24 -translate-x-1/2 rounded-full bg-indigo-400/10 blur-2xl"></div>
+        <div class="relative w-full max-w-[430px] overflow-hidden rounded-[28px] border border-white/70 bg-white/95 p-7 text-center shadow-[0_30px_80px_-20px_rgba(2,6,23,.75)] backdrop-blur md:p-9">
+            <div class="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-blue-600 via-indigo-500 to-teal-400"></div>
+            <div class="mx-auto mb-5 flex h-28 w-28 items-center justify-center rounded-[30px] border border-slate-100 bg-gradient-to-br from-slate-50 to-blue-50 shadow-inner">
                 <img loading="lazy" decoding="async" src="https://i.postimg.cc/L4qLLFNj/Black-White-Modern-Handwritten-Square-Studio-Logo-(15)-Photoroom-0.png"
-                    alt="Pro LPN Scanner Logo" class="h-full w-auto object-contain">
+                    alt="Pro LPN Scanner Logo" class="h-24 w-24 object-contain drop-shadow-md">
             </div>
-            <h2 class="text-2xl font-black text-gray-800 mb-1">Pro Scanner</h2>
-            <div class="flex flex-col gap-3 mt-2 w-full">
-                <input type="text" id="empInput" autocomplete="off"
-                    class="w-full text-2xl p-3 border-2 border-gray-300 rounded-lg text-center uppercase bg-gray-50 focus:border-gray-800 focus:bg-white font-bold tracking-wider"
-                    placeholder="รหัสพนักงาน...">
+            <div class="mb-1 inline-flex items-center gap-1.5 rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-[10px] font-black uppercase tracking-[.16em] text-blue-700">
+                <span class="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,.15)]"></span> Operations workspace
+            </div>
+            <h2 class="mt-2 text-3xl font-black tracking-tight text-slate-800">Pro Scanner</h2>
+            <p class="mt-1 text-xs font-bold text-slate-400">จัดการเอกสารขนส่งได้ง่ายในที่เดียว</p>
+            <div class="mt-6 flex w-full flex-col gap-3">
+                <label for="empInput" class="sr-only">รหัสพนักงาน</label>
+                <div class="group relative">
+                    <span class="pointer-events-none absolute inset-y-0 left-4 flex items-center text-slate-400 transition group-focus-within:text-blue-600">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM4 21a8 8 0 0116 0"></path></svg>
+                    </span>
+                    <input type="text" id="empInput" autocomplete="off"
+                        class="w-full rounded-2xl border-2 border-slate-200 bg-slate-50 py-3.5 pl-12 pr-4 text-center text-xl font-black tracking-[.12em] text-slate-800 outline-none transition placeholder:tracking-normal placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100"
+                        placeholder="รหัสพนักงาน...">
+                </div>
                 <button onclick="processLogin()"
-                    class="w-full bg-gray-800 hover:bg-black text-white font-bold py-3 rounded-lg text-xl shadow-lg transition">เข้าสู่ระบบ
-                    (Enter)</button>
+                    class="group flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-slate-900 via-blue-900 to-blue-700 py-3.5 text-lg font-black text-white shadow-lg shadow-blue-900/20 transition hover:-translate-y-0.5 hover:from-blue-900 hover:to-blue-600 active:translate-y-0">
+                    เข้าสู่ระบบ <span class="rounded-md border border-white/25 px-1.5 py-0.5 text-xs font-bold text-blue-100">Enter</span>
+                </button>
             </div>
+            <div class="mt-5 flex items-center justify-center gap-2 text-[10px] font-bold text-slate-400"><span class="h-px w-10 bg-slate-200"></span><span>ปลอดภัย • พร้อมใช้งาน</span><span class="h-px w-10 bg-slate-200"></span></div>
         </div>
     </div>
 
@@ -1809,7 +1824,7 @@
 
     <script>
         // ⚠️ ต้องตรงกับ APP_VERSION ใน render.yaml ของ backend
-        const APP_VERSION = '1.9.0-free';
+        const APP_VERSION = '1.9.1-free';
         const backendApiUrl = 'https://backed-api-scan-uat.onrender.com';
         // ⚠️ ต้องตรงกับ SCAN_FEATURE_ENABLED ใน render.yaml ของ backend
         // false = hold การสแกน (backend จะตอบ 423 ให้ทุก endpoint ของการสแกน)
