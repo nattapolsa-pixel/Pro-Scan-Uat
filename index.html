@@ -1820,7 +1820,7 @@
 
     <script>
         // ⚠️ ต้องตรงกับ APP_VERSION ใน render.yaml ของ backend
-        const APP_VERSION = '1.8.7-free';
+        const APP_VERSION = '1.8.8-free';
         const backendApiUrl = 'https://backed-api-scan-uat.onrender.com';
         // ⚠️ ต้องตรงกับ SCAN_FEATURE_ENABLED ใน render.yaml ของ backend
         // false = hold การสแกน (backend จะตอบ 423 ให้ทุก endpoint ของการสแกน)
@@ -1848,7 +1848,7 @@
         let loggedInEmpId = ""; let loggedInEmpName = ""; let currentWave = ""; let allLpnsInWave = [];
         let currentBookingNo = ""; let currentLicensePlate = "";
         let activeDocumentType = 'shipping';
-        let currentTransportMeta = { carrier: '', driver: '', plate: '' };
+        let currentTransportMeta = { carrier: '', driver: '', plate: '', booking: '', loaded: false };
         let isAlertOpen = false; let selectedBranchCode = ""; let selectedBranchName = "";
         let employeeDB = {};
         try {
@@ -4153,10 +4153,28 @@
             return currentLicensePlate || '';
         }
 
-        async function loadCurrentTransportMeta() {
+        // ชื่อผู้ส่งบนใบขาดเกินต้องเป็นของ Booking ที่เปิดอยู่เท่านั้น
+        // currentTransportMeta เป็นตัวแปรระดับหน้าและไม่เคยถูกล้างเมื่อเปลี่ยน Wave/Booking
+        // จึงติดป้าย Booking ไว้กับค่า แล้วถือว่ายังไม่มีค่าเมื่อป้ายไม่ตรง ไม่งั้นชื่อของ
+        // งานก่อนหน้าจะค้างอยู่บนเอกสารจนกว่า Server จะตอบกลับมา
+        function transportMetaForCurrentBooking() {
+            const booking = String(currentBookingNo || '').trim().toUpperCase();
+            const metaBooking = String(currentTransportMeta.booking || '').trim().toUpperCase();
+            if (!booking || metaBooking !== booking) {
+                return { carrier: '', driver: '', plate: '', booking, loaded: false };
+            }
+            return currentTransportMeta;
+        }
+
+        async function loadCurrentTransportMeta(force = false) {
             const requestedBooking = String(currentBookingNo || '').trim().toUpperCase();
             if (!requestedBooking) {
-                currentTransportMeta = { carrier: '', driver: '', plate: currentLicensePlate || '' };
+                currentTransportMeta = { carrier: '', driver: '', plate: currentLicensePlate || '', booking: '', loaded: true };
+                return currentTransportMeta;
+            }
+            // โหลดของ Booking นี้ไว้แล้ว ไม่ต้องยิงซ้ำ การกดสลับกลับมาดูใบขาดเกินจึงไม่หน่วง
+            if (!force && currentTransportMeta.loaded
+                && String(currentTransportMeta.booking || '').trim().toUpperCase() === requestedBooking) {
                 return currentTransportMeta;
             }
             try {
@@ -4171,14 +4189,21 @@
                 currentTransportMeta = {
                     carrier: String(meta.carrier || ''),
                     driver: String(meta.driver || ''),
-                    plate: String(meta.plate || currentLicensePlate || '')
+                    plate: String(meta.plate || currentLicensePlate || ''),
+                    booking: requestedBooking,
+                    loaded: true
                 };
                 if (!currentLicensePlate && currentTransportMeta.plate) currentLicensePlate = currentTransportMeta.plate;
             } catch (e) {
+                // อ่านจาก Server ไม่สำเร็จ ใช้ชื่อจากชีตที่แคชไว้เป็นทางเลือกสุดท้าย
+                // แต่หยิบค่าเดิมมาใช้ต่อได้เฉพาะเมื่อเป็นของ Booking เดียวกัน
+                const previous = transportMetaForCurrentBooking();
                 currentTransportMeta = {
-                    carrier: currentTransportMeta.carrier || '',
-                    driver: currentTransportMeta.driver || getSenderNameForBooking(currentBookingNo, currentWave) || '',
-                    plate: currentLicensePlate || getLicensePlateForWave(currentWave, currentBookingNo) || ''
+                    carrier: previous.carrier || '',
+                    driver: previous.driver || getSenderNameForBooking(currentBookingNo, currentWave) || '',
+                    plate: previous.plate || currentLicensePlate || getLicensePlateForWave(currentWave, currentBookingNo) || '',
+                    booking: requestedBooking,
+                    loaded: true
                 };
             }
             return currentTransportMeta;
@@ -4505,7 +4530,8 @@
         }
 
         function openShortageExcessDocument() {
-            currentTransportMeta = { carrier: '', driver: '', plate: currentLicensePlate || '' };
+            // ไม่ต้องล้าง currentTransportMeta เองแล้ว ป้าย Booking กันค่าข้ามงานให้อยู่
+            // และการเก็บค่าของ Booking เดิมไว้ทำให้เปิดซ้ำแล้วชื่อขึ้นทันที
             return openShippingDocument('', false, 'shortage');
         }
 
@@ -4526,7 +4552,11 @@
             document.getElementById('shippingDocumentModal').classList.add('flex');
             renderActiveDocument();
             trackUsageEvent('OPEN_DOCUMENT', { detail: activeDocumentType });
-            if (activeDocumentType === 'shortage') loadCurrentTransportMeta().then(renderActiveDocument).catch(() => {});
+            // โหลดชื่อผู้ส่งล่วงหน้าแม้เปิดใบคุมส่งสินค้า เพราะหน้างานมักกดสลับไปใบขาดเกินต่อ
+            loadCurrentTransportMeta().then(() => {
+                const modal = document.getElementById('shippingDocumentModal');
+                if (modal && !modal.classList.contains('hidden')) renderActiveDocument();
+            }).catch(() => {});
 
             // รันการตรวจสอบยอดและซิงค์กับเซิร์ฟเวอร์ส่วนกลางเบื้องหลังแบบ Non-blocking
             (async () => {
@@ -5553,9 +5583,11 @@
             const dateText = new Intl.DateTimeFormat('en-GB', {
                 timeZone: 'Asia/Bangkok', day: '2-digit', month: '2-digit', year: 'numeric'
             }).format(new Date()).replace(/\s/g, '');
-            const carrier = currentTransportMeta.carrier || '';
-            const driver = currentTransportMeta.driver || getSenderNameForBooking(currentBookingNo, currentWave) || '';
-            const plate = currentTransportMeta.plate || currentLicensePlate || getLicensePlateForWave(currentWave, currentBookingNo) || '';
+            const transportMeta = transportMetaForCurrentBooking();
+            const carrier = transportMeta.carrier || '';
+            // ยังไม่ยืนยันชื่อกับ Server: เว้นว่างไว้ ห้ามเดาจากแคช เพราะใบที่พิมพ์ออกไปแก้ทีหลังไม่ได้
+            const driver = transportMeta.loaded ? (transportMeta.driver || '') : '';
+            const plate = transportMeta.plate || currentLicensePlate || getLicensePlateForWave(currentWave, currentBookingNo) || '';
             const blankRows = Array.from({ length: 20 }, (_, index) => `
                 <tr>
                     <td class="text-center">${index + 1}</td>
@@ -5625,7 +5657,12 @@
             else printShippingDocument();
         }
 
-        function printShortageExcessDocument() {
+        async function printShortageExcessDocument() {
+            // ใบที่พิมพ์ออกไปแล้วแก้ไม่ได้ จึงรอให้ชื่อผู้ส่งยืนยันก่อนเสมอ
+            if (!transportMetaForCurrentBooking().loaded) {
+                showToast('กำลังโหลดชื่อผู้ส่ง...');
+                await loadCurrentTransportMeta().catch(() => { });
+            }
             renderShortageExcessDocument();
             trackUsageEvent('PRINT_DOCUMENT', { detail: 'shortage' });
             const originalTitle = document.title;
@@ -6243,6 +6280,49 @@
                 document.getElementById('branchSelectorModal').classList.add('flex');
             } else {
                 updateDashboardUI();
+            }
+            scheduleBranchCompletenessCheck();
+        }
+
+        // สาขาถูกเพิ่มเข้า Wave ได้ตลอดเวลา และ Server แคชสาขาของ Wave ไว้เป็นก้อน
+        // บน UAT ตัวรีเฟรชอัตโนมัติทุกตัวถูกปิดด้วย SCAN_FEATURE_ENABLED จึงไม่มีอะไร
+        // มาแก้หน้าจอให้ถูกเองถ้ารอบแรกได้สาขามาไม่ครบ ตรวจซ้ำให้หนึ่งครั้งต่อการเปิดงาน
+        // แบบเงียบ ๆ และแตะหน้าจอเฉพาะเมื่อพบสาขาที่หายไปจริง
+        const branchCompletenessCheckedKeys = new Set();
+        function currentJobLookupValue() {
+            return currentLookupIsWaveOnly ? (activeWavesList[0] || currentWave) : currentBookingNo;
+        }
+        function scheduleBranchCompletenessCheck() {
+            const lookupValue = currentJobLookupValue();
+            if (!lookupValue) return;
+            const key = getWaveDataCacheKey(lookupValue, currentLookupIsWaveOnly);
+            if (branchCompletenessCheckedKeys.has(key)) return;
+            branchCompletenessCheckedKeys.add(key);
+            setTimeout(() => verifyBranchCompleteness(key, lookupValue, currentLookupIsWaveOnly), 6000);
+        }
+        async function verifyBranchCompleteness(key, lookupValue, isWaveOnly) {
+            try {
+                // ผู้ใช้เปลี่ยนไปงานอื่นแล้ว ไม่ต้องเขียนทับหน้าจอ
+                if (key !== getWaveDataCacheKey(currentJobLookupValue(), currentLookupIsWaveOnly)) return;
+                const before = new Set((allLpnsInWave || []).map(item => String(item.branch || '').toUpperCase()));
+                const url = isWaveOnly
+                    ? `${backendApiUrl}/api/check-wave?wave_no=${encodeURIComponent(lookupValue)}&force=true&_ts=${Date.now()}`
+                    : `${backendApiUrl}/api/check-booking?booking_no=${encodeURIComponent(lookupValue)}&force=true&_ts=${Date.now()}`;
+                const response = await fetchWithTimeout(url, { cache: 'no-store' }, 60000);
+                if (!response.ok) return;
+                const data = await response.json();
+                if (key !== getWaveDataCacheKey(currentJobLookupValue(), currentLookupIsWaveOnly)) return;
+                const added = [...new Set((data.lpn_list || []).map(item => String(item.branch || '').toUpperCase()))]
+                    .filter(code => code && !before.has(code));
+                if (!added.length) return;
+                saveWaveDataCache(key, data);
+                applyWaveDataToScreen(data, isWaveOnly);
+                const modal = document.getElementById('shippingDocumentModal');
+                if (modal && !modal.classList.contains('hidden')) renderActiveDocument();
+                showToast(`เพิ่มสาขาที่เข้า Wave ภายหลัง: ${added.join(', ')}`);
+            } catch (error) {
+                // เงียบไว้ ผู้ใช้ยังกดปุ่มรีเฟรชข้อมูลเองได้
+                console.warn('Branch completeness check:', error);
             }
         }
 
