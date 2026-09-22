@@ -1820,7 +1820,7 @@
 
     <script>
         // ⚠️ ต้องตรงกับ APP_VERSION ใน render.yaml ของ backend
-        const APP_VERSION = '1.8.8-free';
+        const APP_VERSION = '1.8.9-free';
         const backendApiUrl = 'https://backed-api-scan-uat.onrender.com';
         // ⚠️ ต้องตรงกับ SCAN_FEATURE_ENABLED ใน render.yaml ของ backend
         // false = hold การสแกน (backend จะตอบ 423 ให้ทุก endpoint ของการสแกน)
@@ -3686,7 +3686,9 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
-                }, 30000);
+                // Saving updates multiple Google Sheets on the free Render instance.
+                // Allow the request to finish instead of showing a false Failed to fetch.
+                }, 120000);
                 let body = {};
                 try { body = await response.json(); } catch (e) { }
                 if (!response.ok) throw new Error(typeof body.detail === 'string' ? body.detail : `HTTP ${response.status}`);
