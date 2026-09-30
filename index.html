@@ -1809,7 +1809,7 @@
 
     <script>
         // ⚠️ ต้องตรงกับ APP_VERSION ใน render.yaml ของ backend
-        const APP_VERSION = '1.9.5-free';
+        const APP_VERSION = '1.9.6-free';
         const backendApiUrl = 'https://backed-api-scan-uat.onrender.com';
         // ⚠️ ต้องตรงกับ SCAN_FEATURE_ENABLED ใน render.yaml ของ backend
         // false = hold การสแกน (backend จะตอบ 423 ให้ทุก endpoint ของการสแกน)
@@ -3419,6 +3419,10 @@
         let autoTotalsRetryTimer = null;
         const pendingAutoTotalsBranches = new Set();
         let manualSummaryTimer = null;
+        // Manual document saves must run in one queue.  On the free backend a
+        // Sheets write can outlive the next click; concurrent requests then
+        // race and the older response can clear a newer hide/edit.
+        let manualSummaryRequestChain = Promise.resolve();
         let documentOverridesRevision = 0;
         let syncedDocumentOverridesRevision = 0;
         const dirtyDocumentOverrideBranches = new Set();
@@ -3651,12 +3655,14 @@
                             sentDirtyBranches.add(normalizeBranchLookupCode(code));
                         }
                     });
-                    // Also add all branches with hidden state changes
-                    documentHiddenBranches.forEach(code => sentDirtyBranches.add(normalizeBranchLookupCode(code)));
+                }
+                // Always include every currently hidden branch.  This makes a
+                // rapid sequence of hide clicks one atomic batch instead of
+                // letting a later request carry only the last branch.
+                documentHiddenBranches.forEach(code => sentDirtyBranches.add(normalizeBranchLookupCode(code)));
+                if (!sentDirtyBranches.size) {
                     // Still nothing? Fall through to send all summaries.
-                    if (!sentDirtyBranches.size) {
-                        sourceSummaries.forEach(s => sentDirtyBranches.add(normalizeBranchLookupCode(s.branch)));
-                    }
+                    sourceSummaries.forEach(s => sentDirtyBranches.add(normalizeBranchLookupCode(s.branch)));
                 }
                 sourceSummaries = sourceSummaries.filter(summary =>
                     sentDirtyBranches.has(normalizeBranchLookupCode(summary.branch))
@@ -3678,7 +3684,7 @@
                 reason
             };
             const sentRevision = documentOverridesRevision;
-            const doSend = async () => {
+            const sendRequest = async () => {
                 const response = await fetchWithTimeout(backendApiUrl + '/api/document-summary', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -3690,11 +3696,21 @@
                 try { body = await response.json(); } catch (e) { }
                 if (!response.ok) throw new Error(typeof body.detail === 'string' ? body.detail : `HTTP ${response.status}`);
                 if (persistOverrides) {
-                    syncedDocumentOverridesRevision = Math.max(syncedDocumentOverridesRevision, sentRevision);
-                    sentDirtyBranches.forEach(branch => dirtyDocumentOverrideBranches.delete(branch));
+                    // Never clear a change made while this request was in
+                    // flight.  It will be included by the next queued save.
+                    if (documentOverridesRevision === sentRevision) {
+                        syncedDocumentOverridesRevision = Math.max(syncedDocumentOverridesRevision, sentRevision);
+                        sentDirtyBranches.forEach(branch => dirtyDocumentOverrideBranches.delete(branch));
+                    }
                 }
                 console.log("✅ Document summary queued for both Google Sheets", reason);
                 return body;
+            };
+            const doSend = async () => {
+                if (!persistOverrides) return await sendRequest();
+                const queued = manualSummaryRequestChain.catch(() => {}).then(sendRequest);
+                manualSummaryRequestChain = queued.catch(() => {});
+                return await queued;
             };
             if (isImmediate) {
                 if (persistOverrides) clearTimeout(manualSummaryTimer);
@@ -3702,7 +3718,10 @@
             } else {
                 if (persistOverrides) {
                     clearTimeout(manualSummaryTimer);
-                    manualSummaryTimer = setTimeout(() => doSend().catch(e => console.warn("⚠️ Manual document sync warning:", e)), 350);
+                    manualSummaryTimer = setTimeout(() => {
+                        manualSummaryTimer = null;
+                        doSend().catch(e => console.warn("⚠️ Manual document sync warning:", e));
+                    }, 350);
                 } else {
                     clearTimeout(pushSummaryTimer);
                     pushSummaryTimer = setTimeout(() => doSend().catch(e => console.warn("⚠️ Document summary sync warning:", e)), 350);
@@ -3854,6 +3873,8 @@
                 });
                 if (serverResult && serverResult.report_sync === 'completed') {
                     showAlert('✅ บันทึกยอดแก้ไขเรียบร้อย', `บันทึกแล้ว ${fieldCount} ช่อง จาก ${branchCount} สาขา\nเวลา ${savedAt} น.\n\nยอดในเว็บ, Member Data และรายงานอัปเดตครบแล้ว`, 'border-green-600', true);
+                } else if (serverResult && serverResult.report_sync === 'queued') {
+                    showAlert('✅ รับยอดแก้ไขแล้ว', `บันทึกแล้ว ${fieldCount} ช่อง จาก ${branchCount} สาขา\nเวลา ${savedAt} น.\n\nระบบกำลังส่งยอดไป Member Data และ Delivery report ต่อเบื้องหลัง ยอดในเว็บจะไม่เด้งกลับ`, 'border-green-600', true);
                 } else {
                     showAlert('⚠️ เก็บยอดในเว็บแล้ว', `ยอดที่แก้จะไม่เด้งกลับ\nเวลา ${savedAt} น.\n\nGoogle Credential ยังใช้งานไม่ได้ จึงรอซิงก์ Member Data และรายงาน`, 'border-amber-500', true);
                 }
@@ -4301,7 +4322,11 @@
         function getAllDocumentBranchesRaw() {
             const branchMap = new Map();
             allLpnsInWave.forEach(item => {
-                const code = item.branch || 'Unknown';
+                // Branch codes from Sheets occasionally contain casing or
+                // invisible whitespace.  Keep one canonical key so hiding
+                // more than one branch cannot split the same branch into
+                // duplicate rows.
+                const code = normalizeBranchLookupCode(item.branch || 'Unknown') || 'UNKNOWN';
                 const candidate = normalizeBranchDisplayName(item.branch_name, code);
                 if (!branchMap.has(code) || (!normalizeBranchDisplayName(branchMap.get(code), code) && candidate)) {
                     branchMap.set(code, candidate || 'ไม่พบชื่อสาขา');
@@ -4807,8 +4832,9 @@
             // เพราะค่าใน memory อาจ updated กว่า localStorage (เช่น หลัง merge server overrides)
             // loadDocumentOverrides ถูกเรียกที่ applyWaveDataToScreen และ saveDocumentOverridesUI แล้ว
             const specificWaveKey = specificWave ? String(parseInt(String(specificWave).replace(/\D/g, ''), 10)) : '';
+            const branchKey = normalizeBranchLookupCode(bCode);
             const branchItems = allLpnsInWave.filter(item => {
-                if ((item.branch || 'Unknown') !== bCode) return false;
+                if (normalizeBranchLookupCode(item.branch || 'Unknown') !== branchKey) return false;
                 if (!specificWaveKey) return true;
                 const itemWave = String(item.wave_no || '').replace(/\D/g, '');
                 return itemWave && String(parseInt(itemWave, 10)) === specificWaveKey;
