@@ -1809,7 +1809,7 @@
 
     <script>
         // ⚠️ ต้องตรงกับ APP_VERSION ใน render.yaml ของ backend
-        const APP_VERSION = '1.9.7-free';
+        const APP_VERSION = '1.9.8-free';
         const backendApiUrl = 'https://backed-api-scan-uat.onrender.com';
         // ⚠️ ต้องตรงกับ SCAN_FEATURE_ENABLED ใน render.yaml ของ backend
         // false = hold การสแกน (backend จะตอบ 423 ให้ทุก endpoint ของการสแกน)
@@ -5709,14 +5709,12 @@
 
             saveDocumentOverrides();
             renderShippingDocument();
-            // Finish persisting the current hidden/visible state before opening
-            // print preview. This prevents a fast click on Print from racing
-            // the save and bringing an old branch list back on the next load.
-            try {
-                await pushDocumentSummaryToServer(true, true, null, 'print_document');
-            } catch (error) {
-                console.warn('⚠️ Document state save before print failed:', error);
-            }
+            // Start saving the current hidden/visible state, but do not wait for
+            // Render/Google Sheets before opening print preview. On the Free
+            // instance a cold/slow response could otherwise make some devices
+            // look stuck even though the document itself is ready to print.
+            pushDocumentSummaryToServer(true, true, null, 'print_document')
+                .catch(error => console.warn('⚠️ Document state save while printing failed:', error));
 
             // ช่องพาเลทที่ยังไม่มีข้อมูลจะแสดงเป็น "-" ในเอกสารอยู่แล้ว
             // ไม่ควรใช้ native confirm มาขวางการพิมพ์ เพราะบางเครื่อง/บางเบราว์เซอร์
