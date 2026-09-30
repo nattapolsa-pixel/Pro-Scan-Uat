@@ -1809,7 +1809,7 @@
 
     <script>
         // ⚠️ ต้องตรงกับ APP_VERSION ใน render.yaml ของ backend
-        const APP_VERSION = '1.9.3-free';
+        const APP_VERSION = '1.9.5-free';
         const backendApiUrl = 'https://backed-api-scan-uat.onrender.com';
         // ⚠️ ต้องตรงกับ SCAN_FEATURE_ENABLED ใน render.yaml ของ backend
         // false = hold การสแกน (backend จะตอบ 423 ให้ทุก endpoint ของการสแกน)
@@ -3452,8 +3452,10 @@
         function loadDocumentHiddenBranches() {
             try {
                 const raw = localStorage.getItem(getDocumentHiddenBranchesStorageKey());
-                documentHiddenBranches = raw ? JSON.parse(raw) : [];
-                if (!Array.isArray(documentHiddenBranches)) documentHiddenBranches = [];
+                const parsed = raw ? JSON.parse(raw) : [];
+                documentHiddenBranches = Array.isArray(parsed)
+                    ? Array.from(new Set(parsed.map(normalizeBranchLookupCode).filter(Boolean)))
+                    : [];
             } catch (e) {
                 documentHiddenBranches = [];
             }
@@ -3467,30 +3469,37 @@
             }
         }
 
+        function isDocumentBranchHidden(branchCode) {
+            const key = normalizeBranchLookupCode(branchCode);
+            return Boolean(key && documentHiddenBranches.some(code => normalizeBranchLookupCode(code) === key));
+        }
+
         function hideBranchInDocument(branchCode) {
-            if (!branchCode) return;
+            const normalizedCode = normalizeBranchLookupCode(branchCode);
+            if (!normalizedCode) return;
             loadDocumentHiddenBranches();
-            if (!documentHiddenBranches.includes(branchCode)) {
-                documentHiddenBranches.push(branchCode);
+            if (!isDocumentBranchHidden(normalizedCode)) {
+                documentHiddenBranches.push(normalizedCode);
                 saveDocumentHiddenBranches();
             }
-            markDocumentOverridesDirty(branchCode);
+            markDocumentOverridesDirty(normalizedCode);
             renderShippingDocument();
             updateManageDocBranchesModalContent();
             pushDocumentSummaryToServer(false, true, null, 'hide_branch');
-            showToast(`ซ่อนสาขา ${branchCode} ออกจากเอกสารแล้ว`);
+            showToast(`ซ่อนสาขา ${normalizedCode} ออกจากเอกสารแล้ว`);
         }
 
         function restoreBranchInDocument(branchCode) {
-            if (!branchCode) return;
+            const normalizedCode = normalizeBranchLookupCode(branchCode);
+            if (!normalizedCode) return;
             loadDocumentHiddenBranches();
-            documentHiddenBranches = documentHiddenBranches.filter(c => c !== branchCode);
+            documentHiddenBranches = documentHiddenBranches.filter(c => normalizeBranchLookupCode(c) !== normalizedCode);
             saveDocumentHiddenBranches();
-            markDocumentOverridesDirty(branchCode);
+            markDocumentOverridesDirty(normalizedCode);
             renderShippingDocument();
             updateManageDocBranchesModalContent();
             pushDocumentSummaryToServer(false, true, null, 'restore_branch');
-            showToast(`นำสาขา ${branchCode} กลับมารวมในเอกสารแล้ว`);
+            showToast(`นำสาขา ${normalizedCode} กลับมารวมในเอกสารแล้ว`);
         }
 
         function restoreAllHiddenBranchesInDocument() {
@@ -3552,7 +3561,7 @@
 
             listEl.innerHTML = allBranches.map(branch => {
                 const bCode = branch.code;
-                const isHidden = documentHiddenBranches.includes(bCode);
+                const isHidden = isDocumentBranchHidden(bCode);
                 const summary = getBranchSummaryData(bCode);
                 const cleanBranchName = getBranchNameOrFallback(branch.name, bCode).replace(/\s*\([^)]+\)\s*/g, '').trim();
                 const province = getProvinceForBranch(bCode, branch.name);
@@ -3564,10 +3573,10 @@
                     : '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-black border border-emerald-300">🟢 รวมในเอกสาร (นำไปส่ง)</span>';
 
                 const actionButton = isHidden
-                    ? `<button onclick="restoreBranchInDocument('${escapeDocumentText(bCode)}')" class="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs px-3.5 py-2 rounded-xl shadow transition active:scale-95 flex items-center gap-1.5 shrink-0">
+                    ? `<button type="button" onclick="restoreBranchInDocument('${escapeDocumentText(bCode)}')" class="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs px-3.5 py-2 rounded-xl shadow transition active:scale-95 flex items-center gap-1.5 shrink-0">
                         <span>↩️</span><span>ดึงกลับมาแสดง</span>
                        </button>`
-                    : `<button onclick="hideBranchInDocument('${escapeDocumentText(bCode)}')" class="bg-rose-50 hover:bg-rose-100 text-rose-700 hover:text-rose-900 border border-rose-300 font-black text-xs px-3.5 py-2 rounded-xl transition active:scale-95 flex items-center gap-1.5 shrink-0">
+                    : `<button type="button" onclick="hideBranchInDocument('${escapeDocumentText(bCode)}')" class="bg-rose-50 hover:bg-rose-100 text-rose-700 hover:text-rose-900 border border-rose-300 font-black text-xs px-3.5 py-2 rounded-xl transition active:scale-95 flex items-center gap-1.5 shrink-0">
                         <span>❌</span><span>ซ่อนออกจากเอกสาร</span>
                        </button>`;
 
@@ -3622,7 +3631,7 @@
                 .filter(summary => summary && summary.wave)
                 .map(summary => ({
                     ...summary,
-                    is_hidden: Boolean(documentHiddenBranches.includes(summary.branch)),
+                    is_hidden: isDocumentBranchHidden(summary.branch),
                     is_closed: Boolean(getBranchCompletionRecord(summary.branch))
                 }));
         }
@@ -3660,7 +3669,7 @@
             if (!sourceSummaries.length) return { status: 'skipped' };
             const enrichedSummaries = sourceSummaries.map(s => ({
                 ...s,
-                is_hidden: Boolean(documentHiddenBranches.includes(s.branch))
+                is_hidden: isDocumentBranchHidden(s.branch)
             }));
             const payload = {
                 summaries: enrichedSummaries,
@@ -4306,13 +4315,13 @@
         function getDocumentBranches() {
             loadDocumentHiddenBranches();
             const allBranches = getAllDocumentBranchesRaw();
-            return allBranches.filter(item => !documentHiddenBranches.includes(item.code));
+            return allBranches.filter(item => !isDocumentBranchHidden(item.code));
         }
 
         function getDocumentHiddenBranches() {
             loadDocumentHiddenBranches();
             const allBranches = getAllDocumentBranchesRaw();
-            return allBranches.filter(item => documentHiddenBranches.includes(item.code));
+            return allBranches.filter(item => isDocumentBranchHidden(item.code));
         }
 
         function getStatusBadge(item) {
@@ -4596,7 +4605,7 @@
             const isSplit = bookingBranchMoveMode === 'split';
             loadDocumentHiddenBranches();
             const alreadyInTarget = bookingBranchMovePreview && String(bookingBranchMovePreview.current_booking || '').toUpperCase() === String(currentBookingNo || '').toUpperCase();
-            const isHiddenHere = bookingBranchMovePreview && documentHiddenBranches.some(code => normalizeBranchLookupCode(code) === normalizeBranchLookupCode(bookingBranchMovePreview.branch_code));
+            const isHiddenHere = bookingBranchMovePreview && isDocumentBranchHidden(bookingBranchMovePreview.branch_code);
             const isInCurrentDocument = bookingBranchMovePreview && allLpnsInWave.some(item => normalizeBranchLookupCode(item.branch) === normalizeBranchLookupCode(bookingBranchMovePreview.branch_code));
             document.getElementById('moveModeAllBtn').className = `border-2 ${isSplit ? 'border-slate-200 bg-white text-slate-700' : 'border-blue-600 bg-blue-50 text-blue-800'} rounded-xl p-3 font-black text-sm`;
             document.getElementById('moveModeSplitBtn').className = `border-2 ${isSplit ? 'border-purple-600 bg-purple-50 text-purple-800' : 'border-slate-200 bg-white text-slate-700'} rounded-xl p-3 font-black text-sm`;
@@ -4678,7 +4687,7 @@
             bookingBranchMovePreview = { ...item, wave_no: loadedWave };
             loadDocumentHiddenBranches();
             const alreadyInTarget = String(item.current_booking || '').toUpperCase() === String(currentBookingNo || '').toUpperCase();
-            const isHiddenHere = documentHiddenBranches.some(code => normalizeBranchLookupCode(code) === normalizeBranchLookupCode(item.branch_code));
+            const isHiddenHere = isDocumentBranchHidden(item.branch_code);
             const isInCurrentDocument = allLpnsInWave.some(current => normalizeBranchLookupCode(current.branch) === normalizeBranchLookupCode(item.branch_code));
             document.querySelectorAll('.move-branch-choice').forEach((button, buttonIndex) => button.classList.toggle('border-blue-600', buttonIndex === index));
             const closed = item.is_closed ? '✅ ปิดจบแล้ว' : '🟡 ยังไม่ Stamp ปิดสาขา';
@@ -4703,7 +4712,7 @@
             if (!bookingBranchMovePreview) return showAlert('ข้อมูลไม่ครบ', 'กรุณาเลือกสาขาก่อน');
             loadDocumentHiddenBranches();
             const alreadyInTarget = String(bookingBranchMovePreview.current_booking || '').toUpperCase() === String(currentBookingNo || '').toUpperCase();
-            const isHiddenHere = documentHiddenBranches.some(code => normalizeBranchLookupCode(code) === normalizeBranchLookupCode(bookingBranchMovePreview.branch_code));
+            const isHiddenHere = bookingBranchMovePreview && isDocumentBranchHidden(bookingBranchMovePreview.branch_code);
             const isInCurrentDocument = allLpnsInWave.some(item => normalizeBranchLookupCode(item.branch) === normalizeBranchLookupCode(bookingBranchMovePreview.branch_code));
             if (alreadyInTarget) {
                 showLoading((isHiddenHere || !isInCurrentDocument) ? 'กำลังนำสาขากลับมาแสดง...' : 'กำลังยืนยันและซิงก์ข้อมูลสาขา...');
@@ -5155,7 +5164,7 @@
 
                         <!-- ❌ จัดการ ซ่อนสาขา -->
                         <td class="no-print p-2 border-r border-slate-200 text-center">
-                            <button onclick="hideBranchInDocument('${escapeDocumentText(bCode)}')" title="ซ่อนสาขานี้ออกจากใบคุมส่งสินค้านี้"
+                            <button type="button" onclick="hideBranchInDocument('${escapeDocumentText(bCode)}')" title="ซ่อนสาขานี้ออกจากใบคุมส่งสินค้านี้"
                                 class="bg-rose-50 hover:bg-rose-100 text-rose-700 hover:text-rose-900 border border-rose-200 text-[11px] font-black px-2 py-1 rounded transition active:scale-95 flex items-center justify-center gap-1 mx-auto shadow-sm">
                                 ❌ ซ่อน
                             </button>
@@ -5642,9 +5651,9 @@
             }).join('');
         }
 
-        function printCurrentDocument() {
-            if (activeDocumentType === 'shortage') printShortageExcessDocument();
-            else printShippingDocument();
+        async function printCurrentDocument() {
+            if (activeDocumentType === 'shortage') await printShortageExcessDocument();
+            else await printShippingDocument();
         }
 
         async function printShortageExcessDocument() {
@@ -5661,7 +5670,7 @@
             setTimeout(() => { document.title = originalTitle; }, 1000);
         }
 
-        function printShippingDocument() {
+        async function printShippingDocument() {
             const content = document.getElementById('shippingDocumentContent');
             if (!content) return;
 
@@ -5674,7 +5683,14 @@
 
             saveDocumentOverrides();
             renderShippingDocument();
-            pushDocumentSummaryToServer(true).catch(() => {});
+            // Finish persisting the current hidden/visible state before opening
+            // print preview. This prevents a fast click on Print from racing
+            // the save and bringing an old branch list back on the next load.
+            try {
+                await pushDocumentSummaryToServer(true, true, null, 'print_document');
+            } catch (error) {
+                console.warn('⚠️ Document state save before print failed:', error);
+            }
 
             const missingPalletBranches = getBranchesMissingPalletCount();
             if (missingPalletBranches.length > 0) {
@@ -6169,15 +6185,18 @@
                             black: (ov.black !== undefined && ov.black !== null) ? ov.black : undefined,
                             pallet: (ov.pallet !== undefined && ov.pallet !== null) ? ov.pallet : undefined
                         };
-                        if (ov.is_hidden) serverHidden.push(bCode);
+                        if (ov.is_hidden) serverHidden.push(normalizeBranchLookupCode(bCode));
                     }
                 }
                 documentOverrides = mergedOverrides;
                 saveDocumentOverrides();
                 if (hasUnsavedLocalOverride) {
-                    documentHiddenBranches = Array.from(new Set([...documentHiddenBranches, ...serverHidden]));
+                    documentHiddenBranches = Array.from(new Set([
+                        ...documentHiddenBranches.map(normalizeBranchLookupCode),
+                        ...serverHidden
+                    ].filter(Boolean)));
                 } else {
-                    documentHiddenBranches = serverHidden;
+                    documentHiddenBranches = Array.from(new Set(serverHidden.filter(Boolean)));
                 }
                 saveDocumentHiddenBranches();
             }
