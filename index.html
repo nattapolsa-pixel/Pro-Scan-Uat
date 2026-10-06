@@ -18,6 +18,55 @@
     <!-- ปลุก Render Free ทันทีที่ HTML ถูก parse โดยไม่รอ JS ทั้งไฟล์หรือรอผู้ใช้ล็อกอิน
          ระหว่างที่คนพิมพ์รหัสพนักงาน เครื่องก็ตื่นไปแล้ว -->
     <script>
+        // Keep the version available even if a later, large script has a syntax error.
+        window.__PRO_SCANNER_APP_VERSION = '1.9.8-free';
+        window.__proScannerSyntaxErrorsReported = new WeakSet();
+        (function installEarlySyntaxErrorCapture() {
+            const queueKey = 'proScannerDebugQueue:v1';
+            const endpoint = 'https://backed-api-scan-uat.onrender.com/api/client-error';
+            function sendQueuedSyntaxError() {
+                let queue = [];
+                try { queue = JSON.parse(localStorage.getItem(queueKey) || '[]'); } catch (e) { }
+                if (!Array.isArray(queue) || !queue.length || !navigator.onLine) return;
+                const item = queue[queue.length - 1];
+                fetch(endpoint, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(item), keepalive: true
+                }).then(response => {
+                    if (!response.ok) return;
+                    try {
+                        const remaining = JSON.parse(localStorage.getItem(queueKey) || '[]');
+                        localStorage.setItem(queueKey, JSON.stringify(remaining.filter(entry => entry.event_id !== item.event_id)));
+                    } catch (e) { }
+                }).catch(() => { });
+            }
+            window.addEventListener('error', event => {
+                if (!event || !((event.error && event.error.name === 'SyntaxError') || /SyntaxError/i.test(event.message || ''))) return;
+                window.__proScannerSyntaxErrorsReported.add(event);
+                const message = String(event.message || 'Syntax error').replace(/\b\d{5,}\b/g, '[reference]').slice(0, 600);
+                const source = String(event.filename || '').split(/[?#]/, 1)[0];
+                let sourcePath = '';
+                try { sourcePath = source ? new URL(source, location.href).pathname : ''; } catch (e) { }
+                const item = {
+                    event_id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+                    event_type: 'JS_ERROR', app_version: window.__PRO_SCANNER_APP_VERSION,
+                    page_path: location.pathname, source_file: sourcePath,
+                    line: Number(event.lineno) || 0, column: Number(event.colno) || 0,
+                    error_name: 'SyntaxError', message, stack: '',
+                    user_agent: String(navigator.userAgent || '').slice(0, 240),
+                    client_time: new Date().toISOString()
+                };
+                try {
+                    const queue = JSON.parse(localStorage.getItem(queueKey) || '[]');
+                    const safeQueue = Array.isArray(queue) ? queue : [];
+                    safeQueue.push(item);
+                    localStorage.setItem(queueKey, JSON.stringify(safeQueue.slice(-40)));
+                } catch (e) { }
+                sendQueuedSyntaxError();
+            }, true);
+            window.addEventListener('online', sendQueuedSyntaxError);
+        })();
+
         // ping นี้ไม่มี AbortController ได้ (ยังไม่มี JS ส่วนอื่นโหลด) จึงต้องคุมด้วย
         // Promise.race แทน มิฉะนั้นถ้า socket ค้าง (Wi-Fi หน้างานสลับ AP / captive portal
         // ที่ไม่ส่ง RST) ensureBackendReady() ที่ await ค่านี้จะค้างจนถึง timeout ของเบราว์เซอร์
@@ -1809,7 +1858,7 @@
 
     <script>
         // ⚠️ ต้องตรงกับ APP_VERSION ใน render.yaml ของ backend
-        const APP_VERSION = '1.9.8-free';
+        const APP_VERSION = window.__PRO_SCANNER_APP_VERSION;
         const backendApiUrl = 'https://backed-api-scan-uat.onrender.com';
         // ⚠️ ต้องตรงกับ SCAN_FEATURE_ENABLED ใน render.yaml ของ backend
         // false = hold การสแกน (backend จะตอบ 423 ให้ทุก endpoint ของการสแกน)
@@ -1889,12 +1938,12 @@
                 detail: String(options.detail || '').slice(0, 240),
                 client_time: new Date().toISOString()
             };
-            fetch(backendApiUrl + '/api/usage-event', {
+            fetchWithTimeout(backendApiUrl + '/api/usage-event', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload),
                 keepalive: true
-            }).catch(() => { });
+            }, 8000).catch(() => { });
         }
 
         function openPerformanceDashboard() {
@@ -1995,16 +2044,15 @@
             if (!force) content.classList.add('hidden');
             if (dashboardLoadController) dashboardLoadController.abort();
             dashboardLoadController = new AbortController();
-            const timeout = setTimeout(() => dashboardLoadController.abort(), 45000);
             try {
                 const params = new URLSearchParams({ days: String(dashboardRangeDays), _ts: String(Date.now()) });
                 if (dashboardReferenceQuery) params.set('q', dashboardReferenceQuery);
                 if (dashboardEmployeeFilter) params.set('employee', dashboardEmployeeFilter);
                 if (dashboardDateFrom) params.set('date_from', dashboardDateFrom);
                 if (dashboardDateTo) params.set('date_to', dashboardDateTo);
-                const response = await fetch(`${backendApiUrl}/api/dashboard?${params.toString()}`, {
+                const response = await fetchWithTimeout(`${backendApiUrl}/api/dashboard?${params.toString()}`, {
                     cache: 'no-store', signal: dashboardLoadController.signal
-                });
+                }, 45000);
                 let data = {};
                 try { data = await response.json(); } catch (e) { }
                 if (!response.ok || !data.success) throw new Error(data.detail || `HTTP ${response.status}`);
@@ -2020,7 +2068,6 @@
                 error.classList.remove('hidden');
                 if (!content.dataset.loaded) content.classList.add('hidden');
             } finally {
-                clearTimeout(timeout);
                 if (requestId === dashboardLoadSequence) loading.classList.add('hidden');
             }
         }
@@ -2749,11 +2796,192 @@
         }
 
         // ✅ fetchWithTimeout: fetch พร้อม AbortController เพื่อไม่ให้ request ค้างนานโดยไม่จำกัด
+        const debugQueueStorageKey = 'proScannerDebugQueue:v1';
+        const debugEventDedupe = new Map();
+        let debugFlushPromise = null;
+        let debugFlushRetryTimer = null;
+        let debugFlushRetryDelayMs = 5000;
+        let debugEventsThisPage = 0;
+
+        function diagnosticPath(value) {
+            const rawValue = String(value || '').trim();
+            if (!rawValue) return '';
+            try { return new URL(rawValue, location.href).pathname || '/'; }
+            catch (e) { return String(value || '').split(/[?#]/, 1)[0].slice(0, 240); }
+        }
+
+        function diagnosticText(value, maxLength = 600) {
+            return String(value || '')
+                .replace(/\bBearer\s+[^\s,;]+/gi, 'Bearer [redacted]')
+                .replace(/([?&](?:key|token|password|secret|auth)=)[^&\s]+/gi, '$1[redacted]')
+                .replace(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/g, '[email]')
+                .replace(/\b(?:[A-Z]{1,8}[-_]?\d{5,}|[A-Z]{1,8}[-_]\d{4,}|\d{5,})\b/gi, '[reference]')
+                .slice(0, maxLength);
+        }
+
+        function readDebugQueue() {
+            try {
+                const value = JSON.parse(localStorage.getItem(debugQueueStorageKey) || '[]');
+                return Array.isArray(value) ? value.slice(-40) : [];
+            } catch (e) { return []; }
+        }
+
+        function writeDebugQueue(queue) {
+            try { localStorage.setItem(debugQueueStorageKey, JSON.stringify(queue.slice(-40))); }
+            catch (e) { /* Diagnostics must never interrupt normal page use. */ }
+        }
+
+        function queueClientDebugEvent(event) {
+            if (debugEventsThisPage >= 20) return;
+            const item = {
+                event_id: (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+                event_type: event.event_type || 'JS_ERROR',
+                app_version: APP_VERSION,
+                page_path: diagnosticPath(location.pathname),
+                source_file: diagnosticPath(event.source_file || ''),
+                line: Number(event.line) || 0,
+                column: Number(event.column) || 0,
+                http_status: Number(event.http_status) || 0,
+                http_method: diagnosticText(event.http_method || '', 12),
+                endpoint: diagnosticPath(event.endpoint || ''),
+                request_id: diagnosticText(event.request_id || '', 80),
+                api_version: diagnosticText(event.api_version || '', 40),
+                error_name: diagnosticText(event.error_name || '', 100),
+                message: diagnosticText(event.message || 'Unknown client error', 600),
+                stack: diagnosticText(event.stack || '', 4000),
+                user_agent: diagnosticText(navigator.userAgent || '', 240),
+                client_time: new Date().toISOString()
+            };
+            const signature = [item.event_type, item.endpoint, item.http_status, item.error_name, item.message, item.stack].join('|');
+            const now = Date.now();
+            if (now - (debugEventDedupe.get(signature) || 0) < 60000) return;
+            debugEventDedupe.set(signature, now);
+            if (debugEventDedupe.size > 100) debugEventDedupe.delete(debugEventDedupe.keys().next().value);
+            debugEventsThisPage += 1;
+
+            const queue = readDebugQueue();
+            queue.push(item);
+            writeDebugQueue(queue.slice(-40));
+            if (navigator.onLine) window.setTimeout(flushClientDebugQueue, 250);
+        }
+
+        async function flushClientDebugQueue() {
+            if (debugFlushPromise || !navigator.onLine) return debugFlushPromise;
+            debugFlushPromise = (async () => {
+                let queue = readDebugQueue();
+                for (let sent = 0; sent < 3 && queue.length > 0; sent += 1) {
+                    const item = queue[0];
+                    try {
+                        const response = await fetch(backendApiUrl + '/api/client-error', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(item),
+                            keepalive: true
+                        });
+                        if (!response.ok) {
+                            debugFlushRetryDelayMs = Math.min(300000, debugFlushRetryDelayMs * 2);
+                            break;
+                        }
+                        debugFlushRetryDelayMs = 5000;
+                        queue = queue.filter(entry => entry.event_id !== item.event_id);
+                        writeDebugQueue(queue);
+                    } catch (e) {
+                        debugFlushRetryDelayMs = Math.min(300000, debugFlushRetryDelayMs * 2);
+                        break;
+                    }
+                }
+            })().finally(() => {
+                debugFlushPromise = null;
+                clearTimeout(debugFlushRetryTimer);
+                if (navigator.onLine && readDebugQueue().length > 0) {
+                    debugFlushRetryTimer = window.setTimeout(flushClientDebugQueue, debugFlushRetryDelayMs);
+                }
+            });
+            return debugFlushPromise;
+        }
+
+        window.addEventListener('error', event => {
+            if (window.__proScannerSyntaxErrorsReported && window.__proScannerSyntaxErrorsReported.has(event)) return;
+            if (event.target && event.target !== window) {
+                const target = event.target;
+                if (!['SCRIPT', 'LINK'].includes(String(target.tagName || '').toUpperCase())) return;
+                queueClientDebugEvent({
+                    event_type: 'RESOURCE_ERROR',
+                    source_file: target.src || target.href || '',
+                    error_name: String(target.tagName || 'RESOURCE'),
+                    message: 'A script or stylesheet failed to load'
+                });
+                return;
+            }
+            queueClientDebugEvent({
+                event_type: 'JS_ERROR', error_name: event.error && event.error.name,
+                message: event.message, stack: event.error && event.error.stack,
+                source_file: event.filename, line: event.lineno, column: event.colno
+            });
+        }, true);
+
+        window.addEventListener('unhandledrejection', event => {
+            const reason = event.reason;
+            queueClientDebugEvent({
+                event_type: 'UNHANDLED_REJECTION',
+                error_name: reason && reason.name,
+                message: reason && reason.message ? reason.message : reason,
+                stack: reason && reason.stack
+            });
+        });
+        window.addEventListener('online', flushClientDebugQueue);
+        window.setTimeout(flushClientDebugQueue, 1000);
+
         function fetchWithTimeout(url, options = {}, timeoutMs = 25000) {
             const controller = new AbortController();
             const id = setTimeout(() => controller.abort(), timeoutMs);
-            return fetch(url, { ...options, signal: controller.signal })
-                .finally(() => clearTimeout(id));
+            const externalSignal = options.signal;
+            const abortFromCaller = () => controller.abort();
+            if (externalSignal) {
+                if (externalSignal.aborted) controller.abort();
+                else externalSignal.addEventListener('abort', abortFromCaller, { once: true });
+            }
+            const endpoint = diagnosticPath(url);
+            const shouldReport = endpoint.startsWith('/api/')
+                && endpoint !== '/api/client-error' && endpoint !== '/api/health';
+            const requestId = (window.crypto && crypto.randomUUID)
+                ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+            let requestUrl = url;
+            if (shouldReport) {
+                try {
+                    const parsedUrl = new URL(url, location.href);
+                    parsedUrl.searchParams.set('_debug_request_id', requestId);
+                    requestUrl = parsedUrl.toString();
+                } catch (e) { }
+            }
+            return fetch(requestUrl, { ...options, signal: controller.signal })
+                .then(response => {
+                    if (shouldReport && (response.status >= 500 || response.status === 429 || response.status === 422)) {
+                        queueClientDebugEvent({
+                            event_type: 'API_ERROR', endpoint,
+                            http_method: options.method || 'GET', http_status: response.status,
+                            request_id: response.headers.get('X-Request-ID') || requestId,
+                            api_version: response.headers.get('X-API-Version'),
+                            error_name: 'HTTP_ERROR', message: `API returned HTTP ${response.status}`
+                        });
+                    }
+                    return response;
+                })
+                .catch(error => {
+                    if (shouldReport && error && error.name !== 'AbortError') {
+                        queueClientDebugEvent({
+                            event_type: 'NETWORK_ERROR', endpoint,
+                            http_method: options.method || 'GET',
+                            request_id: requestId,
+                            error_name: error.name, message: error.message || 'Network request failed'
+                        });
+                    }
+                    throw error;
+                })
+                .finally(() => {
+                    clearTimeout(id);
+                    if (externalSignal) externalSignal.removeEventListener('abort', abortFromCaller);
+                });
         }
 
         // 502/503/504 = worker ตายหรือกำลังรีสตาร์ท, 429 = Render edge กันไว้เพราะยิงถี่เกิน
@@ -6060,7 +6288,7 @@
         async function fetchPendingWavesFresh(forceRefresh = false) {
             if (pendingWavesFetchPromise) return pendingWavesFetchPromise;
             const url = backendApiUrl + `/api/pending-waves${forceRefresh ? '?force=true' : ''}`;
-            pendingWavesFetchPromise = fetch(url, { cache: 'no-store' })
+            pendingWavesFetchPromise = fetchWithTimeout(url, { cache: 'no-store' }, 45000)
                 .then(res => {
                     if (!res.ok) throw new Error('API Error');
                     return res.json();
