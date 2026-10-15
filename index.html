@@ -19,7 +19,7 @@
          ระหว่างที่คนพิมพ์รหัสพนักงาน เครื่องก็ตื่นไปแล้ว -->
     <script>
         // Keep the version available even if a later, large script has a syntax error.
-        window.__PRO_SCANNER_APP_VERSION = '1.9.8-free';
+        window.__PRO_SCANNER_APP_VERSION = '1.9.9-free';
         window.__proScannerSyntaxErrorsReported = new WeakSet();
         (function installEarlySyntaxErrorCapture() {
             const queueKey = 'proScannerDebugQueue:v1';
@@ -3869,7 +3869,7 @@
         }
 
         let pushSummaryTimer = null;
-        async function pushDocumentSummaryToServer(isImmediate = false, persistOverrides = false, branchCodes = null, reason = 'auto_snapshot') {
+        async function pushDocumentSummaryToServer(isImmediate = false, persistOverrides = false, branchCodes = null, reason = 'auto_snapshot', syncReport = false) {
             const currentSummaries = collectDocumentSummariesForSync(branchCodes);
             let sourceSummaries = currentSummaries.length ? currentSummaries : (latestDocumentSummaries || []);
             const sentDirtyBranches = persistOverrides ? new Set(dirtyDocumentOverrideBranches) : new Set();
@@ -3909,6 +3909,7 @@
                 summaries: enrichedSummaries,
                 emp_id: loggedInEmpId || '',
                 persist_overrides: Boolean(persistOverrides),
+                sync_report: Boolean(syncReport && activeDocumentType === 'shipping'),
                 reason
             };
             const sentRevision = documentOverridesRevision;
@@ -4817,7 +4818,7 @@
                     const modal = document.getElementById('shippingDocumentModal');
                     if (modal && !modal.classList.contains('hidden')) {
                         renderActiveDocument();
-                        pushDocumentSummaryToServer(true).catch(() => {});
+                        pushDocumentSummaryToServer(true, false, null, 'document_open', true).catch(() => {});
                     }
                 } catch (e) {
                     console.warn('Background document verification:', e);
@@ -4831,7 +4832,6 @@
                 const modal = document.getElementById('shippingDocumentModal');
                 if (modal && !modal.classList.contains('hidden')) {
                     renderActiveDocument();
-                    pushDocumentSummaryToServer(true).catch(() => {});
                 }
             }).catch(() => { });
 
