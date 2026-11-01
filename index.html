@@ -19,7 +19,7 @@
          ระหว่างที่คนพิมพ์รหัสพนักงาน เครื่องก็ตื่นไปแล้ว -->
     <script>
         // Keep the version available even if a later, large script has a syntax error.
-        window.__PRO_SCANNER_APP_VERSION = '1.9.9-free';
+        window.__PRO_SCANNER_APP_VERSION = '1.9.10-free';
         window.__proScannerSyntaxErrorsReported = new WeakSet();
         (function installEarlySyntaxErrorCapture() {
             const queueKey = 'proScannerDebugQueue:v1';
@@ -6594,6 +6594,20 @@
 
             const requestId = ++latestWaveLoadRequestId;
             userSearchInFlight = true;
+            let loadingProgressTimer = null;
+            let loadingProgressMessage = '';
+            const showLookupLoading = (message) => {
+                loadingProgressMessage = message;
+                if (loadingProgressTimer) clearInterval(loadingProgressTimer);
+                const update = () => {
+                    if (requestId !== latestWaveLoadRequestId) return;
+                    const elapsedSeconds = Math.floor((performance.now() - lookupStartedAt) / 1000);
+                    const elapsedLabel = `${Math.floor(elapsedSeconds / 60)}:${String(elapsedSeconds % 60).padStart(2, '0')}`;
+                    showLoading(`${loadingProgressMessage} · รอ ${elapsedLabel}`);
+                };
+                update();
+                loadingProgressTimer = setInterval(update, 1000);
+            };
             const isWaveOnly = /^\d+$/.test(inputVal);
             const cacheKey = getWaveDataCacheKey(inputVal, isWaveOnly);
             currentWaveDataCacheKey = cacheKey;
@@ -6608,7 +6622,7 @@
                 applyWaveDataToScreen(cachedData, isWaveOnly);
                 showToast('โหลดข้อมูลจากเครื่องแล้ว กำลังอัปเดตล่าสุด...');
             } else {
-                showLoading(isWaveOnly ? 'กำลังค้นหาและโหลดข้อมูล Wave...' : 'กำลังค้นหาและโหลดข้อมูล Booking...');
+                showLookupLoading(isWaveOnly ? 'กำลังเริ่มค้นหา Wave...' : 'กำลังเริ่มค้นหา Booking...');
             }
 
             try {
@@ -6624,6 +6638,7 @@
                 // เดิมตั้ง 180 วิ x 4 รอบ + completeness 3 รอบ = ผู้ใช้ยืนรอได้ถึง ~13 นาที
                 // ก่อนจะเห็นข้อความ ซึ่งคือสิ่งที่หน้างานเจอ
                 if (!usedCache) {
+                    showLookupLoading(isWaveOnly ? 'กำลังปลุก API เพื่อค้นหา Wave' : 'กำลังปลุก API เพื่อค้นหา Booking');
                     try { await ensureBackendReady(true); }
                     catch (e) {
                         hideLoading();
@@ -6633,7 +6648,7 @@
                         return;
                     }
                     if (requestId !== latestWaveLoadRequestId) return;
-                    showLoading(isWaveOnly ? 'กำลังค้นหาและโหลดข้อมูล Wave...' : 'กำลังค้นหาและโหลดข้อมูล Booking...');
+                    showLookupLoading(isWaveOnly ? 'API ตอบแล้ว กำลังโหลด Wave' : 'API ตอบแล้ว กำลังรวมข้อมูล Booking');
                 }
                 let res = await fetchJobDataWithRetry(
                     url,
@@ -6668,7 +6683,7 @@
                 // Member Data ยังทยอยเข้า (backend เป็นฝ่ายบอกเองว่ายังไม่ครบ)
                 // ทั้งสองกรณีรอสั้น ๆ แล้วถามซ้ำได้ แต่ห้ามสั่ง force
                 for (let attempt = 1; attempt <= 2 && !res.ok && (res.status === 404 || res.status === 409); attempt++) {
-                    showLoading(res.status === 409
+                    showLookupLoading(res.status === 409
                         ? `ข้อมูล Booking กำลังเข้าระบบ รอข้อมูลครบ (${attempt}/2)...`
                         : 'กำลังอ่านข้อมูลล่าสุดจาก Sheet...');
                     await new Promise(resolve => setTimeout(resolve, attempt * 1500));
@@ -6775,8 +6790,11 @@
                     showToast('เชื่อมต่อช้า ใช้ข้อมูลที่โหลดไว้ก่อนหน้าอยู่', true);
                 }
             } finally {
-                if (requestId === latestWaveLoadRequestId) userSearchInFlight = false;
-                if (!usedCache) hideLoading();
+                if (loadingProgressTimer) clearInterval(loadingProgressTimer);
+                if (requestId === latestWaveLoadRequestId) {
+                    userSearchInFlight = false;
+                    if (!usedCache) hideLoading();
+                }
             }
         }
 
