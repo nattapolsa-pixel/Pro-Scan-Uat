@@ -19,7 +19,7 @@
          ระหว่างที่คนพิมพ์รหัสพนักงาน เครื่องก็ตื่นไปแล้ว -->
     <script>
         // Keep the version available even if a later, large script has a syntax error.
-        window.__PRO_SCANNER_APP_VERSION = '1.9.18-free';
+        window.__PRO_SCANNER_APP_VERSION = '1.9.19-free';
         window.__proScannerSyntaxErrorsReported = new WeakSet();
         (function installEarlySyntaxErrorCapture() {
             const queueKey = 'proScannerDebugQueue:v1';
@@ -4720,8 +4720,12 @@
                 ? backendApiUrl + `/api/check-booking?booking_no=${encodeURIComponent(currentBookingNo)}${refreshParam}&_ts=${Date.now()}`
                 : backendApiUrl + `/api/check-wave?wave_no=${encodeURIComponent(activeWavesList[0] || currentWave)}${refreshParam}&_ts=${Date.now()}`;
             const res = await fetchWithTimeout(url, { cache: 'no-store' }, 60000);
-            if (!res.ok) throw new Error(`โหลดข้อมูลส่วนกลางไม่สำเร็จ (HTTP ${res.status})`);
-            return { data: await res.json(), isWaveOnly: !isBookingMode };
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                const detail = typeof data.detail === 'string' ? data.detail : '';
+                throw new Error(detail || `โหลดข้อมูลส่วนกลางไม่สำเร็จ (HTTP ${res.status})`);
+            }
+            return { data, isWaveOnly: !isBookingMode };
         }
 
         async function verifyDocumentAgainstServer(bypassOtherDevices = false) {
@@ -5345,6 +5349,7 @@
             const boxTotal = quantities.m + quantities.red + quantities.blue + quantities.green + quantities.black;
             if (boxTotal <= 0) return showAlert('ยังไม่ได้ใส่ยอด', 'กรุณาใส่ยอดกล่องที่รถคันนี้รับจริงอย่างน้อย 1 กล่อง');
             showLoading('กำลังเพิ่มแถบและบันทึกยอดจริง...');
+            let additionCommitted = false;
             try {
                 const response = await fetchWithTimeout(backendApiUrl + '/api/booking-branch-actual', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -5355,9 +5360,12 @@
                 }, 120000);
                 const result = await response.json().catch(() => ({}));
                 if (!response.ok) throw new Error(typeof result.detail === 'string' ? result.detail : `HTTP ${response.status}`);
+                additionCommitted = true;
                 bookingBranchAddFormOpen = false;
                 bookingBranchAddLookup = { wave: '', code: '', options: [], selectedIndex: 0, error: '' };
-                const latest = await fetchFreshCurrentJobData(true);
+                // The API already updated its actual-allocation and override caches.
+                // Avoid a full Member Data refresh after every single branch add.
+                const latest = await fetchFreshCurrentJobData(false);
                 applyWaveDataToScreen(latest.data, latest.isWaveOnly);
                 saveCurrentWaveDataCache();
                 renderShippingDocument();
@@ -5372,7 +5380,12 @@
                     showToast(`เพิ่ม ${selected.branch_code} แล้ว · ยอดจริง ${boxTotal} กล่อง · รายงานกำลังซิงก์`);
                 }
             } catch (error) {
-                showAlert('เพิ่มสาขาไม่สำเร็จ', error && error.message ? error.message : String(error));
+                const message = error && error.message ? error.message : String(error);
+                if (additionCommitted) {
+                    showAlert('เพิ่มสาขาแล้ว แต่โหลดเอกสารยังไม่ครบ', `ระบบบันทึกสาขา ${selected.branch_code} แล้ว แต่ยังโหลดเอกสารล่าสุดไม่ได้\n${message}\n\nข้อมูลที่บันทึกไว้ไม่หาย กรุณาเปิดเอกสารใหม่หรือรีเฟรชหลังข้อมูลครบ`, 'border-amber-500');
+                } else {
+                    showAlert('เพิ่มสาขาไม่สำเร็จ', message);
+                }
             } finally { hideLoading(); }
         }
 
