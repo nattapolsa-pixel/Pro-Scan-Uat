@@ -19,7 +19,7 @@
          ระหว่างที่คนพิมพ์รหัสพนักงาน เครื่องก็ตื่นไปแล้ว -->
     <script>
         // Keep the version available even if a later, large script has a syntax error.
-        window.__PRO_SCANNER_APP_VERSION = '1.9.13-free';
+        window.__PRO_SCANNER_APP_VERSION = '1.9.14-free';
         window.__proScannerSyntaxErrorsReported = new WeakSet();
         (function installEarlySyntaxErrorCapture() {
             const queueKey = 'proScannerDebugQueue:v1';
@@ -5232,7 +5232,7 @@
         ];
 
         function renderBookingBranchAddPanel() {
-            if (!currentBookingNo || currentLookupIsWaveOnly) return '';
+            if (!currentBookingNo) return '';
             const state = bookingBranchAddLookup;
             const options = state.options || [];
             const selected = options[state.selectedIndex] || null;
@@ -5280,8 +5280,8 @@
         }
 
         function toggleBookingBranchAddRow(open) {
-            if (open && currentLookupIsWaveOnly) {
-                return showAlert('เพิ่มสาขาไม่ได้จากหน้า Wave', 'กรุณาเปิดเอกสารด้วย Booking ก่อนเพิ่มแถบสาขา');
+            if (open && !currentBookingNo) {
+                return showAlert('ยังไม่มี Booking ปลายทาง', 'กรุณาเปิดเอกสารด้วย Booking ที่ต้องการก่อนเพิ่มแถบสาขา');
             }
             bookingBranchAddFormOpen = Boolean(open);
             if (!open) bookingBranchAddLookup = { code: '', options: [], selectedIndex: 0, error: '' };
