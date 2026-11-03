@@ -19,7 +19,7 @@
          ระหว่างที่คนพิมพ์รหัสพนักงาน เครื่องก็ตื่นไปแล้ว -->
     <script>
         // Keep the version available even if a later, large script has a syntax error.
-        window.__PRO_SCANNER_APP_VERSION = '1.9.14-free';
+        window.__PRO_SCANNER_APP_VERSION = '1.9.15-free';
         window.__proScannerSyntaxErrorsReported = new WeakSet();
         (function installEarlySyntaxErrorCapture() {
             const queueKey = 'proScannerDebugQueue:v1';
@@ -5237,34 +5237,32 @@
             const options = state.options || [];
             const selected = options[state.selectedIndex] || null;
             const candidateSelect = options.length > 1 ? `
-                <label class="block text-xs font-black text-slate-600 mt-3">พบสาขารหัสนี้ในหลาย Wave — เลือก Wave ให้ถูกต้อง
+                <label class="block text-xs font-black text-slate-600 mt-3">พบรหัสนี้ในหลาย Wave ของเอกสาร — เลือก Wave ที่ต้องการ
                     <select onchange="selectBookingBranchAddOption(this.value)" class="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm font-black">
-                        ${options.map((item, index) => `<option value="${index}" ${index === state.selectedIndex ? 'selected' : ''}>Wave ${escapeDocumentText(item.wave_no)} · ต้นทาง ${escapeDocumentText(item.source_booking)}${item.can_add ? '' : ' · เพิ่มไม่ได้'}</option>`).join('')}
+                        ${options.map((item, index) => `<option value="${index}" ${index === state.selectedIndex ? 'selected' : ''}>Wave ${escapeDocumentText(item.wave_no)}${item.can_add ? '' : ' · ตรวจสอบข้อมูลก่อน'}</option>`).join('')}
                     </select>
                 </label>` : '';
             const quantities = selected ? `
                 <div class="mt-3 rounded-xl border border-indigo-200 bg-white p-3">
                     <div class="flex flex-wrap items-center justify-between gap-2 text-sm">
                         <div><b class="text-indigo-700">${escapeDocumentText(selected.branch_code)}</b> — ${escapeDocumentText(selected.branch_name)} <span class="text-xs text-slate-500">Wave ${escapeDocumentText(selected.wave_no)}</span></div>
-                        <span class="rounded-full bg-slate-100 px-2 py-1 text-xs font-bold">Booking ต้นทาง ${escapeDocumentText(selected.source_booking)}</span>
                     </div>
-                    <div class="mt-1 text-xs font-bold text-slate-500">Member Data จะรวมยอดจริงของแต่ละ Booking · ยอดคงเหลือแยกตามประเภท</div>
                     <div class="mt-3 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
                         ${bookingActualQuantityFields.map(([field, label, color]) => `
-                            <label class="text-[11px] font-black ${color}">${label}<input id="bookingBranchAdd_${field}" type="number" min="0" max="${Number(selected.available[field]) || 0}" step="1" value="0" class="mt-1 w-full rounded-lg border border-slate-300 p-2 text-center text-sm font-black text-slate-900" ${Number(selected.available[field]) <= 0 ? 'disabled' : ''}>
-                                <small class="mt-1 block text-slate-400">เหลือ ${Number(selected.available[field]) || 0}</small>
+                            <label class="text-[11px] font-black ${color}">${label}<input id="bookingBranchAdd_${field}" type="number" min="0" step="1" value="0" oninput="updateBookingBranchAddOverageWarning()" class="mt-1 w-full rounded-lg border border-slate-300 p-2 text-center text-sm font-black text-slate-900">
                             </label>`).join('')}
                     </div>
-                    ${selected.can_add ? '' : `<div class="mt-3 rounded-lg bg-amber-50 p-2.5 text-xs font-bold text-amber-800">${selected.target_already_has_branch ? 'สาขานี้อยู่ใน Booking นี้แล้ว ให้แก้ยอดในแถวเดิม' : selected.is_target_source ? 'สาขานี้เป็น Booking ต้นทางอยู่แล้ว ให้แก้ยอดในแถวเดิม' : 'ต้องบันทึกยอดจริงของ Booking ต้นทางก่อน หรือไม่มียอดคงเหลือที่จัดสรรได้'}</div>`}
+                    <div id="bookingBranchAddOverageWarning" class="hidden mt-3 whitespace-pre-line rounded-lg border border-amber-300 bg-amber-50 p-2.5 text-xs font-bold text-amber-800"></div>
+                    ${selected.can_add ? '' : `<div class="mt-3 rounded-lg bg-amber-50 p-2.5 text-xs font-bold text-amber-800">${selected.target_already_has_branch || selected.is_target_source ? 'สาขานี้มีอยู่ในเอกสารแล้ว ให้แก้ยอดที่แถวเดิม' : selected.source_record_ready ? 'เพิ่มสาขานี้ไม่ได้ เนื่องจากข้อมูลสาขาในเอกสารยังไม่พร้อม' : 'ข้อมูลยอดตรวจตั้งต้นของสาขานี้ยังไม่พร้อม'}</div>`}
                     <div class="mt-3 flex justify-end">
-                        <button type="button" onclick="saveBookingBranchAddRow()" ${selected.can_add ? '' : 'disabled'} class="rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-black text-white shadow disabled:cursor-not-allowed disabled:bg-slate-300">เพิ่มแถบนี้ใน Booking ${escapeDocumentText(currentBookingNo)}</button>
+                        <button type="button" onclick="saveBookingBranchAddRow()" ${selected.can_add ? '' : 'disabled'} class="rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-black text-white shadow disabled:cursor-not-allowed disabled:bg-slate-300">เพิ่มสาขาในเอกสารนี้</button>
                     </div>
                 </div>` : '';
             const resultError = state.error ? `<div class="mt-2 text-xs font-bold text-rose-700">${escapeDocumentText(state.error)}</div>` : '';
             return `
                 <div class="no-print rounded-xl border-2 border-indigo-200 bg-indigo-50/70 p-3 md:p-4">
                     <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                        <div><div class="font-black text-indigo-950">＋ เพิ่มแถบสาขาใน Booking นี้</div><div class="text-xs font-bold text-slate-500">กรอกรหัสสาขาและยอดที่รถคันนี้รับจริง</div></div>
+                        <div><div class="font-black text-indigo-950">＋ เพิ่มสาขาในเอกสารนี้</div><div class="text-xs font-bold text-slate-500">กรอกรหัสสาขาและยอดที่รับจริง ระบบจะผูกกับเอกสารนี้ให้อัตโนมัติ</div></div>
                         ${bookingBranchAddFormOpen ? '' : '<button type="button" onclick="toggleBookingBranchAddRow(true)" class="rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-black text-white">เพิ่มแถบสาขา</button>'}
                     </div>
                     ${bookingBranchAddFormOpen ? `
@@ -5281,7 +5279,7 @@
 
         function toggleBookingBranchAddRow(open) {
             if (open && !currentBookingNo) {
-                return showAlert('ยังไม่มี Booking ปลายทาง', 'กรุณาเปิดเอกสารด้วย Booking ที่ต้องการก่อนเพิ่มแถบสาขา');
+                return showAlert('ยังไม่มีเอกสารที่เปิดอยู่', 'กรุณาเปิดเอกสารขนส่งก่อนเพิ่มสาขา');
             }
             bookingBranchAddFormOpen = Boolean(open);
             if (!open) bookingBranchAddLookup = { code: '', options: [], selectedIndex: 0, error: '' };
@@ -5293,6 +5291,26 @@
             renderShippingDocument();
         }
 
+        function updateBookingBranchAddOverageWarning() {
+            const warning = document.getElementById('bookingBranchAddOverageWarning');
+            const selected = (bookingBranchAddLookup.options || [])[bookingBranchAddLookup.selectedIndex];
+            if (!warning || !selected) return;
+            const overages = bookingActualQuantityFields.flatMap(([field, label]) => {
+                const entered = Math.max(0, parseInt(document.getElementById(`bookingBranchAdd_${field}`)?.value || '0', 10) || 0);
+                const inspected = Number(selected.baseline?.[field]) || 0;
+                const allocatedBefore = Number(selected.allocated?.[field]);
+                const prior = Number.isFinite(allocatedBefore)
+                    ? allocatedBefore
+                    : Math.max(0, inspected - (Number(selected.available?.[field]) || 0));
+                const excess = Math.max(0, prior + entered - inspected);
+                return excess > 0 ? [`${label}: เกินยอดที่ตรวจไว้ ${excess}`] : [];
+            });
+            warning.textContent = overages.length
+                ? `ยอดนี้บันทึกได้ แต่ยอดรวมจะเกินยอดที่ตรวจไว้\n${overages.join('\n')}`
+                : '';
+            warning.classList.toggle('hidden', overages.length === 0);
+        }
+
         async function lookupBookingBranchAddRow() {
             const input = document.getElementById('bookingBranchAddCode');
             const code = normalizeBranchLookupCode(input ? input.value : bookingBranchAddLookup.code);
@@ -5300,7 +5318,7 @@
             bookingBranchAddLookup = { code, options: [], selectedIndex: 0, error: '' };
             showLoading('กำลังค้นหาสาขาใน Wave ปัจจุบัน...');
             try {
-                const url = backendApiUrl + `/api/booking-branch-lookup?branch_code=${encodeURIComponent(code)}&target_booking=${encodeURIComponent(currentBookingNo)}&_ts=${Date.now()}`;
+                const url = backendApiUrl + `/api/booking-branch-lookup?branch_code=${encodeURIComponent(code)}&target_booking=${encodeURIComponent(currentBookingNo)}&wave_no=${encodeURIComponent(currentWave)}&_ts=${Date.now()}`;
                 const response = await fetchWithTimeout(url, { cache: 'no-store' }, 60000);
                 const body = await response.json().catch(() => ({}));
                 if (!response.ok) throw new Error(typeof body.detail === 'string' ? body.detail : `HTTP ${response.status}`);
@@ -5316,17 +5334,12 @@
 
         async function saveBookingBranchAddRow() {
             const selected = (bookingBranchAddLookup.options || [])[bookingBranchAddLookup.selectedIndex];
-            if (!selected || !selected.can_add) return showAlert('เพิ่มแถบไม่ได้', 'กรุณาเลือกสาขาที่มียอดคงเหลือจัดสรรได้');
+            if (!selected || !selected.can_add) return showAlert('เพิ่มสาขาไม่ได้', 'กรุณาเลือกสาขาที่ข้อมูลพร้อม และยังไม่มีในเอกสารนี้');
             const quantities = Object.fromEntries(bookingActualQuantityFields.map(([field]) => [
                 field, Math.max(0, parseInt(document.getElementById(`bookingBranchAdd_${field}`)?.value || '0', 10) || 0)
             ]));
             const boxTotal = quantities.m + quantities.red + quantities.blue + quantities.green + quantities.black;
             if (boxTotal <= 0) return showAlert('ยังไม่ได้ใส่ยอด', 'กรุณาใส่ยอดกล่องที่รถคันนี้รับจริงอย่างน้อย 1 กล่อง');
-            for (const [field] of bookingActualQuantityFields) {
-                if (quantities[field] > Number(selected.available[field] || 0)) {
-                    return showAlert('ยอดเกินคงเหลือ', `${field} ระบุ ${quantities[field]} แต่ยอดที่เพิ่มได้คือ ${selected.available[field] || 0}`);
-                }
-            }
             showLoading('กำลังเพิ่มแถบและบันทึกยอดจริง...');
             try {
                 const response = await fetchWithTimeout(backendApiUrl + '/api/booking-branch-actual', {
@@ -5345,7 +5358,15 @@
                 saveCurrentWaveDataCache();
                 renderShippingDocument();
                 shippingDocumentVerifiedAt = Date.now();
-                showToast(`เพิ่ม ${selected.branch_code} แล้ว · ยอดจริง ${boxTotal} กล่อง · รายงานกำลังซิงก์`);
+                const warningLabels = Object.fromEntries(bookingActualQuantityFields.map(([field, label]) => [field, label]));
+                const warningDetails = Object.entries(result.warnings || {}).map(([field, detail]) =>
+                    `${warningLabels[field] || field}: กรอก ${detail.entered} · ตรวจไว้ ${detail.inspected} · รวมที่บันทึก ${detail.allocated_after} (เกิน ${detail.excess})`
+                );
+                if (warningDetails.length) {
+                    showAlert('บันทึกแล้ว แต่ยอดรวมเกินยอดตรวจ', `${selected.branch_code} เพิ่มเรียบร้อย · ยอดจริง ${boxTotal} กล่อง\n${warningDetails.join('\n')}\nรายงานกำลังซิงก์`, 'border-amber-500');
+                } else {
+                    showToast(`เพิ่ม ${selected.branch_code} แล้ว · ยอดจริง ${boxTotal} กล่อง · รายงานกำลังซิงก์`);
+                }
             } catch (error) {
                 showAlert('เพิ่มสาขาไม่สำเร็จ', error && error.message ? error.message : String(error));
             } finally { hideLoading(); }
