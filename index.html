@@ -19,7 +19,7 @@
          ระหว่างที่คนพิมพ์รหัสพนักงาน เครื่องก็ตื่นไปแล้ว -->
     <script>
         // Keep the version available even if a later, large script has a syntax error.
-        window.__PRO_SCANNER_APP_VERSION = '1.9.17-free';
+        window.__PRO_SCANNER_APP_VERSION = '1.9.18-free';
         window.__proScannerSyntaxErrorsReported = new WeakSet();
         (function installEarlySyntaxErrorCapture() {
             const queueKey = 'proScannerDebugQueue:v1';
@@ -3655,7 +3655,7 @@
         let syncedDocumentOverridesRevision = 0;
         const dirtyDocumentOverrideBranches = new Set();
         let bookingBranchAddFormOpen = false;
-        let bookingBranchAddLookup = { code: '', options: [], selectedIndex: 0, error: '' };
+        let bookingBranchAddLookup = { wave: '', code: '', options: [], selectedIndex: 0, error: '' };
         function markDocumentOverridesDirty(branchCodes = []) {
             documentOverridesRevision += 1;
             (Array.isArray(branchCodes) ? branchCodes : [branchCodes])
@@ -5236,12 +5236,6 @@
             const state = bookingBranchAddLookup;
             const options = state.options || [];
             const selected = options[state.selectedIndex] || null;
-            const candidateSelect = options.length > 1 ? `
-                <label class="block text-xs font-black text-slate-600 mt-3">พบรหัสนี้ในหลาย Wave ที่มีวันที่ครบ — เลือก Wave ที่ตรงกับสาขา
-                    <select onchange="selectBookingBranchAddOption(this.value)" class="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm font-black">
-                        ${options.map((item, index) => `<option value="${index}" ${index === state.selectedIndex ? 'selected' : ''}>Wave ${escapeDocumentText(item.wave_no)}${item.current_document_wave ? ' · Wave ของเอกสารนี้' : ''}${item.can_add ? '' : ' · ตรวจสอบข้อมูลก่อน'}</option>`).join('')}
-                    </select>
-                </label>` : '';
             const quantities = selected ? `
                 <div class="mt-3 rounded-xl border border-indigo-200 bg-white p-3">
                     <div class="flex flex-wrap items-center justify-between gap-2 text-sm">
@@ -5262,18 +5256,21 @@
             return `
                 <div class="no-print rounded-xl border-2 border-indigo-200 bg-indigo-50/70 p-3 md:p-4">
                     <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                        <div><div class="font-black text-indigo-950">＋ เพิ่มสาขาในเอกสารนี้</div><div class="text-xs font-bold text-slate-500">กรอกรหัสสาขาและยอดที่รับจริง ระบบจะผูกกับเอกสารนี้ให้อัตโนมัติ</div></div>
+                        <div><div class="font-black text-indigo-950">＋ เพิ่มสาขาในเอกสารนี้</div><div class="text-xs font-bold text-slate-500">กรอกเลข Wave และรหัสสาขา ระบบจะตรวจวันที่ของ Wave ก่อน แล้วผูก Booking ปลายทางกับเอกสารนี้</div></div>
                         ${bookingBranchAddFormOpen ? '' : '<button type="button" onclick="toggleBookingBranchAddRow(true)" class="rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-black text-white">เพิ่มแถบสาขา</button>'}
                     </div>
                     ${bookingBranchAddFormOpen ? `
-                        <div class="mt-3 flex flex-col gap-2 sm:flex-row">
+                        <div class="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
+                            <label class="flex-1 text-xs font-black text-slate-600">เลข Wave
+                                <input id="bookingBranchAddWave" type="text" inputmode="numeric" maxlength="12" value="${escapeDocumentText(state.wave)}" onkeydown="if(event.key==='Enter'){event.preventDefault();lookupBookingBranchAddRow()}" class="mt-1 w-full rounded-lg border border-slate-300 bg-white p-3 text-base font-black" placeholder="เช่น 0000065650" autocomplete="off">
+                            </label>
                             <label class="flex-1 text-xs font-black text-slate-600">รหัสสาขา
                                 <input id="bookingBranchAddCode" value="${escapeDocumentText(state.code)}" onkeydown="if(event.key==='Enter'){event.preventDefault();lookupBookingBranchAddRow()}" class="mt-1 w-full rounded-lg border border-slate-300 bg-white p-3 text-base font-black uppercase" placeholder="เช่น MH13" autocomplete="off">
                             </label>
                             <button type="button" onclick="lookupBookingBranchAddRow()" class="rounded-lg bg-slate-800 px-5 py-3 text-sm font-black text-white">ค้นหาสาขา</button>
                             <button type="button" onclick="toggleBookingBranchAddRow(false)" class="rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm font-black text-slate-600">ยกเลิก</button>
                         </div>
-                        ${resultError}${candidateSelect}${quantities}` : ''}
+                        ${resultError}${quantities}` : ''}
                 </div>`;
         }
 
@@ -5282,12 +5279,7 @@
                 return showAlert('ยังไม่มีเอกสารที่เปิดอยู่', 'กรุณาเปิดเอกสารขนส่งก่อนเพิ่มสาขา');
             }
             bookingBranchAddFormOpen = Boolean(open);
-            if (!open) bookingBranchAddLookup = { code: '', options: [], selectedIndex: 0, error: '' };
-            renderShippingDocument();
-        }
-
-        function selectBookingBranchAddOption(value) {
-            bookingBranchAddLookup.selectedIndex = Math.max(0, Number(value) || 0);
+            if (!open) bookingBranchAddLookup = { wave: '', code: '', options: [], selectedIndex: 0, error: '' };
             renderShippingDocument();
         }
 
@@ -5312,19 +5304,23 @@
         }
 
         async function lookupBookingBranchAddRow() {
+            const waveInput = document.getElementById('bookingBranchAddWave');
             const input = document.getElementById('bookingBranchAddCode');
+            const waveDigits = String(waveInput ? waveInput.value : bookingBranchAddLookup.wave).replace(/\D/g, '');
+            const wave = waveDigits ? String(Number(waveDigits)) : '';
             const code = normalizeBranchLookupCode(input ? input.value : bookingBranchAddLookup.code);
+            if (!wave) return showAlert('ยังไม่ได้กรอกเลข Wave', 'กรุณากรอกเลข Wave ที่ต้องการเพิ่มสาขา');
             if (!code) return showAlert('ยังไม่ได้กรอกรหัสสาขา', 'กรุณากรอกรหัสสาขาก่อนค้นหา');
-            bookingBranchAddLookup = { code, options: [], selectedIndex: 0, error: '' };
-            showLoading('กำลังค้นหารหัสสาขาใน Wave_Monitoring ที่มีวันที่ครบ...');
+            bookingBranchAddLookup = { wave, code, options: [], selectedIndex: 0, error: '' };
+            showLoading(`กำลังตรวจสาขา ${code} ใน Wave ${wave} และตรวจวันที่...`);
             try {
-                const url = backendApiUrl + `/api/booking-branch-lookup?branch_code=${encodeURIComponent(code)}&target_booking=${encodeURIComponent(currentBookingNo)}&wave_no=${encodeURIComponent(currentWave)}&_ts=${Date.now()}`;
+                const url = backendApiUrl + `/api/booking-branch-lookup?branch_code=${encodeURIComponent(code)}&target_booking=${encodeURIComponent(currentBookingNo)}&wave_no=${encodeURIComponent(wave)}&_ts=${Date.now()}`;
                 const response = await fetchWithTimeout(url, { cache: 'no-store' }, 60000);
                 const body = await response.json().catch(() => ({}));
                 if (!response.ok) throw new Error(typeof body.detail === 'string' ? body.detail : `HTTP ${response.status}`);
                 const options = Array.isArray(body.branches) ? body.branches : [];
                 const firstAvailable = Math.max(0, options.findIndex(item => item.can_add));
-                bookingBranchAddLookup = { code, options, selectedIndex: firstAvailable, error: '' };
+                bookingBranchAddLookup = { wave, code, options, selectedIndex: firstAvailable, error: '' };
                 renderShippingDocument();
             } catch (error) {
                 bookingBranchAddLookup.error = error && error.message ? error.message : String(error);
@@ -5334,7 +5330,15 @@
 
         async function saveBookingBranchAddRow() {
             const selected = (bookingBranchAddLookup.options || [])[bookingBranchAddLookup.selectedIndex];
-            if (!selected || !selected.can_add) return showAlert('เพิ่มสาขาไม่ได้', 'กรุณาเลือกสาขาที่ข้อมูลพร้อม และยังไม่มีในเอกสารนี้');
+            if (!selected || !selected.can_add) return showAlert('เพิ่มสาขาไม่ได้', 'กรุณาตรวจเลข Wave และรหัสสาขาอีกครั้ง และตรวจว่าเอกสารนี้ยังไม่มีสาขานี้');
+            const waveInput = document.getElementById('bookingBranchAddWave');
+            const codeInput = document.getElementById('bookingBranchAddCode');
+            const currentWaveDigits = String(waveInput ? waveInput.value : bookingBranchAddLookup.wave).replace(/\D/g, '');
+            const currentEnteredWave = currentWaveDigits ? String(Number(currentWaveDigits)) : '';
+            const currentEnteredCode = normalizeBranchLookupCode(codeInput ? codeInput.value : bookingBranchAddLookup.code);
+            if (currentEnteredWave !== String(selected.wave_no) || currentEnteredCode !== String(selected.branch_code).toUpperCase()) {
+                return showAlert('ข้อมูลค้นหาเปลี่ยนแล้ว', 'กดค้นหาสาขาอีกครั้งก่อนเพิ่ม เพื่อให้ Wave และรหัสสาขาตรงกับข้อมูลที่จะบันทึก');
+            }
             const quantities = Object.fromEntries(bookingActualQuantityFields.map(([field]) => [
                 field, Math.max(0, parseInt(document.getElementById(`bookingBranchAdd_${field}`)?.value || '0', 10) || 0)
             ]));
@@ -5352,7 +5356,7 @@
                 const result = await response.json().catch(() => ({}));
                 if (!response.ok) throw new Error(typeof result.detail === 'string' ? result.detail : `HTTP ${response.status}`);
                 bookingBranchAddFormOpen = false;
-                bookingBranchAddLookup = { code: '', options: [], selectedIndex: 0, error: '' };
+                bookingBranchAddLookup = { wave: '', code: '', options: [], selectedIndex: 0, error: '' };
                 const latest = await fetchFreshCurrentJobData(true);
                 applyWaveDataToScreen(latest.data, latest.isWaveOnly);
                 saveCurrentWaveDataCache();
@@ -6559,7 +6563,7 @@
             ]));
             currentBookingNo = data.booking_no ? String(data.booking_no).trim() : '';
             bookingBranchAddFormOpen = false;
-            bookingBranchAddLookup = { code: '', options: [], selectedIndex: 0, error: '' };
+            bookingBranchAddLookup = { wave: '', code: '', options: [], selectedIndex: 0, error: '' };
             currentLicensePlate = data.license_plate ? String(data.license_plate).trim() : '';
 
             if (isWaveOnly) {
