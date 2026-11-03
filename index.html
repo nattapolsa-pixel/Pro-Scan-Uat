@@ -19,7 +19,7 @@
          ระหว่างที่คนพิมพ์รหัสพนักงาน เครื่องก็ตื่นไปแล้ว -->
     <script>
         // Keep the version available even if a later, large script has a syntax error.
-        window.__PRO_SCANNER_APP_VERSION = '1.9.20-free';
+        window.__PRO_SCANNER_APP_VERSION = '1.9.21-free';
         window.__proScannerSyntaxErrorsReported = new WeakSet();
         (function installEarlySyntaxErrorCapture() {
             const queueKey = 'proScannerDebugQueue:v1';
@@ -4714,18 +4714,26 @@
         async function fetchFreshCurrentJobData(force = false) {
             // Booking ที่มี Wave เดียวก็ยังต้องโหลดผ่าน Booking เพื่อให้สาขาที่ย้าย/แบ่งเข้ามาแสดง
             const isBookingMode = !currentLookupIsWaveOnly;
-            // เมื่อสั่ง force=true ให้ส่งไปที่ backend เพื่อล้าง cache และดึงข้อมูลสาขาที่ย้าย/จัดเข้ามาใหม่ทันที
+            // เมื่อสั่ง force=true ให้ API อ่านเฉพาะ Wave ใน Booking นี้ใหม่
             const refreshParam = (force || SCAN_FEATURE_ENABLED) ? '&force=true' : '';
             const url = isBookingMode
-                ? backendApiUrl + `/api/check-booking?booking_no=${encodeURIComponent(currentBookingNo)}${refreshParam}&_ts=${Date.now()}`
-                : backendApiUrl + `/api/check-wave?wave_no=${encodeURIComponent(activeWavesList[0] || currentWave)}${refreshParam}&_ts=${Date.now()}`;
-            const res = await fetchWithTimeout(url, { cache: 'no-store' }, 60000);
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok) {
+                ? backendApiUrl + '/api/check-booking?booking_no=' + encodeURIComponent(currentBookingNo) + refreshParam + '&_ts=' + Date.now()
+                : backendApiUrl + '/api/check-wave?wave_no=' + encodeURIComponent(activeWavesList[0] || currentWave) + refreshParam + '&_ts=' + Date.now();
+
+            for (let attempt = 0; attempt < 4; attempt++) {
+                const res = await fetchWithTimeout(url, { cache: 'no-store' }, 60000);
+                const data = await res.json().catch(() => ({}));
+                if (res.ok) return { data, isWaveOnly: !isBookingMode };
+
                 const detail = typeof data.detail === 'string' ? data.detail : '';
-                throw new Error(detail || `โหลดข้อมูลส่วนกลางไม่สำเร็จ (HTTP ${res.status})`);
+                const incomplete = res.status === 409 && /ยังมาไม่ครบ|ยังโหลดสาขาได้ไม่ครบ/.test(detail);
+                if (!incomplete || attempt === 3) {
+                    throw new Error(detail || 'โหลดข้อมูลส่วนกลางไม่สำเร็จ (HTTP ' + res.status + ')');
+                }
+                showLoading('กำลังรอข้อมูลครบจากส่วนกลาง (' + (attempt + 1) + '/4)...');
+                await new Promise(resolve => setTimeout(resolve, 2000));
             }
-            return { data, isWaveOnly: !isBookingMode };
+            throw new Error('โหลดข้อมูลส่วนกลางไม่ครบ กรุณาลองใหม่');
         }
 
         async function verifyDocumentAgainstServer(bypassOtherDevices = false) {
@@ -4806,52 +4814,47 @@
             }
 
             activeDocumentType = documentType === 'shortage' ? 'shortage' : 'shipping';
-
             if (typeof submitAllUnsubmittedPallets === 'function') {
                 submitAllUnsubmittedPallets(false);
             }
 
-            // ⚡ เปิดหน้าเอกสารทันทีแบบ 0 วินาทีจากข้อมูลในเครื่อง ไม่ต้องรอโหลด
-            document.getElementById('shippingDocumentModal').classList.remove('hidden');
-            document.getElementById('shippingDocumentModal').classList.add('flex');
+            // เอกสารเป็นข้อมูลสำคัญ: ตรวจ Booking จาก Server ให้ครบก่อนเปิด
+            // หากเริ่มจาก Wave ให้โหลด Booking รวมสาขาที่จัดเข้ามาก่อน
+            const previousWaveOnlyMode = currentLookupIsWaveOnly;
+            if (currentLookupIsWaveOnly && currentBookingNo) currentLookupIsWaveOnly = false;
+            showLoading('กำลังตรวจสอบข้อมูลให้ครบก่อนเปิดเอกสาร...');
+            try {
+                await verifyDocumentAgainstServer(bypassOtherDevices);
+            } catch (e) {
+                currentLookupIsWaveOnly = previousWaveOnlyMode;
+                const message = e && e.message ? e.message : String(e);
+                if (e && e.isOtherDevicePending) {
+                    showAlert('มีเครื่องอื่นกำลังใช้งาน', message + '\n\nรอให้เครื่องนั้นส่งข้อมูลเสร็จ แล้วเปิดเอกสารใหม่', 'border-amber-500');
+                } else {
+                    showAlert('ยังเปิดเอกสารไม่ได้', message + '\n\nระบบยังไม่เปิดเอกสารจนกว่าจะตรวจข้อมูลส่วนกลางครบ เพื่อป้องกันยอดและสาขาตกหล่น', 'border-amber-500');
+                }
+                return;
+            }
+
+            const modal = document.getElementById('shippingDocumentModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
             renderActiveDocument();
+            hideLoading();
             trackUsageEvent('OPEN_DOCUMENT', { detail: activeDocumentType });
-            // โหลดชื่อผู้ส่งล่วงหน้าแม้เปิดใบคุมส่งสินค้า เพราะหน้างานมักกดสลับไปใบขาดเกินต่อ
+
+            // โหลดข้อมูลประกอบหลังจากยืนยันรายการสาขาและยอดครบแล้ว
             loadCurrentTransportMeta().then(() => {
-                const modal = document.getElementById('shippingDocumentModal');
-                if (modal && !modal.classList.contains('hidden')) renderActiveDocument();
+                if (!modal.classList.contains('hidden')) renderActiveDocument();
+            }).catch(() => {});
+            loadBranchProvinceMap().then(() => {
+                if (!modal.classList.contains('hidden')) renderActiveDocument();
+            }).catch(() => {});
+            loadBookingSenderMap(currentBookingNo).then(() => {
+                if (!modal.classList.contains('hidden')) renderActiveDocument();
             }).catch(() => {});
 
-            // รันการตรวจสอบยอดและซิงค์กับเซิร์ฟเวอร์ส่วนกลางเบื้องหลังแบบ Non-blocking
-            (async () => {
-                try {
-                    await verifyDocumentAgainstServer(bypassOtherDevices);
-                    const modal = document.getElementById('shippingDocumentModal');
-                    if (modal && !modal.classList.contains('hidden')) {
-                        renderActiveDocument();
-                        pushDocumentSummaryToServer(true, false, null, 'document_open', true).catch(() => {});
-                    }
-                } catch (e) {
-                    console.warn('Background document verification:', e);
-                    if (e && e.isOtherDevicePending) {
-                        showToast('⚠️ มีเครื่องอื่นกำลังสแกน Wave นี้อยู่ร่วมด้วย');
-                    }
-                }
-            })();
-
-            loadBranchProvinceMap().then(() => {
-                const modal = document.getElementById('shippingDocumentModal');
-                if (modal && !modal.classList.contains('hidden')) {
-                    renderActiveDocument();
-                }
-            }).catch(() => { });
-
-            loadBookingSenderMap(currentBookingNo).then(() => {
-                const modal = document.getElementById('shippingDocumentModal');
-                if (modal && !modal.classList.contains('hidden')) {
-                    renderActiveDocument();
-                }
-            }).catch(() => { });
+            pushDocumentSummaryToServer(true, false, null, 'document_open', true).catch(() => {});
         }
 
         function closeShippingDocument() {
@@ -6732,49 +6735,6 @@
             } else {
                 updateDashboardUI();
             }
-            scheduleBranchCompletenessCheck();
-        }
-
-        // สาขาถูกเพิ่มเข้า Wave ได้ตลอดเวลา และ Server แคชสาขาของ Wave ไว้เป็นก้อน
-        // บน UAT ตัวรีเฟรชอัตโนมัติทุกตัวถูกปิดด้วย SCAN_FEATURE_ENABLED จึงไม่มีอะไร
-        // มาแก้หน้าจอให้ถูกเองถ้ารอบแรกได้สาขามาไม่ครบ ตรวจซ้ำให้หนึ่งครั้งต่อการเปิดงาน
-        // แบบเงียบ ๆ และแตะหน้าจอเฉพาะเมื่อพบสาขาที่หายไปจริง
-        const branchCompletenessCheckedKeys = new Set();
-        function currentJobLookupValue() {
-            return currentLookupIsWaveOnly ? (activeWavesList[0] || currentWave) : currentBookingNo;
-        }
-        function scheduleBranchCompletenessCheck() {
-            const lookupValue = currentJobLookupValue();
-            if (!lookupValue) return;
-            const key = getWaveDataCacheKey(lookupValue, currentLookupIsWaveOnly);
-            if (branchCompletenessCheckedKeys.has(key)) return;
-            branchCompletenessCheckedKeys.add(key);
-            setTimeout(() => verifyBranchCompleteness(key, lookupValue, currentLookupIsWaveOnly), 6000);
-        }
-        async function verifyBranchCompleteness(key, lookupValue, isWaveOnly) {
-            try {
-                // ผู้ใช้เปลี่ยนไปงานอื่นแล้ว ไม่ต้องเขียนทับหน้าจอ
-                if (key !== getWaveDataCacheKey(currentJobLookupValue(), currentLookupIsWaveOnly)) return;
-                const before = new Set((allLpnsInWave || []).map(item => String(item.branch || '').toUpperCase()));
-                const url = isWaveOnly
-                    ? `${backendApiUrl}/api/check-wave?wave_no=${encodeURIComponent(lookupValue)}&force=true&_ts=${Date.now()}`
-                    : `${backendApiUrl}/api/check-booking?booking_no=${encodeURIComponent(lookupValue)}&force=true&_ts=${Date.now()}`;
-                const response = await fetchWithTimeout(url, { cache: 'no-store' }, 60000);
-                if (!response.ok) return;
-                const data = await response.json();
-                if (key !== getWaveDataCacheKey(currentJobLookupValue(), currentLookupIsWaveOnly)) return;
-                const added = [...new Set((data.lpn_list || []).map(item => String(item.branch || '').toUpperCase()))]
-                    .filter(code => code && !before.has(code));
-                if (!added.length) return;
-                saveWaveDataCache(key, data);
-                applyWaveDataToScreen(data, isWaveOnly);
-                const modal = document.getElementById('shippingDocumentModal');
-                if (modal && !modal.classList.contains('hidden')) renderActiveDocument();
-                showToast(`เพิ่มสาขาที่เข้า Wave ภายหลัง: ${added.join(', ')}`);
-            } catch (error) {
-                // เงียบไว้ ผู้ใช้ยังกดปุ่มรีเฟรชข้อมูลเองได้
-                console.warn('Branch completeness check:', error);
-            }
         }
 
         async function checkAndLoadWave() {
@@ -6802,19 +6762,10 @@
             const isWaveOnly = /^\d+$/.test(inputVal);
             const cacheKey = getWaveDataCacheKey(inputVal, isWaveOnly);
             currentWaveDataCacheKey = cacheKey;
-            let cachedData = getCachedWaveData(cacheKey);
-            // Booking is an aggregate of several Waves. Never render its local
-            // cache before the server confirms every Wave is available.
-            if (!isWaveOnly) cachedData = null;
+            // Never show a cached snapshot first. The API verifies the complete
+            // monitored branch set before the screen replaces its loading state.
             let usedCache = false;
-
-            if (cachedData) {
-                usedCache = true;
-                applyWaveDataToScreen(cachedData, isWaveOnly);
-                showToast('โหลดข้อมูลจากเครื่องแล้ว กำลังอัปเดตล่าสุด...');
-            } else {
-                showLookupLoading(isWaveOnly ? 'กำลังเริ่มค้นหา Wave...' : 'กำลังเริ่มค้นหา Booking...');
-            }
+            showLookupLoading(isWaveOnly ? 'กำลังเริ่มค้นหา Wave...' : 'กำลังเริ่มค้นหา Booking...');
 
             try {
                 // ค้นหาปกติให้ใช้ Server cache ก่อน ห้าม force อ่าน Sheet ทุกครั้ง
@@ -6873,11 +6824,13 @@
                 // 404 = ยังไม่เห็น Wave/Booking นี้, 409 = Booking มีหลาย Wave และ
                 // Member Data ยังทยอยเข้า (backend เป็นฝ่ายบอกเองว่ายังไม่ครบ)
                 // ทั้งสองกรณีรอสั้น ๆ แล้วถามซ้ำได้ แต่ห้ามสั่ง force
-                for (let attempt = 1; attempt <= 2 && !res.ok && (res.status === 404 || res.status === 409); attempt++) {
+                for (let attempt = 1; attempt <= 4 && !res.ok && (res.status === 404 || res.status === 409); attempt++) {
+                    const retryLimit = res.status === 404 ? 2 : 4;
+                    if (attempt > retryLimit) break;
                     showLookupLoading(res.status === 409
-                        ? `ข้อมูล Booking กำลังเข้าระบบ รอข้อมูลครบ (${attempt}/2)...`
+                        ? 'กำลังรอข้อมูลครบจากส่วนกลาง (' + attempt + '/' + retryLimit + ')...'
                         : 'กำลังอ่านข้อมูลล่าสุดจาก Sheet...');
-                    await new Promise(resolve => setTimeout(resolve, attempt * 1500));
+                    await new Promise(resolve => setTimeout(resolve, res.status === 409 ? 2000 : attempt * 1500));
                     const retryUrl = isWaveOnly
                         ? backendApiUrl + `/api/check-wave?wave_no=${encodeURIComponent(inputVal)}&_ts=${Date.now()}`
                         : backendApiUrl + `/api/check-booking?booking_no=${encodeURIComponent(inputVal)}&_ts=${Date.now()}`;
