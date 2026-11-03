@@ -19,7 +19,7 @@
          ระหว่างที่คนพิมพ์รหัสพนักงาน เครื่องก็ตื่นไปแล้ว -->
     <script>
         // Keep the version available even if a later, large script has a syntax error.
-        window.__PRO_SCANNER_APP_VERSION = '1.9.9-free';
+        window.__PRO_SCANNER_APP_VERSION = '1.9.13-free';
         window.__proScannerSyntaxErrorsReported = new WeakSet();
         (function installEarlySyntaxErrorCapture() {
             const queueKey = 'proScannerDebugQueue:v1';
@@ -1017,9 +1017,9 @@
                     📄 เอกสารใบคุมส่งสินค้า (สามารถแก้ไขตัวเลขในตารางได้ทุกช่อง)
                 </span>
                 <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2.5">
-                    <button onclick="openBookingBranchMove()" title="ย้ายทั้งสาขา หรือแบ่งบางส่วนเข้ารถคันนี้"
+                    <button onclick="toggleBookingBranchAddRow(!bookingBranchAddFormOpen)" title="เพิ่มแถบสาขาและใส่ยอดที่ Booking นี้รับจริง"
                         class="shipping-document-action group min-h-[58px] bg-gradient-to-br from-amber-400 to-orange-500 hover:from-amber-300 hover:to-orange-400 text-slate-950 font-black px-3 py-2.5 rounded-xl text-xs md:text-sm transition active:scale-95 shadow-lg shadow-orange-950/30 border border-amber-200 flex items-center justify-center gap-2">
-                        <span class="text-xl group-hover:scale-110 transition">🚚</span><span class="leading-tight">จัดสาขาเข้ารถ<br><small class="font-bold opacity-75">ย้ายทั้งหมด / แบ่งบางส่วน</small></span>
+                        <span class="text-xl group-hover:scale-110 transition">＋</span><span class="leading-tight">เพิ่มแถบสาขา<br><small class="font-bold opacity-75">กรอกรหัสและยอดจริง</small></span>
                     </button>
                     <button onclick="openManageDocBranchesModal()" title="จัดการ ซ่อน/แสดง สาขาในเอกสารใบคุมส่งสินค้านี้"
                         class="shipping-document-action group min-h-[58px] bg-gradient-to-br from-indigo-500 to-purple-700 hover:from-indigo-400 hover:to-purple-600 text-white font-black px-3 py-2.5 rounded-xl text-xs md:text-sm transition active:scale-95 shadow-lg shadow-indigo-950/30 border border-indigo-300/60 flex items-center justify-center gap-2">
@@ -3654,6 +3654,8 @@
         let documentOverridesRevision = 0;
         let syncedDocumentOverridesRevision = 0;
         const dirtyDocumentOverrideBranches = new Set();
+        let bookingBranchAddFormOpen = false;
+        let bookingBranchAddLookup = { code: '', options: [], selectedIndex: 0, error: '' };
         function markDocumentOverridesDirty(branchCodes = []) {
             documentOverridesRevision += 1;
             (Array.isArray(branchCodes) ? branchCodes : [branchCodes])
@@ -3909,6 +3911,7 @@
                 summaries: enrichedSummaries,
                 emp_id: loggedInEmpId || '',
                 persist_overrides: Boolean(persistOverrides),
+                booking_actuals: Boolean(persistOverrides && activeDocumentType === 'shipping' && currentBookingNo),
                 sync_report: Boolean(syncReport && activeDocumentType === 'shipping'),
                 reason
             };
@@ -4140,7 +4143,11 @@
                         });
                         if (!resetResponse.ok) throw new Error(`HTTP ${resetResponse.status}`);
                         syncedDocumentOverridesRevision = documentOverridesRevision;
-                        await pushDocumentSummaryToServer(true, false, null, 'reset_to_scanner_totals');
+                        const latest = await fetchFreshCurrentJobData(true);
+                        applyWaveDataToScreen(latest.data, latest.isWaveOnly);
+                        saveCurrentWaveDataCache();
+                        renderShippingDocument();
+                        shippingDocumentVerifiedAt = Date.now();
                         showToast('คืนค่าเป็นยอดสแกนจริงและแสดงทุกสาขาเรียบร้อยแล้ว');
                     } catch (e) {
                         showAlert('คืนยอดเดิมไม่สำเร็จ', 'Server ยังไม่รับคำสั่ง กรุณาลองใหม่อีกครั้ง');
@@ -5159,6 +5166,15 @@
                 autoBlack = parseInt(bookingSplit.black) || 0;
             }
 
+            const bookingActual = branchItems.find(item => item.booking_actual_summary)?.booking_actual_summary;
+            if (bookingActual) {
+                autoM = parseInt(bookingActual.m) || 0;
+                autoRed = parseInt(bookingActual.red) || 0;
+                autoBlue = parseInt(bookingActual.blue) || 0;
+                autoGreen = parseInt(bookingActual.green) || 0;
+                autoBlack = parseInt(bookingActual.black) || 0;
+            }
+
             let autoPalletCount = getCurrentBranchPalletNos(bCode).length;
             if (specificWaveKey) {
                 const wavePalletNos = new Set();
@@ -5173,6 +5189,7 @@
                 autoPalletCount = wavePalletNos.size;
             }
             if (bookingSplit) autoPalletCount = parseInt(bookingSplit.pallet) || 0;
+            if (bookingActual) autoPalletCount = parseInt(bookingActual.pallet) || 0;
             // ยอดแก้ไขถูกแยกตาม Booking ที่ API และ localStorage แล้ว จึงใช้กับ
             // สาขาที่แบ่ง Booking ได้โดยไม่ทับยอดของ Booking ต้นทาง.
             const ov = documentOverrides[bCode] || documentOverrides[normalizeBranchLookupCode(bCode)] || {};
@@ -5203,8 +5220,135 @@
                 total: branchTotalBoxes,
                 pallet: branchPallets,
                 booking_split: Boolean(bookingSplit),
+                booking_actual: Boolean(bookingActual),
                 autoM, autoRed, autoBlue, autoGreen, autoBlack, autoPalletCount, paperBoxCount, yellowCount, owner
             };
+        }
+
+        const bookingActualQuantityFields = [
+            ['m', 'กล่อง M', 'text-slate-800'], ['red', 'TOTE แดง', 'text-red-700'],
+            ['blue', 'TOTE น้ำเงิน', 'text-blue-700'], ['green', 'TOTE เขียว', 'text-green-700'],
+            ['black', 'TOTE ดำ', 'text-slate-800'], ['pallet', 'พาเลท', 'text-indigo-700']
+        ];
+
+        function renderBookingBranchAddPanel() {
+            if (!currentBookingNo || currentLookupIsWaveOnly) return '';
+            const state = bookingBranchAddLookup;
+            const options = state.options || [];
+            const selected = options[state.selectedIndex] || null;
+            const candidateSelect = options.length > 1 ? `
+                <label class="block text-xs font-black text-slate-600 mt-3">พบสาขารหัสนี้ในหลาย Wave — เลือก Wave ให้ถูกต้อง
+                    <select onchange="selectBookingBranchAddOption(this.value)" class="mt-1 w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm font-black">
+                        ${options.map((item, index) => `<option value="${index}" ${index === state.selectedIndex ? 'selected' : ''}>Wave ${escapeDocumentText(item.wave_no)} · ต้นทาง ${escapeDocumentText(item.source_booking)}${item.can_add ? '' : ' · เพิ่มไม่ได้'}</option>`).join('')}
+                    </select>
+                </label>` : '';
+            const quantities = selected ? `
+                <div class="mt-3 rounded-xl border border-indigo-200 bg-white p-3">
+                    <div class="flex flex-wrap items-center justify-between gap-2 text-sm">
+                        <div><b class="text-indigo-700">${escapeDocumentText(selected.branch_code)}</b> — ${escapeDocumentText(selected.branch_name)} <span class="text-xs text-slate-500">Wave ${escapeDocumentText(selected.wave_no)}</span></div>
+                        <span class="rounded-full bg-slate-100 px-2 py-1 text-xs font-bold">Booking ต้นทาง ${escapeDocumentText(selected.source_booking)}</span>
+                    </div>
+                    <div class="mt-1 text-xs font-bold text-slate-500">Member Data จะรวมยอดจริงของแต่ละ Booking · ยอดคงเหลือแยกตามประเภท</div>
+                    <div class="mt-3 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+                        ${bookingActualQuantityFields.map(([field, label, color]) => `
+                            <label class="text-[11px] font-black ${color}">${label}<input id="bookingBranchAdd_${field}" type="number" min="0" max="${Number(selected.available[field]) || 0}" step="1" value="0" class="mt-1 w-full rounded-lg border border-slate-300 p-2 text-center text-sm font-black text-slate-900" ${Number(selected.available[field]) <= 0 ? 'disabled' : ''}>
+                                <small class="mt-1 block text-slate-400">เหลือ ${Number(selected.available[field]) || 0}</small>
+                            </label>`).join('')}
+                    </div>
+                    ${selected.can_add ? '' : `<div class="mt-3 rounded-lg bg-amber-50 p-2.5 text-xs font-bold text-amber-800">${selected.target_already_has_branch ? 'สาขานี้อยู่ใน Booking นี้แล้ว ให้แก้ยอดในแถวเดิม' : selected.is_target_source ? 'สาขานี้เป็น Booking ต้นทางอยู่แล้ว ให้แก้ยอดในแถวเดิม' : 'ต้องบันทึกยอดจริงของ Booking ต้นทางก่อน หรือไม่มียอดคงเหลือที่จัดสรรได้'}</div>`}
+                    <div class="mt-3 flex justify-end">
+                        <button type="button" onclick="saveBookingBranchAddRow()" ${selected.can_add ? '' : 'disabled'} class="rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-black text-white shadow disabled:cursor-not-allowed disabled:bg-slate-300">เพิ่มแถบนี้ใน Booking ${escapeDocumentText(currentBookingNo)}</button>
+                    </div>
+                </div>` : '';
+            const resultError = state.error ? `<div class="mt-2 text-xs font-bold text-rose-700">${escapeDocumentText(state.error)}</div>` : '';
+            return `
+                <div class="no-print rounded-xl border-2 border-indigo-200 bg-indigo-50/70 p-3 md:p-4">
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                        <div><div class="font-black text-indigo-950">＋ เพิ่มแถบสาขาใน Booking นี้</div><div class="text-xs font-bold text-slate-500">กรอกรหัสสาขาและยอดที่รถคันนี้รับจริง</div></div>
+                        ${bookingBranchAddFormOpen ? '' : '<button type="button" onclick="toggleBookingBranchAddRow(true)" class="rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-black text-white">เพิ่มแถบสาขา</button>'}
+                    </div>
+                    ${bookingBranchAddFormOpen ? `
+                        <div class="mt-3 flex flex-col gap-2 sm:flex-row">
+                            <label class="flex-1 text-xs font-black text-slate-600">รหัสสาขา
+                                <input id="bookingBranchAddCode" value="${escapeDocumentText(state.code)}" onkeydown="if(event.key==='Enter'){event.preventDefault();lookupBookingBranchAddRow()}" class="mt-1 w-full rounded-lg border border-slate-300 bg-white p-3 text-base font-black uppercase" placeholder="เช่น MH13" autocomplete="off">
+                            </label>
+                            <button type="button" onclick="lookupBookingBranchAddRow()" class="rounded-lg bg-slate-800 px-5 py-3 text-sm font-black text-white">ค้นหาสาขา</button>
+                            <button type="button" onclick="toggleBookingBranchAddRow(false)" class="rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm font-black text-slate-600">ยกเลิก</button>
+                        </div>
+                        ${resultError}${candidateSelect}${quantities}` : ''}
+                </div>`;
+        }
+
+        function toggleBookingBranchAddRow(open) {
+            if (open && currentLookupIsWaveOnly) {
+                return showAlert('เพิ่มสาขาไม่ได้จากหน้า Wave', 'กรุณาเปิดเอกสารด้วย Booking ก่อนเพิ่มแถบสาขา');
+            }
+            bookingBranchAddFormOpen = Boolean(open);
+            if (!open) bookingBranchAddLookup = { code: '', options: [], selectedIndex: 0, error: '' };
+            renderShippingDocument();
+        }
+
+        function selectBookingBranchAddOption(value) {
+            bookingBranchAddLookup.selectedIndex = Math.max(0, Number(value) || 0);
+            renderShippingDocument();
+        }
+
+        async function lookupBookingBranchAddRow() {
+            const input = document.getElementById('bookingBranchAddCode');
+            const code = normalizeBranchLookupCode(input ? input.value : bookingBranchAddLookup.code);
+            if (!code) return showAlert('ยังไม่ได้กรอกรหัสสาขา', 'กรุณากรอกรหัสสาขาก่อนค้นหา');
+            bookingBranchAddLookup = { code, options: [], selectedIndex: 0, error: '' };
+            showLoading('กำลังค้นหาสาขาใน Wave ปัจจุบัน...');
+            try {
+                const url = backendApiUrl + `/api/booking-branch-lookup?branch_code=${encodeURIComponent(code)}&target_booking=${encodeURIComponent(currentBookingNo)}&_ts=${Date.now()}`;
+                const response = await fetchWithTimeout(url, { cache: 'no-store' }, 60000);
+                const body = await response.json().catch(() => ({}));
+                if (!response.ok) throw new Error(typeof body.detail === 'string' ? body.detail : `HTTP ${response.status}`);
+                const options = Array.isArray(body.branches) ? body.branches : [];
+                const firstAvailable = Math.max(0, options.findIndex(item => item.can_add));
+                bookingBranchAddLookup = { code, options, selectedIndex: firstAvailable, error: '' };
+                renderShippingDocument();
+            } catch (error) {
+                bookingBranchAddLookup.error = error && error.message ? error.message : String(error);
+                renderShippingDocument();
+            } finally { hideLoading(); }
+        }
+
+        async function saveBookingBranchAddRow() {
+            const selected = (bookingBranchAddLookup.options || [])[bookingBranchAddLookup.selectedIndex];
+            if (!selected || !selected.can_add) return showAlert('เพิ่มแถบไม่ได้', 'กรุณาเลือกสาขาที่มียอดคงเหลือจัดสรรได้');
+            const quantities = Object.fromEntries(bookingActualQuantityFields.map(([field]) => [
+                field, Math.max(0, parseInt(document.getElementById(`bookingBranchAdd_${field}`)?.value || '0', 10) || 0)
+            ]));
+            const boxTotal = quantities.m + quantities.red + quantities.blue + quantities.green + quantities.black;
+            if (boxTotal <= 0) return showAlert('ยังไม่ได้ใส่ยอด', 'กรุณาใส่ยอดกล่องที่รถคันนี้รับจริงอย่างน้อย 1 กล่อง');
+            for (const [field] of bookingActualQuantityFields) {
+                if (quantities[field] > Number(selected.available[field] || 0)) {
+                    return showAlert('ยอดเกินคงเหลือ', `${field} ระบุ ${quantities[field]} แต่ยอดที่เพิ่มได้คือ ${selected.available[field] || 0}`);
+                }
+            }
+            showLoading('กำลังเพิ่มแถบและบันทึกยอดจริง...');
+            try {
+                const response = await fetchWithTimeout(backendApiUrl + '/api/booking-branch-actual', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        target_booking: currentBookingNo, wave_no: selected.wave_no,
+                        branch_code: selected.branch_code, emp_id: loggedInEmpId || '', ...quantities
+                    })
+                }, 120000);
+                const result = await response.json().catch(() => ({}));
+                if (!response.ok) throw new Error(typeof result.detail === 'string' ? result.detail : `HTTP ${response.status}`);
+                bookingBranchAddFormOpen = false;
+                bookingBranchAddLookup = { code: '', options: [], selectedIndex: 0, error: '' };
+                const latest = await fetchFreshCurrentJobData(true);
+                applyWaveDataToScreen(latest.data, latest.isWaveOnly);
+                saveCurrentWaveDataCache();
+                renderShippingDocument();
+                shippingDocumentVerifiedAt = Date.now();
+                showToast(`เพิ่ม ${selected.branch_code} แล้ว · ยอดจริง ${boxTotal} กล่อง · รายงานกำลังซิงก์`);
+            } catch (error) {
+                showAlert('เพิ่มสาขาไม่สำเร็จ', error && error.message ? error.message : String(error));
+            } finally { hideLoading(); }
         }
 
         function renderShippingDocument() {
@@ -5261,6 +5405,7 @@
                 content.innerHTML = `
                     <div class="screen-document-sheet bg-white p-8 rounded-xl shadow-xl border border-slate-200 text-center space-y-4 max-w-4xl mx-auto my-6">
                         ${hiddenBannerHtml}
+                        ${renderBookingBranchAddPanel()}
                         <div class="text-2xl font-black text-slate-800">ไม่มีสาขาแสดงในเอกสารใบคุมนี้</div>
                         <p class="text-sm font-bold text-slate-500">${allBranches.length > 0 ? `สาขาทั้งหมด (${allBranches.length} สาขา) ถูกซ่อนไว้อยู่` : 'ไม่พบข้อมูลสาขาใน Wave / Booking นี้'}</p>
                         ${allBranches.length > 0 ? `<button onclick="restoreAllHiddenBranchesInDocument()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-black px-6 py-3 rounded-xl shadow-lg transition active:scale-95 text-base">↩️ ดึงทุกสาขากลับมาแสดงในเอกสาร</button>` : ''}
@@ -5690,6 +5835,8 @@
                     </div>
 
                     ${hiddenBannerHtml}
+
+                    ${renderBookingBranchAddPanel()}
 
                     ${branchPaginationHtml}
 
@@ -6390,6 +6537,8 @@
                 { palletNo: parseInt(item.palletNo) || 0, palletColor: item.palletColor || null, correctionCount: parseInt(item.correctionCount) || 0 }
             ]));
             currentBookingNo = data.booking_no ? String(data.booking_no).trim() : '';
+            bookingBranchAddFormOpen = false;
+            bookingBranchAddLookup = { code: '', options: [], selectedIndex: 0, error: '' };
             currentLicensePlate = data.license_plate ? String(data.license_plate).trim() : '';
 
             if (isWaveOnly) {
@@ -6594,6 +6743,20 @@
 
             const requestId = ++latestWaveLoadRequestId;
             userSearchInFlight = true;
+            let loadingProgressTimer = null;
+            let loadingProgressMessage = '';
+            const showLookupLoading = (message) => {
+                loadingProgressMessage = message;
+                if (loadingProgressTimer) clearInterval(loadingProgressTimer);
+                const update = () => {
+                    if (requestId !== latestWaveLoadRequestId) return;
+                    const elapsedSeconds = Math.floor((performance.now() - lookupStartedAt) / 1000);
+                    const elapsedLabel = `${Math.floor(elapsedSeconds / 60)}:${String(elapsedSeconds % 60).padStart(2, '0')}`;
+                    showLoading(`${loadingProgressMessage} · รอ ${elapsedLabel}`);
+                };
+                update();
+                loadingProgressTimer = setInterval(update, 1000);
+            };
             const isWaveOnly = /^\d+$/.test(inputVal);
             const cacheKey = getWaveDataCacheKey(inputVal, isWaveOnly);
             currentWaveDataCacheKey = cacheKey;
@@ -6608,7 +6771,7 @@
                 applyWaveDataToScreen(cachedData, isWaveOnly);
                 showToast('โหลดข้อมูลจากเครื่องแล้ว กำลังอัปเดตล่าสุด...');
             } else {
-                showLoading(isWaveOnly ? 'กำลังค้นหาและโหลดข้อมูล Wave...' : 'กำลังค้นหาและโหลดข้อมูล Booking...');
+                showLookupLoading(isWaveOnly ? 'กำลังเริ่มค้นหา Wave...' : 'กำลังเริ่มค้นหา Booking...');
             }
 
             try {
@@ -6624,6 +6787,7 @@
                 // เดิมตั้ง 180 วิ x 4 รอบ + completeness 3 รอบ = ผู้ใช้ยืนรอได้ถึง ~13 นาที
                 // ก่อนจะเห็นข้อความ ซึ่งคือสิ่งที่หน้างานเจอ
                 if (!usedCache) {
+                    showLookupLoading(isWaveOnly ? 'กำลังปลุก API เพื่อค้นหา Wave' : 'กำลังปลุก API เพื่อค้นหา Booking');
                     try { await ensureBackendReady(true); }
                     catch (e) {
                         hideLoading();
@@ -6633,7 +6797,7 @@
                         return;
                     }
                     if (requestId !== latestWaveLoadRequestId) return;
-                    showLoading(isWaveOnly ? 'กำลังค้นหาและโหลดข้อมูล Wave...' : 'กำลังค้นหาและโหลดข้อมูล Booking...');
+                    showLookupLoading(isWaveOnly ? 'API ตอบแล้ว กำลังโหลด Wave' : 'API ตอบแล้ว กำลังรวมข้อมูล Booking');
                 }
                 let res = await fetchJobDataWithRetry(
                     url,
@@ -6668,7 +6832,7 @@
                 // Member Data ยังทยอยเข้า (backend เป็นฝ่ายบอกเองว่ายังไม่ครบ)
                 // ทั้งสองกรณีรอสั้น ๆ แล้วถามซ้ำได้ แต่ห้ามสั่ง force
                 for (let attempt = 1; attempt <= 2 && !res.ok && (res.status === 404 || res.status === 409); attempt++) {
-                    showLoading(res.status === 409
+                    showLookupLoading(res.status === 409
                         ? `ข้อมูล Booking กำลังเข้าระบบ รอข้อมูลครบ (${attempt}/2)...`
                         : 'กำลังอ่านข้อมูลล่าสุดจาก Sheet...');
                     await new Promise(resolve => setTimeout(resolve, attempt * 1500));
@@ -6775,8 +6939,11 @@
                     showToast('เชื่อมต่อช้า ใช้ข้อมูลที่โหลดไว้ก่อนหน้าอยู่', true);
                 }
             } finally {
-                if (requestId === latestWaveLoadRequestId) userSearchInFlight = false;
-                if (!usedCache) hideLoading();
+                if (loadingProgressTimer) clearInterval(loadingProgressTimer);
+                if (requestId === latestWaveLoadRequestId) {
+                    userSearchInFlight = false;
+                    if (!usedCache) hideLoading();
+                }
             }
         }
 
