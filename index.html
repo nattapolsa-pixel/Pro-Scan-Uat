@@ -19,7 +19,7 @@
          ระหว่างที่คนพิมพ์รหัสพนักงาน เครื่องก็ตื่นไปแล้ว -->
     <script>
         // Keep the version available even if a later, large script has a syntax error.
-        window.__PRO_SCANNER_APP_VERSION = '1.9.22-free';
+        window.__PRO_SCANNER_APP_VERSION = '1.9.23-free';
         window.__proScannerSyntaxErrorsReported = new WeakSet();
         (function installEarlySyntaxErrorCapture() {
             const queueKey = 'proScannerDebugQueue:v1';
@@ -5254,7 +5254,8 @@
                             </label>`).join('')}
                     </div>
                     <div id="bookingBranchAddOverageWarning" class="hidden mt-3 whitespace-pre-line rounded-lg border border-amber-300 bg-amber-50 p-2.5 text-xs font-bold text-amber-800"></div>
-                    ${selected.can_add && !selected.report_dates_ready ? '<div class="mt-3 rounded-lg bg-amber-50 p-2.5 text-xs font-bold text-amber-800">พบสาขาใน Member Data และเพิ่มเข้า Booking ได้ ส่วน Delivery Report จะรอจน Wave_Monitoring มีวันที่ครบ</div>' : ''}
+                    ${selected.can_add && !selected.source_booking_available ? '<div class="mt-3 rounded-lg bg-amber-50 p-2.5 text-xs font-bold text-amber-800">พบสาขาใน Member Data แล้ว แต่ไม่พบ Booking ต้นทาง ระบบจะบันทึกยอดที่กรอกเข้าปลายทางโดยตรง</div>' : ''}
+                    ${selected.can_add && !selected.report_dates_ready ? '<div class="mt-3 rounded-lg bg-amber-50 p-2.5 text-xs font-bold text-amber-800">Delivery Report จะซิงก์เมื่อ Wave_Monitoring มีวันที่ครบ</div>' : ''}
                     ${selected.can_add ? '' : `<div class="mt-3 rounded-lg bg-amber-50 p-2.5 text-xs font-bold text-amber-800">${selected.target_already_has_branch || selected.is_target_source ? 'สาขานี้มีอยู่ในเอกสารแล้ว ให้แก้ยอดที่แถวเดิม' : selected.source_booking_available ? 'เพิ่มสาขานี้ไม่ได้ เนื่องจากเอกสารนี้มีสาขานี้อยู่แล้ว' : 'ไม่พบ Booking ต้นทางที่ระบุยอดตั้งต้นได้ จึงยังเพิ่มอย่างปลอดภัยไม่ได้'}</div>`}
                     <div class="mt-3 flex justify-end">
                         <button type="button" onclick="saveBookingBranchAddRow()" ${selected.can_add ? '' : 'disabled'} class="rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-black text-white shadow disabled:cursor-not-allowed disabled:bg-slate-300">เพิ่มสาขาในเอกสารนี้</button>
@@ -5382,7 +5383,9 @@
                 const warningDetails = Object.entries(result.warnings || {}).map(([field, detail]) =>
                     `${warningLabels[field] || field}: กรอก ${detail.entered} · ตรวจไว้ ${detail.inspected} · รวมที่บันทึก ${detail.allocated_after} (เกิน ${detail.excess})`
                 );
-                if (result.report_sync === 'waiting_for_complete_dates') {
+                if (result.source_booking_missing) {
+                    showAlert('เพิ่มสาขาแล้ว · ไม่พบ Booking ต้นทาง', `${selected.branch_code} บันทึกใน Booking ปลายทางตามยอดจริง ${boxTotal} กล่องแล้ว${result.report_sync === 'waiting_for_complete_dates' ? '\nDelivery Report จะซิงก์เมื่อ Wave_Monitoring มีวันที่ครบ' : '\nรายงานกำลังซิงก์'}`, 'border-amber-500');
+                } else if (result.report_sync === 'waiting_for_complete_dates') {
                     showAlert('เพิ่มสาขาแล้ว · รอวันที่ Report', `${selected.branch_code} บันทึกใน Booking แล้ว · ยอดจริง ${boxTotal} กล่อง\nDelivery Report จะซิงก์เมื่อ Wave_Monitoring มีวันที่ครบ`, 'border-amber-500');
                 } else if (warningDetails.length) {
                     showAlert('บันทึกแล้ว แต่ยอดรวมเกินยอดตรวจ', `${selected.branch_code} เพิ่มเรียบร้อย · ยอดจริง ${boxTotal} กล่อง\n${warningDetails.join('\n')}\nรายงานกำลังซิงก์`, 'border-amber-500');
