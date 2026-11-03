@@ -19,7 +19,7 @@
          ระหว่างที่คนพิมพ์รหัสพนักงาน เครื่องก็ตื่นไปแล้ว -->
     <script>
         // Keep the version available even if a later, large script has a syntax error.
-        window.__PRO_SCANNER_APP_VERSION = '1.9.19-free';
+        window.__PRO_SCANNER_APP_VERSION = '1.9.20-free';
         window.__proScannerSyntaxErrorsReported = new WeakSet();
         (function installEarlySyntaxErrorCapture() {
             const queueKey = 'proScannerDebugQueue:v1';
@@ -5363,6 +5363,10 @@
                 additionCommitted = true;
                 bookingBranchAddFormOpen = false;
                 bookingBranchAddLookup = { wave: '', code: '', options: [], selectedIndex: 0, error: '' };
+                // A document opened from a Wave must switch to its target Booking
+                // after adding a branch from another Wave. Refreshing check-wave
+                // would show only the original Wave and hide the new allocation.
+                currentLookupIsWaveOnly = false;
                 // The API already updated its actual-allocation and override caches.
                 // Avoid a full Member Data refresh after every single branch add.
                 const latest = await fetchFreshCurrentJobData(false);
