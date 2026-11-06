@@ -19,7 +19,7 @@
          ระหว่างที่คนพิมพ์รหัสพนักงาน เครื่องก็ตื่นไปแล้ว -->
     <script>
         // Keep the version available even if a later, large script has a syntax error.
-        window.__PRO_SCANNER_APP_VERSION = '1.9.23-free';
+        window.__PRO_SCANNER_APP_VERSION = '1.9.24-free';
         window.__proScannerSyntaxErrorsReported = new WeakSet();
         (function installEarlySyntaxErrorCapture() {
             const queueKey = 'proScannerDebugQueue:v1';
@@ -1885,6 +1885,7 @@
 
         let loggedInEmpId = ""; let loggedInEmpName = ""; let currentWave = ""; let allLpnsInWave = [];
         let currentBookingNo = ""; let currentLicensePlate = "";
+        let branchCompletenessWarnings = [];
         let activeDocumentType = 'shipping';
         let currentTransportMeta = { carrier: '', driver: '', plate: '', booking: '', loaded: false };
         let isAlertOpen = false; let selectedBranchCode = ""; let selectedBranchName = "";
@@ -4046,10 +4047,12 @@
 
         function closeGenericConfirm() {
             const modal = document.getElementById('genericConfirmModal');
+            const message = document.getElementById('genericConfirmMessage');
             if (modal) {
                 modal.classList.add('hidden');
                 modal.classList.remove('flex');
             }
+            if (message) message.classList.remove('max-h-[55vh]', 'overflow-y-auto', 'text-left');
             isConfirmOpen = false;
             genericConfirmCallback = null;
         }
@@ -6103,7 +6106,26 @@
             }).join('');
         }
 
-        async function printCurrentDocument() {
+        async function printCurrentDocument(completenessWarningAcknowledged = false) {
+            if (!completenessWarningAcknowledged && branchCompletenessWarnings.length > 0) {
+                const details = branchCompletenessWarnings.map(item => {
+                    const wave = String(item.wave || item.wave_no || '-');
+                    const missing = Array.isArray(item.missing) ? item.missing : [];
+                    const counts = Number.isFinite(Number(item.actual)) && Number.isFinite(Number(item.expected))
+                        ? `มีข้อมูล ${Number(item.actual)} / คาดหวัง ${Number(item.expected)} สาขา\n`
+                        : '';
+                    return `Wave ${wave}: ขาด ${missing.length} สาขา\n${counts}${missing.join(', ')}`;
+                }).join('\n\n');
+                const message = document.getElementById('genericConfirmMessage');
+                if (message) message.classList.add('max-h-[55vh]', 'overflow-y-auto', 'text-left');
+                showConfirm(
+                    '⚠️ รายการสาขาใน Wave ไม่ครบ',
+                    `Wave_Monitoring ระบุสาขาเหล่านี้ไว้ แต่ไม่พบในข้อมูล Member Data ณ เวลาที่โหลด อาจยังไม่ได้ลงข้อมูลหรือถูกตัดออกจาก Wave แล้ว กรุณาตรวจสอบก่อนพิมพ์\n\n${details}\n\nต้องการพิมพ์เอกสารต่อหรือไม่?`,
+                    'พิมพ์ต่อ',
+                    () => printCurrentDocument(true)
+                );
+                return;
+            }
             if (activeDocumentType === 'shortage') await printShortageExcessDocument();
             else await printShippingDocument();
         }
@@ -6583,6 +6605,9 @@
 
         function applyWaveDataToScreen(data, isWaveOnly) {
             currentLookupIsWaveOnly = Boolean(isWaveOnly);
+            branchCompletenessWarnings = Array.isArray(data.branch_completeness_warnings)
+                ? data.branch_completeness_warnings.filter(item => item && Array.isArray(item.missing) && item.missing.length > 0)
+                : [];
             const previousLocalState = new Map((allLpnsInWave || []).map(item => [
                 `${String(item.branch || '').toUpperCase()}|${String(item.lpn || '').toUpperCase()}`,
                 { palletNo: parseInt(item.palletNo) || 0, palletColor: item.palletColor || null, correctionCount: parseInt(item.correctionCount) || 0 }
