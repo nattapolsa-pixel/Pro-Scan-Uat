@@ -19,7 +19,7 @@
          ระหว่างที่คนพิมพ์รหัสพนักงาน เครื่องก็ตื่นไปแล้ว -->
     <script>
         // Keep the version available even if a later, large script has a syntax error.
-        window.__PRO_SCANNER_APP_VERSION = '1.9.27-free';
+        window.__PRO_SCANNER_APP_VERSION = '1.9.28-free';
         window.__proScannerSyntaxErrorsReported = new WeakSet();
         (function installEarlySyntaxErrorCapture() {
             const queueKey = 'proScannerDebugQueue:v1';
@@ -4015,12 +4015,36 @@
                     if (!result || result.persist_overrides !== true) {
                         throw new Error('Server ยังไม่ยืนยันการบันทึกยอด');
                     }
-                    showToast('บันทึกยอดแก้ไขส่วนกลางแล้ว');
+                    if (!showDocumentActualCountWarning(result.warnings)) {
+                        showToast('บันทึกยอดแก้ไขส่วนกลางแล้ว');
+                    }
                 } catch (error) {
                     console.warn('⚠️ Committed document total save failed:', error);
                     showToast('บันทึกยอดส่วนกลางไม่สำเร็จ กรุณากดบันทึกยอดก่อนปิดเอกสาร', true);
                 }
             }, 500);
+        }
+
+        function showDocumentActualCountWarning(warnings) {
+            if (!Array.isArray(warnings) || warnings.length === 0) return false;
+            const labels = { m: 'กล่อง M', red: 'TOTE แดง', blue: 'TOTE น้ำเงิน', green: 'TOTE เขียว', black: 'TOTE ดำ', pallet: 'พาเลท' };
+            const details = warnings.flatMap(item => {
+                const fields = Object.entries(item && item.fields || {}).map(([field, detail]) => {
+                    const direction = detail.direction === 'over' ? 'เกิน' : 'ขาด';
+                    return `${labels[field] || field}: กรอก ${detail.entered} / ยอดที่ระบบเหลือ ${detail.expected} (${direction} ${detail.difference})`;
+                });
+                return fields.length
+                    ? [`สาขา ${item.branch || '-'} · Wave ${item.wave || '-'} · Booking ${item.booking || '-'}\n${fields.join('\n')}`]
+                    : [];
+            });
+            if (!details.length) return false;
+            showAlert(
+                '⚠️ บันทึกแล้ว แต่ยอดต่างจากระบบ',
+                `บันทึกยอดตามที่กรอกแล้ว กรุณาตรวจสอบส่วนต่างกับของจริง\n\n${details.join('\n\n')}`,
+                'border-amber-500',
+                false
+            );
+            return true;
         }
 
         function commitDocumentFieldInput(input) {
@@ -4175,7 +4199,9 @@
                     duration_ms: performance.now() - saveStartedAt,
                     detail: `${branchCount} branches / ${fieldCount} fields`
                 });
-                if (serverResult && serverResult.report_sync === 'completed') {
+                if (showDocumentActualCountWarning(serverResult && serverResult.warnings)) {
+                    return;
+                } else if (serverResult && serverResult.report_sync === 'completed') {
                     showAlert('✅ บันทึกยอดแก้ไขเรียบร้อย', `บันทึกแล้ว ${fieldCount} ช่อง จาก ${branchCount} สาขา\nเวลา ${savedAt} น.\n\nยอดในเว็บ, Member Data และรายงานอัปเดตครบแล้ว`, 'border-green-600', true);
                 } else if (serverResult && serverResult.report_sync === 'queued') {
                     showAlert('✅ รับยอดแก้ไขแล้ว', `บันทึกแล้ว ${fieldCount} ช่อง จาก ${branchCount} สาขา\nเวลา ${savedAt} น.\n\nระบบกำลังส่งยอดไป Member Data และ Delivery report ต่อเบื้องหลัง ยอดในเว็บจะไม่เด้งกลับ`, 'border-green-600', true);
@@ -6275,6 +6301,7 @@
             // instance a cold/slow response could otherwise make some devices
             // look stuck even though the document itself is ready to print.
             pushDocumentSummaryToServer(true, true, null, 'print_document')
+                .then(result => showDocumentActualCountWarning(result && result.warnings))
                 .catch(error => {
                     console.warn('⚠️ Document state save while printing failed:', error);
                     showToast('พิมพ์จากยอดล่าสุดบนเครื่องแล้ว แต่บันทึกส่วนกลางไม่สำเร็จ', true);
