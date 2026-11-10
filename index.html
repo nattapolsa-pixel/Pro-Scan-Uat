@@ -19,7 +19,7 @@
          ระหว่างที่คนพิมพ์รหัสพนักงาน เครื่องก็ตื่นไปแล้ว -->
     <script>
         // Keep the version available even if a later, large script has a syntax error.
-        window.__PRO_SCANNER_APP_VERSION = '1.9.28-free';
+        window.__PRO_SCANNER_APP_VERSION = '1.9.29-free';
         window.__proScannerSyntaxErrorsReported = new WeakSet();
         (function installEarlySyntaxErrorCapture() {
             const queueKey = 'proScannerDebugQueue:v1';
@@ -3896,6 +3896,11 @@
             const sentDirtyBranches = persistOverrides && dirtyDocumentOverrideScope === sentScope
                 ? new Set(dirtyDocumentOverrideBranches)
                 : new Set();
+            const sentDirtyFields = persistOverrides && dirtyDocumentOverrideScope === sentScope
+                ? new Map(Array.from(dirtyDocumentOverrideFields, ([branch, fields]) => [
+                    normalizeBranchLookupCode(branch), new Set(fields)
+                ]))
+                : new Map();
             if (persistOverrides) {
                 // If no branch was explicitly marked dirty (e.g., after page reload the dirty
                 // set is cleared but documentOverrides still has values), treat ALL branches
@@ -3926,6 +3931,9 @@
             if (!sourceSummaries.length) return { status: 'skipped' };
             const enrichedSummaries = sourceSummaries.map(s => ({
                 ...s,
+                ...(persistOverrides ? {
+                    edited_fields: Array.from(sentDirtyFields.get(normalizeBranchLookupCode(s.branch)) || [])
+                } : {}),
                 is_hidden: isDocumentBranchHidden(s.branch)
             }));
             const payload = {
@@ -4027,20 +4035,9 @@
 
         function showDocumentActualCountWarning(warnings) {
             if (!Array.isArray(warnings) || warnings.length === 0) return false;
-            const labels = { m: 'กล่อง M', red: 'TOTE แดง', blue: 'TOTE น้ำเงิน', green: 'TOTE เขียว', black: 'TOTE ดำ', pallet: 'พาเลท' };
-            const details = warnings.flatMap(item => {
-                const fields = Object.entries(item && item.fields || {}).map(([field, detail]) => {
-                    const direction = detail.direction === 'over' ? 'เกิน' : 'ขาด';
-                    return `${labels[field] || field}: กรอก ${detail.entered} / ยอดที่ระบบเหลือ ${detail.expected} (${direction} ${detail.difference})`;
-                });
-                return fields.length
-                    ? [`สาขา ${item.branch || '-'} · Wave ${item.wave || '-'} · Booking ${item.booking || '-'}\n${fields.join('\n')}`]
-                    : [];
-            });
-            if (!details.length) return false;
             showAlert(
                 '⚠️ บันทึกแล้ว แต่ยอดต่างจากระบบ',
-                `บันทึกยอดตามที่กรอกแล้ว กรุณาตรวจสอบส่วนต่างกับของจริง\n\n${details.join('\n\n')}`,
+                `ยอดที่กรอกบันทึกแล้ว · พบส่วนต่าง ${warnings.length} รายการ`,
                 'border-amber-500',
                 false
             );
