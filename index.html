@@ -19,7 +19,7 @@
          ระหว่างที่คนพิมพ์รหัสพนักงาน เครื่องก็ตื่นไปแล้ว -->
     <script>
         // Keep the version available even if a later, large script has a syntax error.
-        window.__PRO_SCANNER_APP_VERSION = '1.9.26-free';
+        window.__PRO_SCANNER_APP_VERSION = '1.9.27-free';
         window.__proScannerSyntaxErrorsReported = new WeakSet();
         (function installEarlySyntaxErrorCapture() {
             const queueKey = 'proScannerDebugQueue:v1';
@@ -1858,7 +1858,7 @@
     </div>
 
     <script>
-        // ⚠️ ต้องตรงกับ APP_VERSION ใน render.yaml ของ backend
+        // เวอร์ชัน Frontend แยกจาก API เพื่อให้บันทึกการใช้งานระบุรุ่นของแต่ละฝั่งได้
         const APP_VERSION = window.__PRO_SCANNER_APP_VERSION;
         const backendApiUrl = 'https://backed-api-scan-uat.onrender.com';
         // ⚠️ ต้องตรงกับ SCAN_FEATURE_ENABLED ใน render.yaml ของ backend
@@ -4006,6 +4006,23 @@
             }, Math.max(0, delayMs));
         }
 
+        function scheduleDocumentOverrideAutoSave() {
+            clearTimeout(manualSummaryTimer);
+            manualSummaryTimer = setTimeout(async () => {
+                manualSummaryTimer = null;
+                try {
+                    const result = await pushDocumentSummaryToServer(true, true, null, 'manual_total_commit');
+                    if (!result || result.persist_overrides !== true) {
+                        throw new Error('Server ยังไม่ยืนยันการบันทึกยอด');
+                    }
+                    showToast('บันทึกยอดแก้ไขส่วนกลางแล้ว');
+                } catch (error) {
+                    console.warn('⚠️ Committed document total save failed:', error);
+                    showToast('บันทึกยอดส่วนกลางไม่สำเร็จ กรุณากดบันทึกยอดก่อนปิดเอกสาร', true);
+                }
+            }, 500);
+        }
+
         function commitDocumentFieldInput(input) {
             if (!input || !input.dataset) return;
             const branchCode = input.dataset.branch;
@@ -4013,6 +4030,7 @@
             const value = String(input.value ?? '');
             if (String(input.dataset.originalValue ?? '') !== value) {
                 updateDocumentFieldValue(branchCode, field, value);
+                scheduleDocumentOverrideAutoSave();
             }
             input.dataset.originalValue = value;
             if (document.activeElement === input) input.blur();
@@ -4030,6 +4048,7 @@
                 input.dataset.originalValue = value;
                 captured = true;
             });
+            if (captured) scheduleDocumentOverrideAutoSave();
             return captured;
         }
 
@@ -6248,6 +6267,7 @@
                 if (!proceed) return;
             }
 
+            captureDocumentEditorInputs(content);
             saveDocumentOverrides();
             renderShippingDocument();
             // Start saving the current hidden/visible state, but do not wait for
@@ -6255,7 +6275,10 @@
             // instance a cold/slow response could otherwise make some devices
             // look stuck even though the document itself is ready to print.
             pushDocumentSummaryToServer(true, true, null, 'print_document')
-                .catch(error => console.warn('⚠️ Document state save while printing failed:', error));
+                .catch(error => {
+                    console.warn('⚠️ Document state save while printing failed:', error);
+                    showToast('พิมพ์จากยอดล่าสุดบนเครื่องแล้ว แต่บันทึกส่วนกลางไม่สำเร็จ', true);
+                });
 
             // ช่องพาเลทที่ยังไม่มีข้อมูลจะแสดงเป็น "-" ในเอกสารอยู่แล้ว
             // ไม่ควรใช้ native confirm มาขวางการพิมพ์ เพราะบางเครื่อง/บางเบราว์เซอร์
