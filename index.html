@@ -19,7 +19,7 @@
          ระหว่างที่คนพิมพ์รหัสพนักงาน เครื่องก็ตื่นไปแล้ว -->
     <script>
         // Keep the version available even if a later, large script has a syntax error.
-        window.__PRO_SCANNER_APP_VERSION = '1.9.24-free';
+        window.__PRO_SCANNER_APP_VERSION = '1.9.26-free';
         window.__proScannerSyntaxErrorsReported = new WeakSet();
         (function installEarlySyntaxErrorCapture() {
             const queueKey = 'proScannerDebugQueue:v1';
@@ -1087,7 +1087,7 @@
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[92vh] overflow-auto">
             <div class="bg-amber-500 p-4 flex justify-between items-center"><div><div class="text-xs font-bold">เปลี่ยนแผนขนส่ง</div><h2 class="text-xl font-black">🚚 จัดสาขาเข้ารถคันนี้</h2></div><button onclick="closeBookingBranchMove()" class="text-3xl font-black">×</button></div>
             <div class="p-4 space-y-3">
-                <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm"><b>Booking รถคันนี้:</b> <span id="moveTargetBooking" class="font-black text-blue-700"></span><br><span class="text-xs">เลือกได้ว่าจะย้ายทั้งสาขา หรือแบ่งเฉพาะยอดที่รถคันนี้รับไป</span></div>
+                <div id="moveTargetHint" class="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm"><b>Booking รถคันนี้:</b> <span id="moveTargetBooking" class="font-black text-blue-700"></span><br><span class="text-xs">เลือกได้ว่าจะย้ายทั้งสาขา หรือแบ่งเฉพาะยอดที่รถคันนี้รับไป</span></div>
                 <div class="grid grid-cols-2 gap-2">
                     <button id="moveModeAllBtn" onclick="setBookingMoveMode('all')" class="border-2 border-blue-600 bg-blue-50 text-blue-800 rounded-xl p-3 font-black text-sm">🚚 ย้ายทั้งสาขา</button>
                     <button id="moveModeSplitBtn" onclick="setBookingMoveMode('split')" class="border-2 border-slate-200 bg-white text-slate-700 rounded-xl p-3 font-black text-sm">📦 แบ่งบางส่วน</button>
@@ -1106,9 +1106,9 @@
                         <label class="font-bold">TOTE ดำ<input id="moveSplitBlack" type="number" min="0" value="0" class="mt-1 w-full border rounded-lg p-2 text-center font-black"></label>
                         <label class="font-bold text-indigo-700">พาเลท<input id="moveSplitPallet" type="number" min="0" value="0" class="mt-1 w-full border rounded-lg p-2 text-center font-black"></label>
                     </div>
-                    <div class="text-[11px] text-purple-700 font-bold mt-2">Booking เดิมจะเหลือยอดส่วนที่ไม่ได้แบ่ง และสาขาจะอยู่ได้ทั้ง 2 Booking</div>
+                    <div id="moveSplitAvailability" class="text-[11px] text-purple-700 font-bold mt-2">Booking เดิมจะเหลือยอดส่วนที่ไม่ได้แบ่ง และสาขาจะอยู่ได้ทั้ง 2 Booking</div>
                 </div>
-                <label class="block text-sm font-bold">เหตุผล<select id="moveReasonInput" class="mt-1 w-full border-2 rounded-lg p-3"><option value="">-- เลือกเหตุผล --</option><option>เพิ่มจุดส่ง</option><option>เปลี่ยนรถ</option><option>รถเดิมเต็ม</option><option>จัดเส้นทางใหม่</option><option>อื่นๆ</option></select></label>
+                <label class="block text-sm font-bold">เหตุผล<select id="moveReasonInput" class="mt-1 w-full border-2 rounded-lg p-3"><option value="">-- เลือกเหตุผล --</option><option value="SPLIT_BOOKING_TO_TRUCK">แบ่ง Booking ออกเป็นรถ</option><option>เพิ่มจุดส่ง</option><option>เปลี่ยนรถ</option><option>รถเดิมเต็ม</option><option>จัดเส้นทางใหม่</option><option>อื่นๆ</option></select></label>
                 <label class="block text-sm font-bold">หมายเหตุ (ถ้ามี)<input id="moveNoteInput" class="mt-1 w-full border-2 rounded-lg p-3" placeholder="รายละเอียดเพิ่มเติม"></label>
                 <button id="confirmMoveBranchBtn" disabled onclick="confirmBookingBranchMove()" class="w-full bg-emerald-600 disabled:bg-slate-300 text-white rounded-lg p-3 font-black">ยืนยันย้ายทั้งสาขา</button>
             </div>
@@ -1386,6 +1386,7 @@
                 </button>
             </div>
             
+            <div id="bookingSplitFamilyBanner" class="hidden mb-4 rounded-xl border-2 border-blue-300 bg-blue-50 p-4 shadow-sm"></div>
             <!-- 📄 Banner เอกสารใบคุมส่งสินค้า สำหรับผู้ทำเอกสารและผู้ปฏิบัติงานที่สแกนเสร็จแล้ว -->
             <div id="branchDocumentBanner" class="mb-4 p-4 bg-amber-500 hover:bg-amber-600 text-gray-900 rounded-xl shadow-md border-b-4 border-amber-700 flex items-center justify-between cursor-pointer active:scale-95 transition" onclick="openShippingDocument()">
                 <div class="flex items-center gap-3">
@@ -1884,7 +1885,8 @@
         };
 
         let loggedInEmpId = ""; let loggedInEmpName = ""; let currentWave = ""; let allLpnsInWave = [];
-        let currentBookingNo = ""; let currentLicensePlate = "";
+        let currentBookingNo = ""; let currentLicensePlate = ""; let currentBookingVehicleType = "";
+        let currentBookingSplitFamily = null;
         let branchCompletenessWarnings = [];
         let activeDocumentType = 'shipping';
         let currentTransportMeta = { carrier: '', driver: '', plate: '', booking: '', loaded: false };
@@ -2555,13 +2557,13 @@
                 return show ? `<text x="${x(index)}" y="${height - 18}" text-anchor="middle" font-size="10" font-weight="700" fill="#64748b">${label}</text>` : '';
             }).join('');
             const dots = (key, color) => rows.map((row, index) => `<circle cx="${x(index)}" cy="${y(row[key])}" r="4" fill="${color}" stroke="white" stroke-width="2"><title>${row.date}: ${row[key]} ครั้ง</title></circle>`).join('');
-            host.innerHTML = `<div class="flex items-center justify-end gap-4 px-2 text-xs font-black"><span class="flex items-center gap-1.5 text-cyan-700"><i class="w-3 h-3 rounded-full bg-cyan-500"></i>ค้นหา</span><span class="flex items-center gap-1.5 text-emerald-700"><i class="w-3 h-3 rounded-full bg-emerald-500"></i>พิมพ์</span></div><svg viewBox="0 0 ${width} ${height}" class="w-full h-auto" role="img" aria-label="กราฟแนวโน้มการค้นหาและพิมพ์เอกสารรายวัน">${grid}<polyline fill="none" stroke="#06b6d4" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" points="${points('searches')}"/>${dots('searches', '#06b6d4')}<polyline fill="none" stroke="#10b981" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" points="${points('prints')}"/>${dots('prints', '#10b981')}${labels}</svg>`;
+            host.innerHTML = `<div class="flex items-center justify-end gap-4 px-2 text-xs font-black"><span class="flex items-center gap-1.5 text-cyan-700"><i class="w-3 h-3 rounded-full bg-blue-500"></i>ค้นหา</span><span class="flex items-center gap-1.5 text-emerald-700"><i class="w-3 h-3 rounded-full bg-emerald-500"></i>พิมพ์</span></div><svg viewBox="0 0 ${width} ${height}" class="w-full h-auto" role="img" aria-label="กราฟแนวโน้มการค้นหาและพิมพ์เอกสารรายวัน">${grid}<polyline fill="none" stroke="#06b6d4" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" points="${points('searches')}"/>${dots('searches', '#06b6d4')}<polyline fill="none" stroke="#10b981" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" points="${points('prints')}"/>${dots('prints', '#10b981')}${labels}</svg>`;
         }
 
         function renderDashboardEventMix(counts) {
             const host = document.getElementById('dashboardEventMix');
             const order = ['SEARCH', 'OPEN_DOCUMENT', 'PRINT_DOCUMENT', 'SAVE_DOCUMENT', 'LOGIN'];
-            const colors = { SEARCH: 'bg-cyan-500', OPEN_DOCUMENT: 'bg-violet-500', PRINT_DOCUMENT: 'bg-emerald-500', SAVE_DOCUMENT: 'bg-amber-500', LOGIN: 'bg-blue-500' };
+            const colors = { SEARCH: 'bg-blue-500', OPEN_DOCUMENT: 'bg-violet-500', PRINT_DOCUMENT: 'bg-emerald-500', SAVE_DOCUMENT: 'bg-amber-500', LOGIN: 'bg-blue-500' };
             const max = Math.max(1, ...order.map(key => Number(counts[key]) || 0));
             const total = order.reduce((sum, key) => sum + (Number(counts[key]) || 0), 0);
             if (!total) {
@@ -3655,13 +3657,28 @@
         let documentOverridesRevision = 0;
         let syncedDocumentOverridesRevision = 0;
         const dirtyDocumentOverrideBranches = new Set();
+        const dirtyDocumentOverrideFields = new Map();
+        let dirtyDocumentOverrideScope = '';
         let bookingBranchAddFormOpen = false;
         let bookingBranchAddLookup = { wave: '', code: '', options: [], selectedIndex: 0, error: '' };
-        function markDocumentOverridesDirty(branchCodes = []) {
+        function markDocumentOverridesDirty(branchCodes = [], field = '') {
+            const scope = getDocumentOverridesStorageKey();
+            if (dirtyDocumentOverrideScope !== scope) {
+                dirtyDocumentOverrideBranches.clear();
+                dirtyDocumentOverrideFields.clear();
+                dirtyDocumentOverrideScope = scope;
+            }
             documentOverridesRevision += 1;
             (Array.isArray(branchCodes) ? branchCodes : [branchCodes])
                 .filter(Boolean)
-                .forEach(code => dirtyDocumentOverrideBranches.add(normalizeBranchLookupCode(code)));
+                .forEach(code => {
+                    const branch = normalizeBranchLookupCode(code);
+                    dirtyDocumentOverrideBranches.add(branch);
+                    if (field) {
+                        if (!dirtyDocumentOverrideFields.has(branch)) dirtyDocumentOverrideFields.set(branch, new Set());
+                        dirtyDocumentOverrideFields.get(branch).add(field);
+                    }
+                });
         }
         function getDocumentOverridesStorageKey() {
             return 'proScannerDocOverrides_' + (currentBookingNo || currentWave || 'default');
@@ -3875,7 +3892,10 @@
         async function pushDocumentSummaryToServer(isImmediate = false, persistOverrides = false, branchCodes = null, reason = 'auto_snapshot', syncReport = false) {
             const currentSummaries = collectDocumentSummariesForSync(branchCodes);
             let sourceSummaries = currentSummaries.length ? currentSummaries : (latestDocumentSummaries || []);
-            const sentDirtyBranches = persistOverrides ? new Set(dirtyDocumentOverrideBranches) : new Set();
+            const sentScope = getDocumentOverridesStorageKey();
+            const sentDirtyBranches = persistOverrides && dirtyDocumentOverrideScope === sentScope
+                ? new Set(dirtyDocumentOverrideBranches)
+                : new Set();
             if (persistOverrides) {
                 // If no branch was explicitly marked dirty (e.g., after page reload the dirty
                 // set is cleared but documentOverrides still has values), treat ALL branches
@@ -3931,9 +3951,12 @@
                 if (persistOverrides) {
                     // Never clear a change made while this request was in
                     // flight.  It will be included by the next queued save.
-                    if (documentOverridesRevision === sentRevision) {
+                    if (documentOverridesRevision === sentRevision && dirtyDocumentOverrideScope === sentScope) {
                         syncedDocumentOverridesRevision = Math.max(syncedDocumentOverridesRevision, sentRevision);
-                        sentDirtyBranches.forEach(branch => dirtyDocumentOverrideBranches.delete(branch));
+                        sentDirtyBranches.forEach(branch => {
+                            dirtyDocumentOverrideBranches.delete(branch);
+                            dirtyDocumentOverrideFields.delete(branch);
+                        });
                     }
                 }
                 console.log("✅ Document summary queued for both Google Sheets", reason);
@@ -3983,6 +4006,33 @@
             }, Math.max(0, delayMs));
         }
 
+        function commitDocumentFieldInput(input) {
+            if (!input || !input.dataset) return;
+            const branchCode = input.dataset.branch;
+            const field = input.dataset.field;
+            const value = String(input.value ?? '');
+            if (String(input.dataset.originalValue ?? '') !== value) {
+                updateDocumentFieldValue(branchCode, field, value);
+            }
+            input.dataset.originalValue = value;
+            if (document.activeElement === input) input.blur();
+        }
+
+        function captureDocumentEditorInputs(content = document.getElementById('shippingDocumentContent')) {
+            if (!content || content.dataset.documentScope !== getDocumentOverridesStorageKey()) return false;
+            const modal = document.getElementById('shippingDocumentModal');
+            if (!modal || modal.classList.contains('hidden')) return false;
+            let captured = false;
+            content.querySelectorAll('input[data-branch][data-field]').forEach(input => {
+                const value = String(input.value ?? '');
+                if (String(input.dataset.originalValue ?? '') === value) return;
+                updateDocumentFieldValue(input.dataset.branch, input.dataset.field, value);
+                input.dataset.originalValue = value;
+                captured = true;
+            });
+            return captured;
+        }
+
         function updateDocumentFieldValue(branchCode, field, value) {
             if (!branchCode || !field) return;
             const normCode = normalizeBranchLookupCode(branchCode);
@@ -3998,8 +4048,7 @@
                 if (normCode && documentOverrides[normCode]) documentOverrides[normCode][field] = intVal;
             }
             saveDocumentOverrides();
-            markDocumentOverridesDirty(branchCode);
-            if (normCode && normCode !== branchCode) markDocumentOverridesDirty(normCode);
+            markDocumentOverridesDirty(normCode && normCode !== branchCode ? [branchCode, normCode] : branchCode, field);
             // Do not re-render here. onchange fires while the user clicks Save;
             // replacing the document DOM at that moment cancels the click and
             // used to restore the old value. Keep the typed value and button alive.
@@ -4076,6 +4125,7 @@
         let isSavingDocumentOverrides = false;
         async function saveDocumentOverridesUI() {
             if (isSavingDocumentOverrides) return;
+            captureDocumentEditorInputs();
             const saveStartedAt = performance.now();
             isSavingDocumentOverrides = true;
             const button = document.getElementById('saveDocumentOverridesBtn');
@@ -4811,8 +4861,16 @@
         }
 
         async function openShippingDocument(preferredBranchCode = '', bypassOtherDevices = false, documentType = 'shipping') {
+            if (currentBookingSplitFamily && currentBookingSplitFamily.role === 'parent') {
+                showAlert('Booking นี้ยังไม่มีรถ', 'กรุณาเลือก Booking รถลูก แล้วแบ่งยอดรายสาขาให้แต่ละคันก่อนเปิดเอกสาร', 'border-blue-600');
+                return;
+            }
             if (!currentWave || allLpnsInWave.length === 0) {
-                showAlert('ยังไม่มีข้อมูล Wave', 'กรุณาเลือก Wave ก่อนเปิดเอกสารใบคุมส่งสินค้า');
+                if (currentBookingSplitFamily && currentBookingSplitFamily.role === 'child') {
+                    showAlert('รถคันนี้ยังไม่มียอดจัดสรร', 'กด “จัด/ปรับยอดสาขาให้รถคันนี้” แล้วบันทึกยอดที่รับไปจาก Booking ต้นทางก่อนเปิดเอกสาร', 'border-blue-600');
+                } else {
+                    showAlert('ยังไม่มีข้อมูล Wave', 'กรุณาเลือก Wave ก่อนเปิดเอกสารใบคุมส่งสินค้า');
+                }
                 return;
             }
 
@@ -4861,6 +4919,7 @@
         }
 
         function closeShippingDocument() {
+            captureDocumentEditorInputs();
             document.getElementById('shippingDocumentModal').classList.add('hidden');
             document.getElementById('shippingDocumentModal').classList.remove('flex');
             if (selectedBranchCode && !document.getElementById('mainApp').classList.contains('hidden')) {
@@ -4871,7 +4930,8 @@
         let bookingBranchMovePreview = null;
         let bookingBranchMoveMode = 'all';
         function setBookingMoveMode(mode) {
-            bookingBranchMoveMode = mode === 'split' ? 'split' : 'all';
+            const isSplitFamilyChild = currentBookingSplitFamily && currentBookingSplitFamily.role === 'child';
+            bookingBranchMoveMode = isSplitFamilyChild || mode === 'split' ? 'split' : 'all';
             const isSplit = bookingBranchMoveMode === 'split';
             loadDocumentHiddenBranches();
             const alreadyInTarget = bookingBranchMovePreview && String(bookingBranchMovePreview.current_booking || '').toUpperCase() === String(currentBookingNo || '').toUpperCase();
@@ -4879,6 +4939,11 @@
             const isInCurrentDocument = bookingBranchMovePreview && allLpnsInWave.some(item => normalizeBranchLookupCode(item.branch) === normalizeBranchLookupCode(bookingBranchMovePreview.branch_code));
             document.getElementById('moveModeAllBtn').className = `border-2 ${isSplit ? 'border-slate-200 bg-white text-slate-700' : 'border-blue-600 bg-blue-50 text-blue-800'} rounded-xl p-3 font-black text-sm`;
             document.getElementById('moveModeSplitBtn').className = `border-2 ${isSplit ? 'border-purple-600 bg-purple-50 text-purple-800' : 'border-slate-200 bg-white text-slate-700'} rounded-xl p-3 font-black text-sm`;
+            document.getElementById('moveModeAllBtn').classList.toggle('hidden', Boolean(isSplitFamilyChild));
+            document.getElementById('moveModeSplitBtn').classList.toggle('hidden', Boolean(isSplitFamilyChild));
+            document.getElementById('moveTargetHint').innerHTML = isSplitFamilyChild
+                ? `<b>จัดสาขาให้รถคันนี้:</b> <span class="font-black text-blue-700">${escapeDocumentText(currentBookingNo)}</span><br><span class="text-xs">บันทึกยอดตามที่หน้างานแบ่งจริง ระบบจะหักยอดนี้จาก Booking ต้นทาง ${escapeDocumentText(currentBookingSplitFamily.parent_booking || '')}</span>`
+                : `<b>Booking รถคันนี้:</b> <span class="font-black text-blue-700">${escapeDocumentText(currentBookingNo)}</span><br><span class="text-xs">เลือกได้ว่าจะย้ายทั้งสาขา หรือแบ่งเฉพาะยอดที่รถคันนี้รับไป</span>`;
             document.getElementById('moveSplitFields').classList.toggle('hidden', !isSplit || !bookingBranchMovePreview || alreadyInTarget);
             document.getElementById('confirmMoveBranchBtn').textContent = alreadyInTarget
                 ? ((isHiddenHere || !isInCurrentDocument) ? 'นำสาขากลับมาแสดงในเอกสาร' : 'ยืนยันและซิงก์ข้อมูลสาขา')
@@ -4887,11 +4952,14 @@
         function openBookingBranchMove() {
             if (!currentBookingNo) return showAlert('ไม่พบ Booking ปลายทาง', 'ฟังก์ชันนี้ใช้เมื่อเปิดงานด้วย Booking เท่านั้น');
             bookingBranchMovePreview = null;
-            setBookingMoveMode('all');
+            const isSplitFamilyChild = currentBookingSplitFamily && currentBookingSplitFamily.role === 'child';
+            setBookingMoveMode(isSplitFamilyChild ? 'split' : 'all');
             document.getElementById('moveTargetBooking').textContent = currentBookingNo;
-            document.getElementById('moveWaveInput').value = '';
+            const firstFamilyWave = isSplitFamilyChild && Array.isArray(currentBookingSplitFamily.waves)
+                ? String(currentBookingSplitFamily.waves[0] || '') : '';
+            document.getElementById('moveWaveInput').value = firstFamilyWave;
             window.bookingBranchMoveWave = '';
-            document.getElementById('moveReasonInput').value = '';
+            document.getElementById('moveReasonInput').value = isSplitFamilyChild ? 'SPLIT_BOOKING_TO_TRUCK' : '';
             document.getElementById('moveNoteInput').value = '';
             document.getElementById('moveBranchChoices').classList.add('hidden');
             document.getElementById('moveBranchChoices').innerHTML = '';
@@ -4918,7 +4986,7 @@
             try {
                 // UAT อาจเพิ่งตื่น/เพิ่ง Deploy ทำให้คำขอแรกหลุดเป็น Failed to fetch
                 // ลองเชื่อมต่อใหม่อัตโนมัติ เฉพาะการค้นหา Wave สำหรับจัดสาขา
-                const url = backendApiUrl + `/api/wave-branch-options?wave_no=${encodeURIComponent(wave)}&_ts=${Date.now()}`;
+                const url = backendApiUrl + `/api/wave-branch-options?wave_no=${encodeURIComponent(wave)}&target_booking=${encodeURIComponent(currentBookingNo)}&_ts=${Date.now()}`;
                 // 45 วิ x 2 ครั้ง ไม่ใช่ 90 x 3: endpoint นี้วัดได้ 2.1 วิ การตั้ง 90x3
                 // ทำให้คนกดปุ่มยืนรอได้ถึง 4.5 นาทีเวลาเซิร์ฟเวอร์ไม่พร้อม
                 const res = await fetchJobDataWithRetry(url, false, true, 45000, 1);
@@ -4961,16 +5029,28 @@
             const isInCurrentDocument = allLpnsInWave.some(current => normalizeBranchLookupCode(current.branch) === normalizeBranchLookupCode(item.branch_code));
             document.querySelectorAll('.move-branch-choice').forEach((button, buttonIndex) => button.classList.toggle('border-blue-600', buttonIndex === index));
             const closed = item.is_closed ? '✅ ปิดจบแล้ว' : '🟡 ยังไม่ Stamp ปิดสาขา';
-            const actionHint = alreadyInTarget
-                ? ((isHiddenHere || !isInCurrentDocument) ? 'สาขานี้ย้ายเข้า Booking นี้แล้ว กดยืนยันเพื่อนำกลับมาแสดงในเอกสาร' : `สาขานี้อยู่ใน Booking ${escapeDocumentText(currentBookingNo)} และแสดงในเอกสารแล้ว`)
-                : `ยืนยันแล้ว Booking ${escapeDocumentText(currentBookingNo)} จะรวมยอดเดิมทันที ไม่ต้องยิงใหม่`;
+            const actionHint = currentBookingSplitFamily && currentBookingSplitFamily.role === 'child'
+                ? `บันทึกเฉพาะยอดที่รถคันนี้รับไป ระบบจะหักยอดที่จัดให้รถคันอื่นและแสดงส่วนที่เหลือไว้ที่ Booking ต้นทาง ${escapeDocumentText(currentBookingSplitFamily.parent_booking || '')}`
+                : alreadyInTarget
+                    ? ((isHiddenHere || !isInCurrentDocument) ? 'สาขานี้ย้ายเข้า Booking นี้แล้ว กดยืนยันเพื่อนำกลับมาแสดงในเอกสาร' : `สาขานี้อยู่ใน Booking ${escapeDocumentText(currentBookingNo)} และแสดงในเอกสารแล้ว`)
+                    : `ยืนยันแล้ว Booking ${escapeDocumentText(currentBookingNo)} จะรวมยอดเดิมทันที ไม่ต้องยิงใหม่`;
             document.getElementById('moveBranchPreview').innerHTML = `<div class="font-black text-lg">เลือก: ${escapeDocumentText(item.branch_code)} — ${escapeDocumentText(item.branch_name)}</div><div class="grid grid-cols-2 gap-2 mt-2"><div><b>Booking ปัจจุบัน</b><br>${escapeDocumentText(item.current_booking || '-')}</div><div><b>สถานะ</b><br>${closed}</div><div><b>LPN ยิงแล้ว</b><br>${item.lpn_scanned}/${item.lpn_total}</div><div><b>ยอดนับ</b><br>${item.box_qty} กล่อง / ${item.pallet_count} พาเลท</div></div><div class="mt-2 text-xs ${alreadyInTarget ? 'text-amber-700' : 'text-red-700'} font-bold">${actionHint}</div>`;
             document.getElementById('moveBranchPreview').classList.remove('hidden');
             const totals = item.totals || {};
+            const splitDefaults = item.target_split_totals || {};
+            const splitMaximums = item.remaining_totals || totals;
             ['M', 'Red', 'Blue', 'Green', 'Black', 'Pallet'].forEach(name => {
                 const input = document.getElementById('moveSplit' + name);
-                if (input) { input.value = 0; input.max = parseInt(totals[name.toLowerCase()]) || 0; }
+                if (input) {
+                    const field = name.toLowerCase();
+                    input.value = parseInt(splitDefaults[field]) || 0;
+                    input.max = parseInt(splitMaximums[field]) || 0;
+                }
             });
+            const availability = item.remaining_totals || totals;
+            document.getElementById('moveSplitAvailability').textContent = currentBookingSplitFamily && currentBookingSplitFamily.role === 'child'
+                ? `ยอดที่ยังจัดให้รถคันนี้ได้สูงสุด: M ${availability.m || 0}, แดง ${availability.red || 0}, น้ำเงิน ${availability.blue || 0}, เขียว ${availability.green || 0}, ดำ ${availability.black || 0}, พาเลท ${availability.pallet || 0} — ปรับยอดตามที่หน้างานแบ่งจริง`
+                : 'Booking เดิมจะเหลือยอดส่วนที่ไม่ได้แบ่ง และสาขาจะอยู่ได้ทั้ง 2 Booking';
             document.getElementById('moveSplitFields').classList.toggle('hidden', bookingBranchMoveMode !== 'split' || alreadyInTarget);
             // เมื่อเลือกสาขาได้แล้วต้องยืนยันได้ทุกสถานะ การกดย้ำสาขาที่อยู่ใน
             // Booking นี้แล้วจะเป็นการซิงก์ข้อมูลแบบ idempotent และไม่เพิ่มยอดซ้ำ
@@ -5010,6 +5090,11 @@
                 pallet: parseInt(document.getElementById('moveSplitPallet').value) || 0
             } : {};
             if (isSplit && (split.m + split.red + split.blue + split.green + split.black) <= 0) return showAlert('ยังไม่ได้ใส่ยอด', 'กรุณาใส่ยอดกล่องที่รถคันนี้รับไปอย่างน้อย 1 กล่อง');
+            if (isSplit && currentBookingSplitFamily && currentBookingSplitFamily.role === 'child') {
+                const available = bookingBranchMovePreview.remaining_totals || bookingBranchMovePreview.totals || {};
+                const overLimit = Object.keys(split).find(field => split[field] > (parseInt(available[field]) || 0));
+                if (overLimit) return showAlert('ยอดเกินส่วนที่เหลือ', `${overLimit.toUpperCase()} ที่กรอก ${split[overLimit]} มากกว่ายอดที่ยังจัดสรรได้ ${parseInt(available[overLimit]) || 0} กรุณาตรวจยอดแบ่งของรถคันอื่นก่อน`, 'border-amber-500');
+            }
             showLoading(isSplit ? 'กำลังแบ่งยอดและบันทึกหลักฐาน...' : 'กำลังย้ายสาขาและบันทึกหลักฐาน...');
             try {
                 const endpoint = isSplit ? '/api/split-booking-branch' : '/api/move-booking-branch';
@@ -5406,10 +5491,12 @@
         }
 
         function renderShippingDocument() {
+            const content = document.getElementById('shippingDocumentContent');
+            captureDocumentEditorInputs(content);
             loadDocumentOverrides();
             loadDocumentHiddenBranches();
             latestDocumentSummaries = [];
-            const content = document.getElementById('shippingDocumentContent');
+            if (content) content.dataset.documentScope = getDocumentOverridesStorageKey();
             const branches = getDocumentBranches();
             const allBranches = getAllDocumentBranchesRaw();
             const hiddenBranches = getDocumentHiddenBranches();
@@ -5555,9 +5642,10 @@
                         <!-- 📦 กล่อง M -->
                         <td class="p-2 border-r border-slate-200 font-bold font-sans">
                             <input type="number" min="0" step="1" value="${mCount || ''}" placeholder="0"
-                                data-branch="${escapeDocumentText(bCode)}" data-field="m"
+                                data-branch="${escapeDocumentText(bCode)}" data-field="m" data-original-value="${mCount || ''}"
                                 oninput="updateDocumentFieldValue(this.dataset.branch, 'm', this.value)"
-                                onkeydown="if (event.key === 'Enter') this.blur()"
+                                onchange="commitDocumentFieldInput(this)"
+                                onkeydown="if (event.key === 'Enter') { event.preventDefault(); commitDocumentFieldInput(this); }"
                                 class="no-print w-14 max-w-full text-center bg-white border border-slate-200 rounded-lg px-1 py-1 text-slate-900 font-black outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
                             <span class="print-only">${mCount || ''}</span>
                         </td>
@@ -5565,9 +5653,10 @@
                         <!-- 🔴 TOTE แดง -->
                         <td class="p-2 border-r border-slate-200 font-bold font-sans">
                             <input type="number" min="0" step="1" value="${redCount || ''}" placeholder="0"
-                                data-branch="${escapeDocumentText(bCode)}" data-field="red"
+                                data-branch="${escapeDocumentText(bCode)}" data-field="red" data-original-value="${redCount || ''}"
                                 oninput="updateDocumentFieldValue(this.dataset.branch, 'red', this.value)"
-                                onkeydown="if (event.key === 'Enter') this.blur()"
+                                onchange="commitDocumentFieldInput(this)"
+                                onkeydown="if (event.key === 'Enter') { event.preventDefault(); commitDocumentFieldInput(this); }"
                                 class="no-print w-14 max-w-full text-center bg-white border border-slate-200 rounded-lg px-1 py-1 text-red-600 font-black outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100">
                             <span class="print-only">${redCount || ''}</span>
                         </td>
@@ -5575,9 +5664,10 @@
                         <!-- 🔵 TOTE น้ำเงิน -->
                         <td class="p-2 border-r border-slate-200 font-bold font-sans">
                             <input type="number" min="0" step="1" value="${blueCount || ''}" placeholder="0"
-                                data-branch="${escapeDocumentText(bCode)}" data-field="blue"
+                                data-branch="${escapeDocumentText(bCode)}" data-field="blue" data-original-value="${blueCount || ''}"
                                 oninput="updateDocumentFieldValue(this.dataset.branch, 'blue', this.value)"
-                                onkeydown="if (event.key === 'Enter') this.blur()"
+                                onchange="commitDocumentFieldInput(this)"
+                                onkeydown="if (event.key === 'Enter') { event.preventDefault(); commitDocumentFieldInput(this); }"
                                 class="no-print w-14 max-w-full text-center bg-white border border-slate-200 rounded-lg px-1 py-1 text-blue-600 font-black outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
                             <span class="print-only">${blueCount || ''}</span>
                         </td>
@@ -5585,9 +5675,10 @@
                         <!-- 🟢 TOTE เขียว -->
                         <td class="p-2 border-r border-slate-200 font-bold font-sans">
                             <input type="number" min="0" step="1" value="${greenCount || ''}" placeholder="0"
-                                data-branch="${escapeDocumentText(bCode)}" data-field="green"
+                                data-branch="${escapeDocumentText(bCode)}" data-field="green" data-original-value="${greenCount || ''}"
                                 oninput="updateDocumentFieldValue(this.dataset.branch, 'green', this.value)"
-                                onkeydown="if (event.key === 'Enter') this.blur()"
+                                onchange="commitDocumentFieldInput(this)"
+                                onkeydown="if (event.key === 'Enter') { event.preventDefault(); commitDocumentFieldInput(this); }"
                                 class="no-print w-14 max-w-full text-center bg-white border border-slate-200 rounded-lg px-1 py-1 text-green-600 font-black outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100">
                             <span class="print-only">${greenCount || ''}</span>
                         </td>
@@ -5595,9 +5686,10 @@
                         <!-- ⚫ TOTE ดำ -->
                         <td class="p-2 border-r border-slate-200 font-bold font-sans">
                             <input type="number" min="0" step="1" value="${blackCount || ''}" placeholder="0"
-                                data-branch="${escapeDocumentText(bCode)}" data-field="black"
+                                data-branch="${escapeDocumentText(bCode)}" data-field="black" data-original-value="${blackCount || ''}"
                                 oninput="updateDocumentFieldValue(this.dataset.branch, 'black', this.value)"
-                                onkeydown="if (event.key === 'Enter') this.blur()"
+                                onchange="commitDocumentFieldInput(this)"
+                                onkeydown="if (event.key === 'Enter') { event.preventDefault(); commitDocumentFieldInput(this); }"
                                 class="no-print w-14 max-w-full text-center bg-white border border-slate-200 rounded-lg px-1 py-1 text-slate-800 font-black outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-100">
                             <span class="print-only">${blackCount || ''}</span>
                         </td>
@@ -5608,9 +5700,10 @@
                         <!-- 📦 พาเลท -->
                         <td class="p-2 border-r border-slate-200 font-black bg-slate-50/50 text-indigo-900 font-sans">
                             <input type="number" min="0" step="1" value="${branchPallets || ''}" placeholder="0"
-                                data-branch="${escapeDocumentText(bCode)}" data-field="pallet"
+                                data-branch="${escapeDocumentText(bCode)}" data-field="pallet" data-original-value="${branchPallets || ''}"
                                 oninput="updateDocumentFieldValue(this.dataset.branch, 'pallet', this.value)"
-                                onkeydown="if (event.key === 'Enter') this.blur()"
+                                onchange="commitDocumentFieldInput(this)"
+                                onkeydown="if (event.key === 'Enter') { event.preventDefault(); commitDocumentFieldInput(this); }"
                                 class="no-print w-14 max-w-full text-center bg-white border border-slate-200 rounded-lg px-1 py-1 text-indigo-900 font-black outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100">
                             <span class="print-only">${branchPallets || '-'}</span>
                         </td>
@@ -6603,7 +6696,44 @@
         const TEST_WAVE_56245 = JSON.parse('{"wave_no":"0000056245","booking_no":"B001-260755609","license_plate":"","lpn_list":[{"lpn":"PN0004134696","zone":"MART08","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Pending","total_qty":1,"qty":0,"scan_type":null,"owner":"DM02","color":"None","color_breakdown":"","wave_no":"0000056245"},{"lpn":"PN0004134697","zone":"MART08","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":1,"qty":1,"scan_type":"COMBINE: PN0004134696","owner":"DM02","color":"Blue","color_breakdown":"Blue~1~COMBINE: PN0004134696","wave_no":"0000056245"},{"lpn":"PN0004134706","zone":"EA","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":1,"qty":1,"scan_type":"TOTE","owner":"DM02","color":"Black","color_breakdown":"Black~1~TOTE","wave_no":"0000056245"},{"lpn":"PN0004134712","zone":"FA","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":1,"qty":1,"scan_type":"TOTE","owner":"DM02","color":"Blue","color_breakdown":"Blue~1~TOTE","wave_no":"0000056245"},{"lpn":"PN0004134713","zone":"FA","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":1,"qty":1,"scan_type":"Carton","owner":"DM02","color":"Reuse","color_breakdown":"Reuse~1~Carton","wave_no":"0000056245"},{"lpn":"PP0004134685","zone":"BL","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":11,"qty":13,"scan_type":"Carton","owner":"DM02","color":"None","color_breakdown":"None~13~Carton","wave_no":"0000056245"},{"lpn":"PP0004134708","zone":"FA","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":1,"qty":1,"scan_type":"Carton","owner":"DM02","color":"None","color_breakdown":"None~1~Carton","wave_no":"0000056245"},{"lpn":"PP0004134715","zone":"DF","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":2,"qty":2,"scan_type":"Carton","owner":"DM02","color":"None","color_breakdown":"None~2~Carton","wave_no":"0000056245"},{"lpn":"PR0004134714","zone":"YA","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":1,"qty":1,"scan_type":"TOTE","owner":"DM02","color":"Red","color_breakdown":"Red~1~TOTE","wave_no":"0000056245"},{"lpn":"PT0004134680","zone":"BB","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":1,"qty":1,"scan_type":"COMBINE: PT0004134679","owner":"DM02","color":"Reuse","color_breakdown":"Reuse~1~COMBINE: PT0004134679","wave_no":"0000056245"},{"lpn":"PT0004134683","zone":"CA","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":1,"qty":1,"scan_type":"COMBINE: PT0004134684","owner":"DM02","color":"Reuse","color_breakdown":"Reuse~1~COMBINE: PT0004134684","wave_no":"0000056245"},{"lpn":"PT0004134687","zone":"DA","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":1,"qty":1,"scan_type":"TOTE","owner":"DM02","color":"Blue","color_breakdown":"Blue~1~TOTE","wave_no":"0000056245"},{"lpn":"PT0004134688","zone":"DB","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":1,"qty":1,"scan_type":"TOTE","owner":"DM02","color":"Blue","color_breakdown":"Blue~1~TOTE","wave_no":"0000056245"},{"lpn":"PT0004134689","zone":"DB","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":1,"qty":1,"scan_type":"Carton","owner":"DM02","color":"Reuse","color_breakdown":"Reuse~1~Carton","wave_no":"0000056245"},{"lpn":"PT0004134690","zone":"DB","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":1,"qty":1,"scan_type":"Carton","owner":"DM02","color":"Reuse","color_breakdown":"Reuse~1~Carton","wave_no":"0000056245"},{"lpn":"PT0004134691","zone":"DB","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":1,"qty":1,"scan_type":"Carton","owner":"DM02","color":"Reuse","color_breakdown":"Reuse~1~Carton","wave_no":"0000056245"},{"lpn":"PT0004134692","zone":"DC","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":1,"qty":1,"scan_type":"Carton","owner":"DM02","color":"Reuse","color_breakdown":"Reuse~1~Carton","wave_no":"0000056245"},{"lpn":"PT0004134693","zone":"DC","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":1,"qty":1,"scan_type":"Carton","owner":"DM02","color":"Reuse","color_breakdown":"Reuse~1~Carton","wave_no":"0000056245"},{"lpn":"PT0004134694","zone":"DC","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Pending","total_qty":1,"qty":0,"scan_type":null,"owner":"DM02","color":"None","color_breakdown":"","wave_no":"0000056245"},{"lpn":"PT0004134695","zone":"CC","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":1,"qty":1,"scan_type":"COMBINE: PT0004134694","owner":"DM02","color":"Blue","color_breakdown":"Blue~1~COMBINE: PT0004134694","wave_no":"0000056245"},{"lpn":"PT0004134698","zone":"MART09","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Pending","total_qty":1,"qty":0,"scan_type":null,"owner":"DM02","color":"None","color_breakdown":"","wave_no":"0000056245"},{"lpn":"PT0004134702","zone":"EA","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":1,"qty":1,"scan_type":"TOTE","owner":"DM02","color":"Blue","color_breakdown":"Blue~1~TOTE","wave_no":"0000056245"},{"lpn":"PT0004134704","zone":"EA","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":1,"qty":1,"scan_type":"Carton","owner":"DM02","color":"Reuse","color_breakdown":"Reuse~1~Carton","wave_no":"0000056245"},{"lpn":"PT0004134705","zone":"EA","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":1,"qty":1,"scan_type":"Carton","owner":"DM02","color":"Reuse","color_breakdown":"Reuse~1~Carton","wave_no":"0000056245"},{"lpn":"PT0004134711","zone":"FA","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":1,"qty":1,"scan_type":"COMBINE: PT0004134709","owner":"DM02","color":"Reuse","color_breakdown":"Reuse~1~COMBINE: PT0004134709","wave_no":"0000056245"},{"lpn":"PN0004134678","zone":"AC","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":1,"qty":1,"scan_type":"Carton","owner":"DM02","color":"Reuse","color_breakdown":"Reuse~1~Carton","wave_no":"0000056245"},{"lpn":"PN0004134707","zone":"EA","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":1,"qty":1,"scan_type":"Carton","owner":"DM02","color":"Reuse","color_breakdown":"Reuse~1~Carton","wave_no":"0000056245"},{"lpn":"PP0004134681","zone":"AM","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Pending","total_qty":38,"qty":0,"scan_type":null,"owner":"DM02","color":"None","color_breakdown":"","wave_no":"0000056245"},{"lpn":"PP0004134682","zone":"AN","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":11,"qty":11,"scan_type":"Carton","owner":"DM02","color":"None","color_breakdown":"None~11~Carton","wave_no":"0000056245"},{"lpn":"PP0004134686","zone":"BN","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":5,"qty":5,"scan_type":"Carton","owner":"DM02","color":"None","color_breakdown":"None~5~Carton","wave_no":"0000056245"},{"lpn":"PT0004134679","zone":"BB","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Pending","total_qty":1,"qty":0,"scan_type":null,"owner":"DM02","color":"None","color_breakdown":"","wave_no":"0000056245"},{"lpn":"PT0004134684","zone":"CA","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Pending","total_qty":1,"qty":0,"scan_type":null,"owner":"DM02","color":"None","color_breakdown":"","wave_no":"0000056245"},{"lpn":"PT0004134699","zone":"MART09","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":1,"qty":1,"scan_type":"Carton","owner":"DM02","color":"Reuse","color_breakdown":"Reuse~1~Carton","wave_no":"0000056245"},{"lpn":"PT0004134700","zone":"MART09","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Pending","total_qty":1,"qty":0,"scan_type":null,"owner":"DM02","color":"None","color_breakdown":"","wave_no":"0000056245"},{"lpn":"PT0004134701","zone":"MART09","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":1,"qty":1,"scan_type":"COMBINE: PT0004134700","owner":"DM02","color":"Reuse","color_breakdown":"Reuse~1~COMBINE: PT0004134700","wave_no":"0000056245"},{"lpn":"PT0004134703","zone":"EA","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":1,"qty":1,"scan_type":"Carton","owner":"DM02","color":"Reuse","color_breakdown":"Reuse~1~Carton","wave_no":"0000056245"},{"lpn":"PT0004134709","zone":"FA","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Pending","total_qty":1,"qty":0,"scan_type":null,"owner":"DM02","color":"None","color_breakdown":"","wave_no":"0000056245"},{"lpn":"PT0004134710","zone":"FA","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":1,"qty":1,"scan_type":"COMBINE: PT0004134709","owner":"DM02","color":"Reuse","color_breakdown":"Reuse~1~COMBINE: PT0004134709","wave_no":"0000056245"},{"lpn":"PT0004134716","zone":"DF","branch":"MH69","branch_name":"PTC-MRT-MaxMartวังน้อย4","status":"Scanned","total_qty":1,"qty":3,"scan_type":"Carton","owner":"DM02","color":"Reuse","color_breakdown":"Reuse~3~Carton","wave_no":"0000056245"}],"zone_summary":[]}');
         function loadTestWave56245() { try { applyWaveDataToScreen(TEST_WAVE_56245, true); showToast('โหลด Wave 56245 (ข้อมูลจริง) แล้ว'); } catch (e) { showAlert('ผิดพลาด', String(e)); } }
 
+        function switchBookingSplitChild(index) {
+            const child = (currentBookingSplitFamily && currentBookingSplitFamily.children || [])[index];
+            if (!child || !child.booking) return;
+            document.getElementById('waveInput').value = child.booking;
+            checkAndLoadWave();
+        }
+
+        function renderBookingSplitFamilyBanner() {
+            const host = document.getElementById('bookingSplitFamilyBanner');
+            const family = currentBookingSplitFamily;
+            if (!host) return;
+            const children = family && Array.isArray(family.children) ? family.children : [];
+            if (!family || !['parent', 'child'].includes(family.role) || !children.length) {
+                host.innerHTML = '';
+                host.classList.add('hidden');
+                return;
+            }
+            const current = String(currentBookingNo || '').trim().toUpperCase();
+            const childButtons = children.map((child, index) => {
+                const isCurrent = String(child.booking || '').trim().toUpperCase() === current;
+                const vehicle = [child.vehicle_type, child.plate && `ทะเบียน ${child.plate}`, child.sender && `คนขับ ${child.sender}`]
+                    .filter(Boolean).map(escapeDocumentText).join(' • ');
+                return `<button onclick="switchBookingSplitChild(${index})" class="rounded-lg border-2 ${isCurrent ? 'border-blue-700 bg-blue-100' : 'border-blue-200 bg-white'} px-3 py-2 text-left text-sm font-black text-blue-900">รถคันที่ ${Number(child.sequence) || index + 1} • ${escapeDocumentText(child.booking)}${vehicle ? `<span class="block pt-1 text-[11px] font-bold text-slate-600">${vehicle}</span>` : ''}${isCurrent ? '<span class="block pt-1 text-[10px] text-blue-800">กำลังเปิดอยู่</span>' : ''}</button>`;
+            }).join('');
+            if (family.role === 'parent') {
+                host.innerHTML = `<div class="font-black text-blue-900">Booking ต้นทาง ${escapeDocumentText(family.parent_booking || current)} ยังไม่มีรถ</div><p class="mt-1 text-sm font-bold text-blue-900">เลือก Booking รถลูกเพื่อแบ่งยอดรายสาขาใน Pro Scanner ก่อนเปิดเอกสาร ระบบจะเก็บยอดที่จัดให้แต่ละคันและหักออกจากยอดคงเหลือของ Booking ต้นทาง</p><div class="mt-3 flex flex-wrap gap-2">${childButtons}</div>`;
+            } else {
+                const vehicle = [currentBookingVehicleType, currentLicensePlate && `ทะเบียน ${currentLicensePlate}`]
+                    .filter(Boolean).map(escapeDocumentText).join(' • ');
+                host.innerHTML = `<div class="font-black text-blue-900">รถคันที่ ${Number(family.sequence) || 1} — Booking ${escapeDocumentText(currentBookingNo)}</div><p class="mt-1 text-sm font-bold text-blue-900">ต้นทาง ${escapeDocumentText(family.parent_booking || '-')} • ${vehicle || 'ยังไม่ระบุข้อมูลรถ'}<br>เลือกสาขาแล้วบันทึกยอดที่รถคันนี้รับไป ยอดจะไม่ซ้ำกับรถคันอื่น</p><div class="mt-3 flex flex-wrap gap-2"><button onclick="openBookingBranchMove()" class="rounded-lg bg-cyan-800 px-4 py-2 text-sm font-black text-white shadow hover:bg-cyan-900">📦 จัด/ปรับยอดสาขาให้รถคันนี้</button>${childButtons}</div>`;
+            }
+            host.classList.remove('hidden');
+        }
+
         function applyWaveDataToScreen(data, isWaveOnly) {
+            // Preserve edits still visible in the document before a shared-state
+            // refresh changes the current Booking/Wave context.
+            captureDocumentEditorInputs();
             currentLookupIsWaveOnly = Boolean(isWaveOnly);
             branchCompletenessWarnings = Array.isArray(data.branch_completeness_warnings)
                 ? data.branch_completeness_warnings.filter(item => item && Array.isArray(item.missing) && item.missing.length > 0)
@@ -6613,9 +6743,11 @@
                 { palletNo: parseInt(item.palletNo) || 0, palletColor: item.palletColor || null, correctionCount: parseInt(item.correctionCount) || 0 }
             ]));
             currentBookingNo = data.booking_no ? String(data.booking_no).trim() : '';
+            currentBookingSplitFamily = data.booking_split_family || null;
             bookingBranchAddFormOpen = false;
             bookingBranchAddLookup = { wave: '', code: '', options: [], selectedIndex: 0, error: '' };
             currentLicensePlate = data.license_plate ? String(data.license_plate).trim() : '';
+            currentBookingVehicleType = data.vehicle_type ? String(data.vehicle_type).trim() : '';
 
             if (isWaveOnly) {
                 currentWave = data.wave_no;
@@ -6629,6 +6761,7 @@
             if (sheetMeta) {
                 if (sheetMeta.booking) currentBookingNo = sheetMeta.booking;
                 if (sheetMeta.plate) currentLicensePlate = sheetMeta.plate;
+                if (sheetMeta.vehicle_type) currentBookingVehicleType = sheetMeta.vehicle_type;
             }
 
             loadBookingSenderMap(currentBookingNo).catch(() => { });
@@ -6638,40 +6771,70 @@
             loadDocumentHiddenBranches();
             if (data.document_overrides && typeof data.document_overrides === 'object') {
                 const serverOverrides = data.document_overrides || {};
-                const hasUnsavedLocalOverride = documentOverridesRevision > syncedDocumentOverridesRevision;
+                const currentOverrideScope = getDocumentOverridesStorageKey();
+                const hasUnsavedLocalOverride = dirtyDocumentOverrideScope === currentOverrideScope
+                    && documentOverridesRevision > syncedDocumentOverridesRevision;
+                const dirtyBranchesInScope = hasUnsavedLocalOverride
+                    ? new Set(Array.from(dirtyDocumentOverrideBranches, normalizeBranchLookupCode))
+                    : new Set();
+                const dirtyFieldsInScope = hasUnsavedLocalOverride
+                    ? new Map(Array.from(dirtyDocumentOverrideFields, ([branch, fields]) => [
+                        normalizeBranchLookupCode(branch), new Set(fields)
+                    ]))
+                    : new Map();
+                const pendingResetInScope = hasUnsavedLocalOverride && dirtyBranchesInScope.size === 0;
                 // Server เป็นแหล่งหลักเมื่อไม่มีการแก้ที่กำลังรอบันทึก ช่วยล้าง snapshot เก่าในเครื่อง
                 // และทำให้ทุก Handheld เห็นยอดแก้ไขชุดเดียวกัน
                 // Never discard locally saved edits merely because the server
                 // temporarily cannot read Google Sheets or returns no rows.
-                // Merge strategy: local values always win for fields the server doesn't have.
-                // Start with local overrides as the base, then layer server values on top.
-                // This way a successful save that hasn't propagated to server sheet yet
-                // won't cause the UI to snap back to old values on next data refresh.
+                // Server values refresh clean branches.  A branch with an edit or
+                // hide/restore action still waiting to sync keeps its local value
+                // until the write is acknowledged; otherwise polling can restore
+                // an older Sheet value over the operator's current edit.
                 const mergedOverrides = { ...documentOverrides };
                 // If server has no overrides at all AND there are no unsaved local changes,
                 // still keep local overrides (they were saved to server in a previous session).
                 const serverHidden = [];
                 for (const [bCode, ov] of Object.entries(serverOverrides)) {
-                    if (ov) {
-                        mergedOverrides[bCode] = {
-                            ...(mergedOverrides[bCode] || {}),
-                            m: (ov.m !== undefined && ov.m !== null) ? ov.m : undefined,
-                            red: (ov.red !== undefined && ov.red !== null) ? ov.red : undefined,
-                            blue: (ov.blue !== undefined && ov.blue !== null) ? ov.blue : undefined,
-                            green: (ov.green !== undefined && ov.green !== null) ? ov.green : undefined,
-                            black: (ov.black !== undefined && ov.black !== null) ? ov.black : undefined,
-                            pallet: (ov.pallet !== undefined && ov.pallet !== null) ? ov.pallet : undefined
-                        };
+                    if (ov && !pendingResetInScope) {
+                        const branchKey = normalizeBranchLookupCode(bCode);
+                        const localEntry = Object.entries(mergedOverrides).find(([key]) =>
+                            normalizeBranchLookupCode(key) === branchKey
+                        );
+                        const localFields = localEntry ? localEntry[1] || {} : {};
+                        const nextFields = { ...(mergedOverrides[bCode] || {}) };
+                        const dirtyFields = dirtyFieldsInScope.get(branchKey) || new Set();
+                        for (const field of ['m', 'red', 'blue', 'green', 'black', 'pallet']) {
+                            if (dirtyFields.has(field)) {
+                                if (localFields[field] !== undefined && localFields[field] !== null) {
+                                    nextFields[field] = localFields[field];
+                                } else {
+                                    delete nextFields[field];
+                                }
+                            } else if (ov[field] !== undefined && ov[field] !== null) {
+                                nextFields[field] = ov[field];
+                            }
+                        }
+                        mergedOverrides[bCode] = nextFields;
                         if (ov.is_hidden) serverHidden.push(normalizeBranchLookupCode(bCode));
                     }
                 }
                 documentOverrides = mergedOverrides;
                 saveDocumentOverrides();
                 if (hasUnsavedLocalOverride) {
-                    documentHiddenBranches = Array.from(new Set([
-                        ...documentHiddenBranches.map(normalizeBranchLookupCode),
-                        ...serverHidden
-                    ].filter(Boolean)));
+                    const localHidden = new Set(documentHiddenBranches.map(normalizeBranchLookupCode));
+                    const mergedHidden = new Set(serverHidden.filter(Boolean));
+                    if (dirtyBranchesInScope.size) {
+                        dirtyBranchesInScope.forEach(branch => {
+                            if (localHidden.has(branch)) mergedHidden.add(branch);
+                            else mergedHidden.delete(branch);
+                        });
+                    } else {
+                        // Reset clears all local overrides and hidden branches.
+                        mergedHidden.clear();
+                        localHidden.forEach(branch => mergedHidden.add(branch));
+                    }
+                    documentHiddenBranches = Array.from(mergedHidden);
                 } else {
                     documentHiddenBranches = Array.from(new Set(serverHidden.filter(Boolean)));
                 }
@@ -6732,6 +6895,8 @@
             const savedDocumentMeta = getSavedShippingDocumentMeta(isWaveOnly ? currentWave : currentBookingNo);
             if (savedDocumentMeta.booking_no) currentBookingNo = savedDocumentMeta.booking_no;
             if (savedDocumentMeta.license_plate) currentLicensePlate = savedDocumentMeta.license_plate;
+
+            renderBookingSplitFamilyBanner();
 
             allLpnsInWave.forEach(i => { i.childCount = 0; i.combinedWith = null; i.isMaster = false; });
 
@@ -6983,6 +7148,10 @@
                 }
             });
             const branchGrid = document.getElementById('branchButtonGrid');
+            if (currentBookingSplitFamily && currentBookingSplitFamily.role === 'parent') {
+                branchGrid.innerHTML = '<div style="grid-column:1 / -1" class="rounded-xl border-2 border-blue-200 bg-white p-5 text-center font-bold text-blue-900">Booking นี้ไม่มีรถ ให้เลือก Booking รถลูกด้านบนเพื่อจัดยอดและเปิดเอกสารของรถแต่ละคัน</div>';
+                return;
+            }
             const htmlParts = [];
             Array.from(uniqueBranchesMap.entries()).sort().forEach(([bCode, bName]) => {
                 const branchLpns = allLpnsInWave.filter(i => i.branch === bCode);
@@ -8492,7 +8661,7 @@
                             <div class="flex items-center justify-between gap-2 px-2.5 py-1.5" style="background:${hex}15">
                                 <div class="flex items-center gap-1.5 font-black text-slate-800 text-xs min-w-0"><span style="width:12px;height:12px;border-radius:3px;background:${hex};display:inline-block;flex:none"></span> <span class="truncate">พาเลท ${displayNo} • สีพาเลท${PALLET_CLR_TH[g.color] || g.color || '-'}</span>${editing ? '<span class="text-[10px] text-purple-700 bg-purple-100 px-1.5 py-0.5 rounded font-black whitespace-nowrap">✏️ เครื่องนี้กำลังแก้</span>' : isCurrent ? '<span class="text-[10px] text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded font-black whitespace-nowrap">🟠 เครื่องนี้กำลังทำ</span>' : isSubmitted ? '<span class="text-[10px] text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded font-black whitespace-nowrap">✅ เครื่องนี้ส่งแล้ว</span>' : '<span class="text-[10px] text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded font-black whitespace-nowrap">ข้อมูลส่วนกลาง</span>'}</div>
                                 <div class="flex items-center gap-2 shrink-0">
-                                    ${editing ? `<button onclick="finishPalletCorrection()" class="text-[11px] font-black text-white bg-purple-700 border border-purple-700 px-2 py-0.5 rounded whitespace-nowrap">บันทึกและกลับ</button>` : `<button onclick="editPallet(${n}, '${g.color}')" class="text-[11px] font-black text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded hover:bg-blue-100 whitespace-nowrap">✏️ แก้ไข</button>`}
+                                    ${editing ? `<button onclick="finishPalletCorrection()" class="text-[11px] font-black text-white bg-purple-700 border border-purple-700 px-2 py-0.5 rounded whitespace-nowrap">บันทึกและกลับ</button>` : `<button onclick="editPallet(${n}, '${g.color}')" class="text-[11px] font-black text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded whitespace-nowrap">✏️ แก้ไข</button>`}
                                     <div class="text-[11px] font-bold text-slate-500 whitespace-nowrap">${g.items.length} LPN</div>
                                 </div>
                             </div>
