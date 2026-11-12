@@ -19,7 +19,7 @@
          ระหว่างที่คนพิมพ์รหัสพนักงาน เครื่องก็ตื่นไปแล้ว -->
     <script>
         // Keep the version available even if a later, large script has a syntax error.
-        window.__PRO_SCANNER_APP_VERSION = '1.9.29-free';
+        window.__PRO_SCANNER_APP_VERSION = '1.9.30-free';
         window.__proScannerSyntaxErrorsReported = new WeakSet();
         (function installEarlySyntaxErrorCapture() {
             const queueKey = 'proScannerDebugQueue:v1';
@@ -1888,6 +1888,7 @@
         let currentBookingNo = ""; let currentLicensePlate = ""; let currentBookingVehicleType = "";
         let currentBookingSplitFamily = null;
         let branchCompletenessWarnings = [];
+        let bookingSplitWarnings = [];
         let activeDocumentType = 'shipping';
         let currentTransportMeta = { carrier: '', driver: '', plate: '', booking: '', loaded: false };
         let isAlertOpen = false; let selectedBranchCode = ""; let selectedBranchName = "";
@@ -6241,7 +6242,20 @@
             }).join('');
         }
 
-        async function printCurrentDocument(completenessWarningAcknowledged = false) {
+        async function printCurrentDocument(completenessWarningAcknowledged = false, splitWarningAcknowledged = false) {
+            if (!splitWarningAcknowledged && bookingSplitWarnings.length > 0) {
+                const warning = bookingSplitWarnings[0] || {};
+                const children = Array.isArray(warning.child_bookings) ? warning.child_bookings : [];
+                const bookingText = children.length ? children.join(', ') : 'Booking รถลูก';
+                const branchCount = Math.max(0, Number(warning.missing_branch_count) || 0);
+                showConfirm(
+                    '⚠️ ยังแบ่งยอดให้รถลูกไม่ครบ',
+                    `TMS พบ ${bookingText} แต่ใน Pro Scanner ยังมียอดค้าง ${branchCount} สาขาที่ยังไม่ได้แบ่ง\n\nพิมพ์ต่อได้ ต้องการพิมพ์ต่อหรือไม่?`,
+                    'พิมพ์ต่อ',
+                    () => printCurrentDocument(completenessWarningAcknowledged, true)
+                );
+                return;
+            }
             if (!completenessWarningAcknowledged && branchCompletenessWarnings.length > 0) {
                 const details = branchCompletenessWarnings.map(item => {
                     const wave = String(item.wave || item.wave_no || '-');
@@ -6257,7 +6271,7 @@
                     '⚠️ รายการสาขาใน Wave ไม่ครบ',
                     `Wave_Monitoring ระบุสาขาเหล่านี้ไว้ แต่ไม่พบในข้อมูล Member Data ณ เวลาที่โหลด อาจยังไม่ได้ลงข้อมูลหรือถูกตัดออกจาก Wave แล้ว กรุณาตรวจสอบก่อนพิมพ์\n\n${details}\n\nต้องการพิมพ์เอกสารต่อหรือไม่?`,
                     'พิมพ์ต่อ',
-                    () => printCurrentDocument(true)
+                    () => printCurrentDocument(true, splitWarningAcknowledged)
                 );
                 return;
             }
@@ -6784,6 +6798,9 @@
             currentLookupIsWaveOnly = Boolean(isWaveOnly);
             branchCompletenessWarnings = Array.isArray(data.branch_completeness_warnings)
                 ? data.branch_completeness_warnings.filter(item => item && Array.isArray(item.missing) && item.missing.length > 0)
+                : [];
+            bookingSplitWarnings = Array.isArray(data.booking_split_warnings)
+                ? data.booking_split_warnings.filter(item => item && Number(item.missing_branch_count) > 0)
                 : [];
             const previousLocalState = new Map((allLpnsInWave || []).map(item => [
                 `${String(item.branch || '').toUpperCase()}|${String(item.lpn || '').toUpperCase()}`,
