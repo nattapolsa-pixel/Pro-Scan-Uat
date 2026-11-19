@@ -19,7 +19,7 @@
          ระหว่างที่คนพิมพ์รหัสพนักงาน เครื่องก็ตื่นไปแล้ว -->
     <script>
         // Keep the version available even if a later, large script has a syntax error.
-        window.__PRO_SCANNER_APP_VERSION = '1.9.32-free';
+        window.__PRO_SCANNER_APP_VERSION = '1.9.33-free';
         window.__proScannerSyntaxErrorsReported = new WeakSet();
         (function installEarlySyntaxErrorCapture() {
             const queueKey = 'proScannerDebugQueue:v1';
@@ -1098,8 +1098,18 @@
                 </div>
                 <label class="block text-sm font-bold">Wave ของสาขาที่จะเพิ่ม<input id="moveWaveInput" inputmode="numeric" class="mt-1 w-full border-2 rounded-lg p-3 text-lg font-black" placeholder="เช่น 59078"></label>
                 <div id="moveFamilyWaves" class="hidden flex flex-wrap gap-2"></div>
+                <div id="moveBulkModeControls" class="hidden flex flex-wrap gap-2">
+                    <button type="button" id="moveBulkModeBtn" onclick="setBookingBulkMode(true)" class="rounded-lg bg-blue-700 text-white px-3 py-2 text-sm font-bold">เลือกหลายสาขา</button>
+                    <button type="button" id="moveSingleModeBtn" onclick="setBookingBulkMode(false)" class="rounded-lg bg-slate-200 text-slate-800 px-3 py-2 text-sm font-bold">เลือกทีละสาขา</button>
+                </div>
                 <button onclick="loadWaveBranchesForMove()" class="w-full bg-slate-800 text-white rounded-lg p-3 font-black">🔎 ค้นหาสาขาใน Wave นี้</button>
+                <button type="button" id="moveBulkSelectAll" onclick="selectAllBookingMoveBranches()" class="hidden w-full rounded-lg border-2 border-blue-300 bg-blue-50 p-2 text-blue-800 font-black">เลือกทุกสาขาใน Wave นี้</button>
                 <div id="moveBranchChoices" class="hidden space-y-2 max-h-64 overflow-auto border rounded-xl p-2 bg-slate-50"></div>
+                <div id="moveBulkPanel" class="hidden border-2 border-blue-200 bg-blue-50 rounded-xl p-3">
+                    <div id="moveBulkCount" class="font-black text-blue-900">เลือกแล้ว 0 สาขา</div>
+                    <p class="text-xs text-slate-700 mt-1">ยอดเริ่มต้นเป็นยอดคงเหลือ แก้ไขแต่ละสาขาได้ก่อนบันทึก</p>
+                    <div id="moveBulkSelected" class="space-y-3 mt-3"></div>
+                </div>
                 <div id="moveBranchPreview" class="hidden border-2 border-amber-300 bg-amber-50 rounded-xl p-3 text-sm"></div>
                 <div id="moveSplitFields" class="hidden border-2 border-purple-200 bg-purple-50 rounded-xl p-3">
                     <div class="font-black text-purple-900 mb-2">📦 ใส่ยอดที่รถคันนี้รับไป</div>
@@ -1116,6 +1126,7 @@
                 <label class="block text-sm font-bold">เหตุผล<select id="moveReasonInput" class="mt-1 w-full border-2 rounded-lg p-3"><option value="">-- เลือกเหตุผล --</option><option value="SPLIT_BOOKING_TO_TRUCK">แบ่ง Booking ออกเป็นรถ</option><option>เพิ่มจุดส่ง</option><option>เปลี่ยนรถ</option><option>รถเดิมเต็ม</option><option>จัดเส้นทางใหม่</option><option>อื่นๆ</option></select></label>
                 <label class="block text-sm font-bold">หมายเหตุ (ถ้ามี)<input id="moveNoteInput" class="mt-1 w-full border-2 rounded-lg p-3" placeholder="รายละเอียดเพิ่มเติม"></label>
                 <button id="confirmMoveBranchBtn" disabled onclick="confirmBookingBranchMove()" class="w-full bg-emerald-600 disabled:bg-slate-300 text-white rounded-lg p-3 font-black">ยืนยันย้ายทั้งสาขา</button>
+                <button id="confirmMoveBulkBtn" disabled onclick="confirmBookingBulkMove()" class="hidden w-full bg-emerald-600 disabled:bg-slate-300 text-white rounded-lg p-3 font-black">บันทึกสาขาที่เลือก</button>
             </div>
         </div>
     </div>
@@ -5000,6 +5011,100 @@
         let bookingBranchMovePreview = null;
         let bookingBranchMoveMode = 'all';
         let bookingBranchMoveRequestId = 0;
+        let bookingBulkMode = false;
+        let bookingBulkSelected = new Map();
+        const bookingBulkFields = [['m', 'M'], ['red', 'แดง'], ['blue', 'น้ำเงิน'], ['green', 'เขียว'], ['black', 'ดำ'], ['pallet', 'พาเลท']];
+        function bookingBulkKey(wave, branch) {
+            return `${String(Number(wave))}|${String(branch || '').trim().toUpperCase()}`;
+        }
+        function setBookingBulkMode(enabled, discardConfirmed = false) {
+            if (!enabled && bookingBulkMode && bookingBulkSelected.size && !discardConfirmed) {
+                return showConfirm('ยังมีรายการที่เลือก', 'เปลี่ยนเป็นทีละสาขาจะล้างรายการที่ยังไม่ได้บันทึก', 'เปลี่ยน', () => setBookingBulkMode(false, true));
+            }
+            if (!enabled && discardConfirmed) bookingBulkSelected.clear();
+            bookingBulkMode = Boolean(enabled && currentBookingSplitFamily && currentBookingSplitFamily.role === 'child');
+            document.getElementById('moveBulkPanel').classList.toggle('hidden', !bookingBulkMode);
+            document.getElementById('moveBulkSelectAll').classList.toggle('hidden', !bookingBulkMode);
+            document.getElementById('confirmMoveBulkBtn').classList.toggle('hidden', !bookingBulkMode);
+            document.getElementById('confirmMoveBranchBtn').classList.toggle('hidden', bookingBulkMode);
+            document.getElementById('moveBulkModeBtn').className = `rounded-lg px-3 py-2 text-sm font-bold ${bookingBulkMode ? 'bg-blue-700 text-white' : 'bg-slate-200 text-slate-800'}`;
+            document.getElementById('moveSingleModeBtn').className = `rounded-lg px-3 py-2 text-sm font-bold ${bookingBulkMode ? 'bg-slate-200 text-slate-800' : 'bg-blue-700 text-white'}`;
+            document.getElementById('moveBranchPreview').classList.add('hidden');
+            document.getElementById('moveSplitFields').classList.add('hidden');
+            document.getElementById('confirmMoveBranchBtn').disabled = true;
+            renderBookingMoveChoices();
+            renderBookingBulkSelected();
+        }
+        function bookingBulkEligible(item) {
+            return item && !item.legacy_split && String(item.current_booking || '').trim().toUpperCase() === String(currentBookingSplitFamily?.parent_booking || '').trim().toUpperCase();
+        }
+        function renderBookingMoveChoices() {
+            const choices = document.getElementById('moveBranchChoices');
+            const options = window.bookingBranchMoveOptions || [];
+            const wave = String(window.bookingBranchMoveWave || '');
+            if (!wave) return;
+            choices.innerHTML = options.map((item, index) => {
+                const name = `${escapeDocumentText(item.branch_code)} — ${escapeDocumentText(item.branch_name)}`;
+                if (bookingBulkMode) {
+                    const eligible = bookingBulkEligible(item);
+                    const checked = bookingBulkSelected.has(bookingBulkKey(wave, item.branch_code));
+                    const note = !eligible ? (item.legacy_split ? 'ยอดแบ่งเดิม: ใช้เลือกทีละสาขา' : 'ตรวจสอบ Booking ต้นทาง') : (item.target_has_actual ? 'มียอดบันทึกไว้แล้ว' : `คงเหลือ ${Number(item.remaining_totals?.m || 0) + Number(item.remaining_totals?.red || 0) + Number(item.remaining_totals?.blue || 0) + Number(item.remaining_totals?.green || 0) + Number(item.remaining_totals?.black || 0)} กล่อง`);
+                    return `<label class="flex items-center gap-3 border-2 border-slate-200 bg-white rounded-xl p-3"><input type="checkbox" class="w-5 h-5" ${checked ? 'checked' : ''} ${eligible ? '' : 'disabled'} onchange="toggleBookingBulkBranch(${index}, this.checked)"><span><b>${name}</b><small class="block text-slate-600">${escapeDocumentText(note)}</small></span></label>`;
+                }
+                return `<button onclick="selectBranchForMove(${index})" class="move-branch-choice w-full text-left border-2 border-slate-200 hover:border-blue-500 bg-white rounded-xl p-3"><div class="flex justify-between gap-2"><div class="font-black text-base">${name}</div><span class="text-xs font-black ${item.is_closed ? 'text-green-700' : 'text-amber-700'}">${item.is_closed ? '✅ ปิดจบแล้ว' : '🟡 ยังไม่ปิดจบ'}</span></div><div class="grid grid-cols-2 gap-1 mt-2 text-xs"><span>Booking: <b>${escapeDocumentText(item.current_booking || '-')}</b></span><span>LPN ยิงแล้ว: <b>${item.lpn_scanned}/${item.lpn_total}</b></span><span>ยอด: <b>${item.box_qty} กล่อง</b></span><span>พาเลท: <b>${item.pallet_count}</b></span></div></button>`;
+            }).join('') || '<div class="text-center p-4">ไม่พบสาขาใน Wave นี้</div>';
+        }
+        function addBookingBulkBranch(item, wave) {
+            if (!bookingBulkEligible(item)) return;
+            const key = bookingBulkKey(wave, item.branch_code);
+            if (bookingBulkSelected.has(key)) return;
+            const defaults = item.target_has_actual ? (item.target_split_totals || {}) : (item.remaining_totals || item.totals || {});
+            const values = Object.fromEntries(bookingBulkFields.map(([field]) => [field, Math.max(0, Number(defaults[field]) || 0)]));
+            const expectedTarget = Object.fromEntries(bookingBulkFields.map(([field]) => [field, Math.max(0, Number(item.target_split_totals?.[field]) || 0)]));
+            const available = Object.fromEntries(bookingBulkFields.map(([field]) => [field, Math.max(0, Number((item.remaining_totals || item.totals || {})[field]) || 0)]));
+            bookingBulkSelected.set(key, { wave_no: String(Number(wave)), branch_code: String(item.branch_code).trim().toUpperCase(), branch_name: item.branch_name || item.branch_code, values, available, expectedTarget, existing: Boolean(item.target_has_actual) });
+        }
+        function toggleBookingBulkBranch(index, checked) {
+            const item = (window.bookingBranchMoveOptions || [])[index];
+            const wave = window.bookingBranchMoveWave;
+            if (!item || !wave) return;
+            const typed = document.getElementById('moveWaveInput').value.replace(/\D/g, '');
+            if (typed && Number(typed) !== Number(wave)) {
+                renderBookingMoveChoices();
+                return showAlert('เลข Wave ไม่ตรงกับรายการ', `รายการนี้เป็น Wave ${wave} กรุณาค้นหา Wave ${typed} ก่อน`);
+            }
+            if (checked) addBookingBulkBranch(item, wave);
+            else bookingBulkSelected.delete(bookingBulkKey(wave, item.branch_code));
+            renderBookingBulkSelected();
+        }
+        function selectAllBookingMoveBranches() {
+            const wave = window.bookingBranchMoveWave;
+            if (!wave) return showAlert('ยังไม่ได้ค้นหา Wave', 'กรุณาเลือก Wave และค้นหาสาขาก่อน');
+            const typed = document.getElementById('moveWaveInput').value.replace(/\D/g, '');
+            if (typed && Number(typed) !== Number(wave)) return showAlert('เลข Wave ไม่ตรงกับรายการ', `กรุณาค้นหา Wave ${typed} ก่อนเลือกสาขา`);
+            (window.bookingBranchMoveOptions || []).forEach(item => addBookingBulkBranch(item, wave));
+            renderBookingMoveChoices();
+            renderBookingBulkSelected();
+        }
+        function updateBookingBulkField(index, field, value) {
+            const item = Array.from(bookingBulkSelected.values())[index];
+            if (item && bookingBulkFields.some(([name]) => name === field)) item.values[field] = value;
+        }
+        function removeBookingBulkBranch(index) {
+            const key = Array.from(bookingBulkSelected.keys())[index];
+            if (key !== undefined) bookingBulkSelected.delete(key);
+            renderBookingMoveChoices();
+            renderBookingBulkSelected();
+        }
+        function renderBookingBulkSelected() {
+            const entries = Array.from(bookingBulkSelected.values());
+            document.getElementById('moveBulkCount').textContent = `เลือกแล้ว ${entries.length} สาขา`;
+            document.getElementById('confirmMoveBulkBtn').disabled = entries.length === 0;
+            document.getElementById('moveBulkSelected').innerHTML = entries.map((item, index) => {
+                const fields = bookingBulkFields.map(([field, label]) => `<label class="font-bold">${label}<input type="number" min="0" step="1" value="${escapeDocumentText(String(item.values[field]))}" oninput="updateBookingBulkField(${index}, '${field}', this.value)" class="mt-1 w-full border rounded-lg p-2 text-center font-black"></label>`).join('');
+                return `<div class="bg-white border rounded-xl p-3"><div class="flex justify-between gap-2"><div class="font-black">Wave ${escapeDocumentText(item.wave_no)} · ${escapeDocumentText(item.branch_code)}<small class="block font-normal">${escapeDocumentText(item.branch_name)}${item.existing ? ' · ยอดที่บันทึกไว้' : ''}</small></div><button type="button" onclick="removeBookingBulkBranch(${index})" class="text-red-700 font-bold">นำออก</button></div><div class="grid grid-cols-3 gap-2 text-xs mt-2">${fields}</div></div>`;
+            }).join('');
+        }
         function setBookingMoveMode(mode) {
             const isSplitFamilyChild = currentBookingSplitFamily && currentBookingSplitFamily.role === 'child';
             bookingBranchMoveMode = isSplitFamilyChild || mode === 'split' ? 'split' : 'all';
@@ -5023,6 +5128,8 @@
         function openBookingBranchMove() {
             if (!currentBookingNo) return showAlert('ไม่พบ Booking ปลายทาง', 'ฟังก์ชันนี้ใช้เมื่อเปิดงานด้วย Booking เท่านั้น');
             bookingBranchMovePreview = null;
+            bookingBulkSelected = new Map();
+            bookingBulkMode = false;
             const isSplitFamilyChild = currentBookingSplitFamily && currentBookingSplitFamily.role === 'child';
             setBookingMoveMode(isSplitFamilyChild ? 'split' : 'all');
             const firstFamilyWave = isSplitFamilyChild && Array.isArray(currentBookingSplitFamily.waves)
@@ -5034,6 +5141,9 @@
             waveButtons.innerHTML = familyWaves.map(wave => `<button type="button" onclick="selectBookingMoveWave('${wave}')" class="rounded-lg bg-blue-100 px-3 py-2 text-sm font-bold text-blue-800">Wave ${wave}</button>`).join('');
             waveButtons.classList.toggle('hidden', familyWaves.length === 0);
             window.bookingBranchMoveWave = '';
+            window.bookingBranchMoveOptions = [];
+            document.getElementById('moveBulkModeControls').classList.toggle('hidden', !isSplitFamilyChild);
+            setBookingBulkMode(Boolean(isSplitFamilyChild));
             document.getElementById('moveReasonInput').value = isSplitFamilyChild ? 'SPLIT_BOOKING_TO_TRUCK' : '';
             document.getElementById('moveNoteInput').value = '';
             document.getElementById('moveBranchChoices').classList.add('hidden');
@@ -5048,7 +5158,10 @@
             document.getElementById('moveWaveInput').value = String(wave || '').replace(/\D/g, '');
             loadWaveBranchesForMove();
         }
-        function closeBookingBranchMove() {
+        function closeBookingBranchMove(force = false) {
+            if (!force && bookingBulkMode && bookingBulkSelected.size) {
+                return showConfirm('ยังมีรายการที่เลือก', 'ปิดหน้านี้จะล้างรายการที่ยังไม่ได้บันทึก', 'ปิดหน้านี้', () => closeBookingBranchMove(true));
+            }
             bookingBranchMoveRequestId++;
             const modal = document.getElementById('bookingBranchMoveModal'); modal.classList.add('hidden'); modal.classList.remove('flex');
         }
@@ -5078,12 +5191,11 @@
                 if (requestId !== bookingBranchMoveRequestId || targetAtStart !== currentBookingNo) return;
                 if (!res.ok) throw new Error(typeof data.detail === 'string' ? data.detail : `HTTP ${res.status}`);
                 bookingBranchMovePreview = null;
-                const choices = document.getElementById('moveBranchChoices');
-                choices.innerHTML = (data.branches || []).map((item, index) => `<button onclick="selectBranchForMove(${index})" class="move-branch-choice w-full text-left border-2 border-slate-200 hover:border-blue-500 bg-white rounded-xl p-3"><div class="flex justify-between gap-2"><div class="font-black text-base">${escapeDocumentText(item.branch_code)} — ${escapeDocumentText(item.branch_name)}</div><span class="text-xs font-black ${item.is_closed ? 'text-green-700' : 'text-amber-700'}">${item.is_closed ? '✅ ปิดจบแล้ว' : '🟡 ยังไม่ปิดจบ'}</span></div><div class="grid grid-cols-2 gap-1 mt-2 text-xs"><span>Booking: <b>${escapeDocumentText(item.current_booking || '-')}</b></span><span>LPN ยิงแล้ว: <b>${item.lpn_scanned}/${item.lpn_total}</b></span><span>ยอด: <b>${item.box_qty} กล่อง</b></span><span>พาเลท: <b>${item.pallet_count}</b></span></div></button>`).join('') || '<div class="text-center p-4">ไม่พบสาขาใน Wave นี้</div>';
                 window.bookingBranchMoveOptions = data.branches || [];
                 // จำเลข Wave ที่ Server ตอบกลับมากับรากสินนี้ การย้าย/แบ่งต้องอ้างค่านี้
                 window.bookingBranchMoveWave = String(data.wave_no || wave);
-                choices.classList.remove('hidden');
+                renderBookingMoveChoices();
+                document.getElementById('moveBranchChoices').classList.remove('hidden');
                 document.getElementById('moveBranchPreview').classList.add('hidden');
                 document.getElementById('confirmMoveBranchBtn').disabled = true;
             } catch (e) {
@@ -5142,6 +5254,56 @@
             document.getElementById('confirmMoveBranchBtn').disabled = false;
             setBookingMoveMode(bookingBranchMoveMode);
         }
+        async function confirmBookingBulkMove(overageAcknowledged = false) {
+            const entries = Array.from(bookingBulkSelected.values());
+            if (!entries.length || entries.length > 100) return showAlert('ข้อมูลไม่ครบ', 'กรุณาเลือก 1–100 สาขา');
+            const branches = [];
+            let excessCount = 0;
+            for (const item of entries) {
+                const values = {};
+                for (const [field] of bookingBulkFields) {
+                    const raw = String(item.values[field] ?? '').trim();
+                    const number = Number(raw);
+                    if (!/^\d+$/.test(raw) || !Number.isSafeInteger(number)) return showAlert('ยอดไม่ถูกต้อง', `กรุณาใส่จำนวนเต็มตั้งแต่ 0 ขึ้นไป: ${item.branch_code} / Wave ${item.wave_no}`);
+                    values[field] = number;
+                }
+                if (values.m + values.red + values.blue + values.green + values.black <= 0) return showAlert('ยังไม่ได้ใส่ยอด', `กรุณาใส่ยอดกล่องอย่างน้อย 1 กล่อง: ${item.branch_code} / Wave ${item.wave_no}`);
+                if (bookingBulkFields.some(([field]) => values[field] > (Number(item.available[field]) || 0))) excessCount++;
+                branches.push({ wave_no: item.wave_no, branch_code: item.branch_code, expected_target_exists: item.existing, expected_target: item.expectedTarget, expected_available: item.available, ...values });
+            }
+            if (excessCount && !overageAcknowledged) return showConfirm('⚠️ ยอดต่างจากระบบ', `มี ${excessCount} สาขาที่กรอกเกินยอดคงเหลือ กรุณาตรวจสอบก่อนบันทึก`, 'บันทึกต่อ', () => confirmBookingBulkMove(true));
+            const target = currentBookingNo;
+            const button = document.getElementById('confirmMoveBulkBtn');
+            button.disabled = true;
+            showLoading(`กำลังบันทึก ${branches.length} สาขา...`);
+            try {
+                const payload = { target_booking: target, emp_id: loggedInEmpId, reason: document.getElementById('moveReasonInput').value, note: document.getElementById('moveNoteInput').value.trim(), allow_overage: Boolean(overageAcknowledged), branches };
+                const response = await fetchWithTimeout(backendApiUrl + '/api/split-booking-branches', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }, 120000);
+                const result = await response.json().catch(() => ({}));
+                if (!response.ok) throw new Error(typeof result.detail === 'string' ? result.detail : `HTTP ${response.status}`);
+                closeBookingBranchMove(true);
+                let refreshDelayed = false;
+                try {
+                    if (target === currentBookingNo) {
+                        const latest = await fetchFreshCurrentJobData(false);
+                        if (target === currentBookingNo) {
+                            applyWaveDataToScreen(latest.data, latest.isWaveOnly);
+                            saveCurrentWaveDataCache();
+                            renderBranchGrid();
+                            if (!document.getElementById('shippingDocumentModal').classList.contains('hidden')) renderActiveDocument();
+                        }
+                    }
+                } catch (error) { refreshDelayed = true; console.warn('Saved bulk allocations; refresh pending:', error); }
+                showAlert('บันทึกเรียบร้อย', `บันทึก ${Number(result.updated) || branches.length} สาขาให้ ${target} แล้ว\nรายงานกำลังอัปเดต${refreshDelayed ? '\nกรุณารีเฟรชเพื่อดึงรายการล่าสุด' : ''}`, 'border-green-600', true);
+            } catch (error) {
+                const uncertain = error && (error.name === 'AbortError' || /failed to fetch|network/i.test(String(error.message || error)));
+                showAlert(uncertain ? 'ยังยืนยันผลไม่ได้' : 'บันทึกไม่สำเร็จ', uncertain ? 'การเชื่อมต่อขัดข้อง กรุณารีเฟรชและตรวจรายการที่บันทึกแล้วก่อนลองอีกครั้ง' : (error.message || String(error)));
+            } finally {
+                hideLoading();
+                button.disabled = bookingBulkSelected.size === 0;
+            }
+        }
+
         async function confirmBookingBranchMove(overageAcknowledged = false) {
             const reason = document.getElementById('moveReasonInput').value;
             if (!bookingBranchMovePreview) return showAlert('ข้อมูลไม่ครบ', 'กรุณาเลือกสาขาก่อน');
