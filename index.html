@@ -19,7 +19,7 @@
          ระหว่างที่คนพิมพ์รหัสพนักงาน เครื่องก็ตื่นไปแล้ว -->
     <script>
         // Keep the version available even if a later, large script has a syntax error.
-        window.__PRO_SCANNER_APP_VERSION = '1.9.33-free';
+        window.__PRO_SCANNER_APP_VERSION = '1.9.34-free';
         window.__proScannerSyntaxErrorsReported = new WeakSet();
         (function installEarlySyntaxErrorCapture() {
             const queueKey = 'proScannerDebugQueue:v1';
@@ -5254,6 +5254,39 @@
             document.getElementById('confirmMoveBranchBtn').disabled = false;
             setBookingMoveMode(bookingBranchMoveMode);
         }
+        function bulkViewContainsSavedBranches(data, target, branches) {
+            if (!data || String(data.booking_no || '').trim().toUpperCase() !== String(target).trim().toUpperCase()) return false;
+            const items = Array.isArray(data.lpn_list) ? data.lpn_list : [];
+            return branches.every(branch => items.some(item => {
+                const summary = item.booking_actual_summary;
+                return summary && String(parseInt(item.wave_no, 10) || '') === String(parseInt(branch.wave_no, 10) || '')
+                    && String(item.branch || '').trim().toUpperCase() === String(branch.branch_code).trim().toUpperCase()
+                    && bookingBulkFields.every(([field]) => Number(summary[field] || 0) === Number(branch[field] || 0));
+            }));
+        }
+
+        async function reloadSavedBulkBooking(target, branches, initialView = null, saveConfirmed = true) {
+            let view = initialView;
+            for (let attempt = 0; attempt <= 10; attempt++) {
+                if (target !== currentBookingNo) return false;
+                if (bulkViewContainsSavedBranches(view, target, branches)) {
+                    applyWaveDataToScreen(view, false);
+                    saveCurrentWaveDataCache();
+                    if (!document.getElementById('shippingDocumentModal').classList.contains('hidden')) renderActiveDocument();
+                    return true;
+                }
+                if (attempt === 10) break;
+                if (attempt) await new Promise(resolve => setTimeout(resolve, 3000));
+                showLoading(saveConfirmed ? 'บันทึกแล้ว กำลังโหลดสาขาให้พร้อมใช้งาน...' : 'กำลังตรวจผลการบันทึก...');
+                try {
+                    const url = backendApiUrl + '/api/check-booking?booking_no=' + encodeURIComponent(target) + '&_ts=' + Date.now();
+                    const response = await fetchWithTimeout(url, { cache: 'no-store' }, 12000);
+                    view = response.ok ? await response.json() : null;
+                } catch (error) { view = null; }
+            }
+            return false;
+        }
+
         async function confirmBookingBulkMove(overageAcknowledged = false) {
             const entries = Array.from(bookingBulkSelected.values());
             if (!entries.length || entries.length > 100) return showAlert('ข้อมูลไม่ครบ', 'กรุณาเลือก 1–100 สาขา');
@@ -5274,30 +5307,42 @@
             if (excessCount && !overageAcknowledged) return showConfirm('⚠️ ยอดต่างจากระบบ', `มี ${excessCount} สาขาที่กรอกเกินยอดคงเหลือ กรุณาตรวจสอบก่อนบันทึก`, 'บันทึกต่อ', () => confirmBookingBulkMove(true));
             const target = currentBookingNo;
             const button = document.getElementById('confirmMoveBulkBtn');
+            let saveConfirmed = false;
             button.disabled = true;
             showLoading(`กำลังบันทึก ${branches.length} สาขา...`);
             try {
                 const payload = { target_booking: target, emp_id: loggedInEmpId, reason: document.getElementById('moveReasonInput').value, note: document.getElementById('moveNoteInput').value.trim(), allow_overage: Boolean(overageAcknowledged), branches };
                 const response = await fetchWithTimeout(backendApiUrl + '/api/split-booking-branches', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }, 120000);
                 const result = await response.json().catch(() => ({}));
-                if (!response.ok) throw new Error(typeof result.detail === 'string' ? result.detail : `HTTP ${response.status}`);
+                if (!response.ok) {
+                    const error = new Error(typeof result.detail === 'string' ? result.detail : `HTTP ${response.status}`);
+                    error.httpStatus = response.status;
+                    throw error;
+                }
+                if (result.status !== 'success') {
+                    const error = new Error('ยังยืนยันผลการบันทึกไม่ได้');
+                    error.httpStatus = 502;
+                    throw error;
+                }
+                saveConfirmed = true;
+                const refreshed = await reloadSavedBulkBooking(target, branches, result.target_view);
                 closeBookingBranchMove(true);
-                let refreshDelayed = false;
-                try {
-                    if (target === currentBookingNo) {
-                        const latest = await fetchFreshCurrentJobData(false);
-                        if (target === currentBookingNo) {
-                            applyWaveDataToScreen(latest.data, latest.isWaveOnly);
-                            saveCurrentWaveDataCache();
-                            renderBranchGrid();
-                            if (!document.getElementById('shippingDocumentModal').classList.contains('hidden')) renderActiveDocument();
-                        }
-                    }
-                } catch (error) { refreshDelayed = true; console.warn('Saved bulk allocations; refresh pending:', error); }
-                showAlert('บันทึกเรียบร้อย', `บันทึก ${Number(result.updated) || branches.length} สาขาให้ ${target} แล้ว\nรายงานกำลังอัปเดต${refreshDelayed ? '\nกรุณารีเฟรชเพื่อดึงรายการล่าสุด' : ''}`, 'border-green-600', true);
+                if (refreshed) {
+                    showAlert('บันทึกเรียบร้อย', `บันทึก ${Number(result.updated) || branches.length} สาขาแล้ว`, 'border-green-600', true);
+                } else {
+                    showAlert('บันทึกแล้ว', 'ระบบยังโหลดสาขาล่าสุดไม่ได้ กรุณาตรวจการเชื่อมต่อและเปิด Booking อีกครั้ง', 'border-amber-500');
+                }
             } catch (error) {
-                const uncertain = error && (error.name === 'AbortError' || /failed to fetch|network/i.test(String(error.message || error)));
-                showAlert(uncertain ? 'ยังยืนยันผลไม่ได้' : 'บันทึกไม่สำเร็จ', uncertain ? 'การเชื่อมต่อขัดข้อง กรุณารีเฟรชและตรวจรายการที่บันทึกแล้วก่อนลองอีกครั้ง' : (error.message || String(error)));
+                const uncertain = error && (error.name === 'AbortError' || Number(error.httpStatus) >= 500 || /failed to fetch|network|HTTP 5\d\d/i.test(String(error.message || error)));
+                if (saveConfirmed) {
+                    closeBookingBranchMove(true);
+                    showAlert('บันทึกแล้ว', 'ระบบยังโหลดสาขาล่าสุดไม่ได้ กรุณาตรวจการเชื่อมต่อและเปิด Booking อีกครั้ง', 'border-amber-500');
+                } else if (uncertain && await reloadSavedBulkBooking(target, branches, null, false)) {
+                    closeBookingBranchMove(true);
+                    showAlert('บันทึกเรียบร้อย', `บันทึก ${branches.length} สาขาแล้ว`, 'border-green-600', true);
+                } else {
+                    showAlert(uncertain ? 'ยังยืนยันผลไม่ได้' : 'บันทึกไม่สำเร็จ', uncertain ? 'ระบบยังตรวจผลการบันทึกไม่ได้ กรุณาตรวจรายการก่อนบันทึกซ้ำ' : (error.message || String(error)));
+                }
             } finally {
                 hideLoading();
                 button.disabled = bookingBulkSelected.size === 0;
