@@ -19,7 +19,7 @@
          ระหว่างที่คนพิมพ์รหัสพนักงาน เครื่องก็ตื่นไปแล้ว -->
     <script>
         // Keep the version available even if a later, large script has a syntax error.
-        window.__PRO_SCANNER_APP_VERSION = '1.9.31-free';
+        window.__PRO_SCANNER_APP_VERSION = '1.9.32-free';
         window.__proScannerSyntaxErrorsReported = new WeakSet();
         (function installEarlySyntaxErrorCapture() {
             const queueKey = 'proScannerDebugQueue:v1';
@@ -1097,6 +1097,7 @@
                     <button id="moveModeSplitBtn" onclick="setBookingMoveMode('split')" class="border-2 border-slate-200 bg-white text-slate-700 rounded-xl p-3 font-black text-sm">📦 แบ่งบางส่วน</button>
                 </div>
                 <label class="block text-sm font-bold">Wave ของสาขาที่จะเพิ่ม<input id="moveWaveInput" inputmode="numeric" class="mt-1 w-full border-2 rounded-lg p-3 text-lg font-black" placeholder="เช่น 59078"></label>
+                <div id="moveFamilyWaves" class="hidden flex flex-wrap gap-2"></div>
                 <button onclick="loadWaveBranchesForMove()" class="w-full bg-slate-800 text-white rounded-lg p-3 font-black">🔎 ค้นหาสาขาใน Wave นี้</button>
                 <div id="moveBranchChoices" class="hidden space-y-2 max-h-64 overflow-auto border rounded-xl p-2 bg-slate-50"></div>
                 <div id="moveBranchPreview" class="hidden border-2 border-amber-300 bg-amber-50 rounded-xl p-3 text-sm"></div>
@@ -4936,7 +4937,7 @@
             }
             if (!currentWave || allLpnsInWave.length === 0) {
                 if (currentBookingSplitFamily && currentBookingSplitFamily.role === 'child') {
-                    showAlert('รถคันนี้ยังไม่มียอดจัดสรร', 'กด “จัด/ปรับยอดสาขาให้รถคันนี้” แล้วบันทึกยอดที่รับไปจาก Booking ต้นทางก่อนเปิดเอกสาร', 'border-blue-600');
+                    openBookingBranchMove();
                 } else {
                     showAlert('ยังไม่มีข้อมูล Wave', 'กรุณาเลือก Wave ก่อนเปิดเอกสารใบคุมส่งสินค้า');
                 }
@@ -4998,6 +4999,7 @@
 
         let bookingBranchMovePreview = null;
         let bookingBranchMoveMode = 'all';
+        let bookingBranchMoveRequestId = 0;
         function setBookingMoveMode(mode) {
             const isSplitFamilyChild = currentBookingSplitFamily && currentBookingSplitFamily.role === 'child';
             bookingBranchMoveMode = isSplitFamilyChild || mode === 'split' ? 'split' : 'all';
@@ -5023,10 +5025,14 @@
             bookingBranchMovePreview = null;
             const isSplitFamilyChild = currentBookingSplitFamily && currentBookingSplitFamily.role === 'child';
             setBookingMoveMode(isSplitFamilyChild ? 'split' : 'all');
-            document.getElementById('moveTargetBooking').textContent = currentBookingNo;
             const firstFamilyWave = isSplitFamilyChild && Array.isArray(currentBookingSplitFamily.waves)
                 ? String(currentBookingSplitFamily.waves[0] || '') : '';
             document.getElementById('moveWaveInput').value = firstFamilyWave;
+            const waveButtons = document.getElementById('moveFamilyWaves');
+            const familyWaves = isSplitFamilyChild && Array.isArray(currentBookingSplitFamily.waves)
+                ? currentBookingSplitFamily.waves.map(wave => String(wave).replace(/\D/g, '')).filter(Boolean) : [];
+            waveButtons.innerHTML = familyWaves.map(wave => `<button type="button" onclick="selectBookingMoveWave('${wave}')" class="rounded-lg bg-blue-100 px-3 py-2 text-sm font-bold text-blue-800">Wave ${wave}</button>`).join('');
+            waveButtons.classList.toggle('hidden', familyWaves.length === 0);
             window.bookingBranchMoveWave = '';
             document.getElementById('moveReasonInput').value = isSplitFamilyChild ? 'SPLIT_BOOKING_TO_TRUCK' : '';
             document.getElementById('moveNoteInput').value = '';
@@ -5036,13 +5042,21 @@
             document.getElementById('moveSplitFields').classList.add('hidden');
             document.getElementById('confirmMoveBranchBtn').disabled = true;
             const modal = document.getElementById('bookingBranchMoveModal'); modal.classList.remove('hidden'); modal.classList.add('flex');
+            if (firstFamilyWave) loadWaveBranchesForMove();
+        }
+        function selectBookingMoveWave(wave) {
+            document.getElementById('moveWaveInput').value = String(wave || '').replace(/\D/g, '');
+            loadWaveBranchesForMove();
         }
         function closeBookingBranchMove() {
+            bookingBranchMoveRequestId++;
             const modal = document.getElementById('bookingBranchMoveModal'); modal.classList.add('hidden'); modal.classList.remove('flex');
         }
         async function loadWaveBranchesForMove() {
             const wave = document.getElementById('moveWaveInput').value.replace(/\D/g, '');
             if (!wave) return showAlert('ยังไม่ได้กรอก Wave', 'กรุณากรอกเลข Wave ก่อนค้นหา');
+            const requestId = ++bookingBranchMoveRequestId;
+            const targetAtStart = currentBookingNo;
             // ห้ามใช้สาขาจากการค้นหาครั้งก่อน หาก Wave ใหม่โหลดไม่สำเร็จ
             bookingBranchMovePreview = null;
             window.bookingBranchMoveOptions = [];
@@ -5061,6 +5075,7 @@
                 const res = await fetchJobDataWithRetry(url, false, true, 45000, 1);
                 if (isServerUnavailable(res)) throw new Error(`เซิร์ฟเวอร์ยังไม่พร้อม (HTTP ${res.status}) รอสักครู่แล้วลองใหม่`);
                 const data = await res.json();
+                if (requestId !== bookingBranchMoveRequestId || targetAtStart !== currentBookingNo) return;
                 if (!res.ok) throw new Error(typeof data.detail === 'string' ? data.detail : `HTTP ${res.status}`);
                 bookingBranchMovePreview = null;
                 const choices = document.getElementById('moveBranchChoices');
@@ -5072,13 +5087,14 @@
                 document.getElementById('moveBranchPreview').classList.add('hidden');
                 document.getElementById('confirmMoveBranchBtn').disabled = true;
             } catch (e) {
+                if (requestId !== bookingBranchMoveRequestId || targetAtStart !== currentBookingNo) return;
                 bookingBranchMovePreview = null;
                 const message = (e && (e.name === 'AbortError' || /failed to fetch|network/i.test(String(e.message || e))))
                     ? 'เชื่อมต่อ Backend ไม่สำเร็จ ระบบลองใหม่ให้แล้ว กรุณากดค้นหาอีกครั้ง'
                     : (e.message || String(e));
                 showAlert('ตรวจสอบไม่สำเร็จ', message);
             }
-            finally { hideLoading(); }
+            finally { if (requestId === bookingBranchMoveRequestId) hideLoading(); }
         }
         function selectBranchForMove(index) {
             const item = (window.bookingBranchMoveOptions || [])[index]; if (!item) return;
@@ -5126,7 +5142,7 @@
             document.getElementById('confirmMoveBranchBtn').disabled = false;
             setBookingMoveMode(bookingBranchMoveMode);
         }
-        async function confirmBookingBranchMove() {
+        async function confirmBookingBranchMove(overageAcknowledged = false) {
             const reason = document.getElementById('moveReasonInput').value;
             if (!bookingBranchMovePreview) return showAlert('ข้อมูลไม่ครบ', 'กรุณาเลือกสาขาก่อน');
             loadDocumentHiddenBranches();
@@ -5162,12 +5178,12 @@
             if (isSplit && currentBookingSplitFamily && currentBookingSplitFamily.role === 'child') {
                 const available = bookingBranchMovePreview.remaining_totals || bookingBranchMovePreview.totals || {};
                 const overLimit = Object.keys(split).find(field => split[field] > (parseInt(available[field]) || 0));
-                if (overLimit) return showAlert('ยอดเกินส่วนที่เหลือ', `${overLimit.toUpperCase()} ที่กรอก ${split[overLimit]} มากกว่ายอดที่ยังจัดสรรได้ ${parseInt(available[overLimit]) || 0} กรุณาตรวจยอดแบ่งของรถคันอื่นก่อน`, 'border-amber-500');
+                if (overLimit && !overageAcknowledged) return showConfirm('⚠️ ยอดต่างจากระบบ', 'ยอดที่กรอกเกินยอดคงเหลือ กรุณาตรวจสอบก่อนบันทึก', 'บันทึกต่อ', () => confirmBookingBranchMove(true));
             }
             showLoading(isSplit ? 'กำลังแบ่งยอดและบันทึกหลักฐาน...' : 'กำลังย้ายสาขาและบันทึกหลักฐาน...');
             try {
                 const endpoint = isSplit ? '/api/split-booking-branch' : '/api/move-booking-branch';
-                const payload = { target_booking: currentBookingNo, wave_no: bookingBranchMovePreview.wave_no, branch_code: bookingBranchMovePreview.branch_code, reason, note: document.getElementById('moveNoteInput').value.trim(), emp_id: loggedInEmpId, ...split };
+                const payload = { target_booking: currentBookingNo, wave_no: bookingBranchMovePreview.wave_no, branch_code: bookingBranchMovePreview.branch_code, reason, note: document.getElementById('moveNoteInput').value.trim(), emp_id: loggedInEmpId, allow_overage: Boolean(overageAcknowledged), ...split };
                 const res = await fetchWithTimeout(backendApiUrl + endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }, 120000);
                 const data = await res.json();
                 if (!res.ok) throw new Error(typeof data.detail === 'string' ? data.detail : `HTTP ${res.status}`);
@@ -5197,7 +5213,7 @@
                     }
                 }
                 showAlert(isSplit ? 'แบ่งยอดเข้ารถเรียบร้อย' : 'ย้ายสาขาเข้ารถเรียบร้อย', (isSplit
-                    ? `${bookingBranchMovePreview.branch_code}\nสาขานี้อยู่ทั้ง ${data.source_booking} และ ${data.target_booking}\nBooking นี้รับเพิ่ม ${split.m + split.red + split.blue + split.green + split.black} กล่อง`
+                    ? `${bookingBranchMovePreview.branch_code}\nบันทึกให้ ${data.target_booking} จำนวน ${split.m + split.red + split.blue + split.green + split.black} กล่อง`
                     : `${bookingBranchMovePreview.branch_code}\n${data.previous_booking || '-'} → ${data.target_booking}\nยอดเดิมถูกนำมาใช้ ไม่ต้องสแกนใหม่`) + (refreshDelayed ? '\n\nบันทึกแล้ว ระบบกำลังดึงหน้าเอกสารให้ใหม่อัตโนมัติ' : ''), 'border-green-600', true);
             } catch (e) { showAlert('ย้ายสาขาไม่สำเร็จ', e.message || String(e)); }
             finally { hideLoading(); }
